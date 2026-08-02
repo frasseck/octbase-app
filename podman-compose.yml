@@ -56,11 +56,17 @@ services:
       # 30s; "0" disables). The backstop that keeps a stuck query from pinning
       # its pooled connection until the whole API deadlocks.
       OCTBASE_DB_STATEMENT_TIMEOUT: "${OCTBASE_DB_STATEMENT_TIMEOUT:-}"
-      # Demo mode is on for the local stack, which permits the dev JWT fallback.
-      # For a real deployment set OCTBASE_JWT_SECRET (>=32 bytes) in the env/.env
-      # and turn demo mode off — the API refuses to start without a strong secret.
-      OCTBASE_DEMO_MODE: "true"
+      # Demo mode defaults on for the local stack, which permits the dev JWT
+      # fallback. For a real deployment set OCTBASE_DEMO_MODE=false and
+      # OCTBASE_JWT_SECRET (>=32 bytes) in the env/.env — the API refuses to
+      # start without a strong secret outside demo mode. Empty (unset in .env)
+      # keeps the demo default: the API reads "" the same as unset.
+      OCTBASE_DEMO_MODE: "${OCTBASE_DEMO_MODE:-true}"
       OCTBASE_JWT_SECRET: "${OCTBASE_JWT_SECRET:-}"
+      # Token lifetimes. Blank falls back to the in-code defaults
+      # (access 15m, refresh 1h).
+      OCTBASE_JWT_ACCESS_TTL: "${OCTBASE_JWT_ACCESS_TTL:-}"
+      OCTBASE_JWT_REFRESH_TTL: "${OCTBASE_JWT_REFRESH_TTL:-}"
       # First SUPER_ADMIN for a non-demo stack, created only while the users
       # table is empty (internal/bootstrap). Blank = no bootstrap. Inert here
       # while OCTBASE_DEMO_MODE is "true" above, which seeds its own accounts.
@@ -76,6 +82,10 @@ services:
       # TOTP secrets at rest. Separate from OCTBASE_SCM_ENC_KEY by design.
       # Required before any user can enroll in MFA.
       OCTBASE_MFA_ENC_KEY: "${OCTBASE_MFA_ENC_KEY:-}"
+      # MFA enforcement: off | admins | all. Blank = off (unchanged behavior).
+      OCTBASE_REQUIRE_MFA: "${OCTBASE_REQUIRE_MFA:-}"
+      # Lifetime of the login MFA challenge token. Blank = in-code default (5m).
+      OCTBASE_MFA_CHALLENGE_TTL: "${OCTBASE_MFA_CHALLENGE_TTL:-}"
       # OAuth apps for SCM "Connect with OAuth" (optional). Callback URL to
       # register with each provider: <REDIRECT_BASE>/api/v1/oauth/<provider>/callback
       OCTBASE_OAUTH_REDIRECT_BASE: "${OCTBASE_OAUTH_REDIRECT_BASE:-}"
@@ -87,6 +97,21 @@ services:
       OCTBASE_OAUTH_GITLAB_CLIENT_SECRET: "${OCTBASE_OAUTH_GITLAB_CLIENT_SECRET:-}"
       OCTBASE_OAUTH_BITBUCKET_CLIENT_ID: "${OCTBASE_OAUTH_BITBUCKET_CLIENT_ID:-}"
       OCTBASE_OAUTH_BITBUCKET_CLIENT_SECRET: "${OCTBASE_OAUTH_BITBUCKET_CLIENT_SECRET:-}"
+      # Per-provider OAuth endpoint/scope overrides for self-hosted GitLab /
+      # GitHub Enterprise. Blank = each provider's public cloud defaults.
+      OCTBASE_OAUTH_GITHUB_AUTH_URL: "${OCTBASE_OAUTH_GITHUB_AUTH_URL:-}"
+      OCTBASE_OAUTH_GITHUB_TOKEN_URL: "${OCTBASE_OAUTH_GITHUB_TOKEN_URL:-}"
+      OCTBASE_OAUTH_GITHUB_SCOPE: "${OCTBASE_OAUTH_GITHUB_SCOPE:-}"
+      OCTBASE_OAUTH_GITLAB_AUTH_URL: "${OCTBASE_OAUTH_GITLAB_AUTH_URL:-}"
+      OCTBASE_OAUTH_GITLAB_TOKEN_URL: "${OCTBASE_OAUTH_GITLAB_TOKEN_URL:-}"
+      OCTBASE_OAUTH_GITLAB_SCOPE: "${OCTBASE_OAUTH_GITLAB_SCOPE:-}"
+      OCTBASE_OAUTH_BITBUCKET_AUTH_URL: "${OCTBASE_OAUTH_BITBUCKET_AUTH_URL:-}"
+      OCTBASE_OAUTH_BITBUCKET_TOKEN_URL: "${OCTBASE_OAUTH_BITBUCKET_TOKEN_URL:-}"
+      OCTBASE_OAUTH_BITBUCKET_SCOPE: "${OCTBASE_OAUTH_BITBUCKET_SCOPE:-}"
+      # HMAC secrets validating inbound SCM webhooks. Blank = that provider's
+      # webhook receiver rejects deliveries.
+      OCTBASE_WEBHOOK_SECRET_GITHUB: "${OCTBASE_WEBHOOK_SECRET_GITHUB:-}"
+      OCTBASE_WEBHOOK_SECRET_BITBUCKET: "${OCTBASE_WEBHOOK_SECRET_BITBUCKET:-}"
       # Deployment-stamped app version (blank falls back to the build default);
       # surfaced at /health, /api/v1/version and /api/v1/config.
       OCTBASE_APP_VERSION: "${OCTBASE_APP_VERSION:-}"
@@ -107,7 +132,18 @@ services:
       OCTBASE_MAX_USERS: "${OCTBASE_MAX_USERS:-}"
       OCTBASE_MAX_UPLOAD_MB: "${OCTBASE_MAX_UPLOAD_MB:-}"
       OCTBASE_MAX_USER_STORAGE_MB: "${OCTBASE_MAX_USER_STORAGE_MB:-}"
-      OCTBASE_LOG_LEVEL: "info"
+      OCTBASE_LOG_LEVEL: "${OCTBASE_LOG_LEVEL:-info}"
+      # Edition gating (TEAM | BUSINESS | ENTERPRISE; blank = ENTERPRISE, the
+      # full app) and the BUSINESS-only Jira CSV import add-on (default off).
+      OCTBASE_EDITION: "${OCTBASE_EDITION:-}"
+      OCTBASE_OPTION_JIRA_IMPORT: "${OCTBASE_OPTION_JIRA_IMPORT:-}"
+      # Feature toggle surfaced to the SPA via GET /api/v1/config. Anything but
+      # the literal "false" (including blank) leaves the Task view enabled.
+      OCTBASE_FEATURE_TASKVIEW: "${OCTBASE_FEATURE_TASKVIEW:-}"
+      # GDPR purge windows in days. Blank falls back to the in-code default
+      # (365); 0 disables a purge.
+      OCTBASE_AUDIT_RETENTION_DAYS: "${OCTBASE_AUDIT_RETENTION_DAYS:-}"
+      OCTBASE_ACTIVITY_RETENTION_DAYS: "${OCTBASE_ACTIVITY_RETENTION_DAYS:-}"
       # DB pool size. Lower this (or front Postgres with pgBouncer) when many API
       # instances share one database — see docs/hosting-concept.md §4.
       OCTBASE_DB_MAX_OPEN_CONNS: "${OCTBASE_DB_MAX_OPEN_CONNS:-25}"

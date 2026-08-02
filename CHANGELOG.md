@@ -6,6 +6,17 @@ All notable changes to Octbase are documented here.
 
 ### Changed
 
+- **The compose stack forwards the environment variables the runbook says to
+  set.** `podman-compose.yml`'s API `environment:` block is an allowlist, and
+  a dozen documented tunables were missing from it — setting
+  `OCTBASE_WEBHOOK_SECRET_GITHUB`/`_BITBUCKET`, the JWT TTLs,
+  `OCTBASE_REQUIRE_MFA`, `OCTBASE_LOG_LEVEL` and friends in `.env` silently
+  did nothing (the webhook secrets being the security-relevant case: the
+  documented setup left the receivers disabled with no error). They are now
+  forwarded with behavior-preserving defaults, including
+  `OCTBASE_DEMO_MODE` (was hardcoded `"true"`; the default stays `true`, but
+  a real deployment can finally turn it off in `.env`). `POSTGRES_SSLMODE`
+  joined `.env.example`, which claims to list every supported variable.
 - **The guard scripts are hardened against silent decay.** The pre-commit
   security sweep now fails loudly when a path it greps has been renamed away —
   previously a moved directory made every backend check vacuously pass. The
