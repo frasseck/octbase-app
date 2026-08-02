@@ -935,7 +935,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bulk action on multiple tasks */
+        /**
+         * Bulk action on multiple tasks
+         * @description Applies one action (set_status, set_priority, set_assignee, set_release, archive, delete) to every selected task that belongs to the project. Unknown and cross-project IDs are silently skipped; the response reports how many tasks actually changed. set_status additionally skips DONE and ARCHIVED tasks — finished work is immutable on this door exactly as on the single-task status route (reopening is POST /tasks/{taskId}/reopen, per task) — and archive skips already-ARCHIVED tasks. set_status to DONE is refused entirely (422 TASK_HAS_BLOCKER) while any selected task has an open BLOCKER descendant. Values are validated like the single-task doors: unknown status/priority answer 422 INVALID_STATUS / INVALID_PRIORITY, set_assignee requires an assignable user (422 ASSIGNEE_INVALID), set_release a release of this project (422 RELEASE_NOT_FOUND); an empty assignee/release value clears the link (stored as null).
+         */
         post: operations["bulkTasks"];
         delete?: never;
         options?: never;
@@ -1338,7 +1341,10 @@ export interface paths {
         /** List relations */
         get: operations["listRelations"];
         put?: never;
-        /** Add a relation */
+        /**
+         * Add a relation
+         * @description Creates the relation and its symmetric inverse. The target task must exist in the same project as the source; a missing and a cross-project targetTaskId both answer 422 TASK_NOT_FOUND (details.field targetTaskId) — deliberately indistinguishable, so the response cannot probe other projects' task IDs. Other 422s: TASK_SELF_RELATION, TASK_RELATION_TYPE_INVALID, TASK_RELATION_DUPLICATE, TASK_RELATION_CYCLE.
+         */
         post: operations["addRelation"];
         delete?: never;
         options?: never;
@@ -1537,7 +1543,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete a column. The lane's tasks are detached back to the backlog (they keep their status). */
+        /** Delete a column. The lane's tasks are detached back to the backlog and reset to PLANNED (OCT-304); DONE and ARCHIVED tasks keep their status. */
         delete: operations["deleteColumn"];
         options?: never;
         head?: never;
@@ -1618,7 +1624,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Remove a task from the board */
+        /**
+         * Remove a task from the board
+         * @description Detaches the task's card, returning the task to the backlog: a non-DONE/ARCHIVED task is reset to PLANNED (OCT-304), so it cannot sit in the backlog wearing an in-flight status. Removing a task from its sprint's board also un-commits it from that sprint — the inverse of move-task's enrollment.
+         */
         post: operations["removeTaskFromBoard"];
         delete?: never;
         options?: never;
@@ -2873,6 +2882,34 @@ export interface components {
             /** Format: date-time */
             updatedAt?: string;
             version?: number;
+        };
+        /**
+         * @description One entry in a project's append-only activity log. `type` plus `params` is the message: the frontend renders `notifications.activity.<type>` with `params` interpolated, so the entry stays localizable and no English text is stored.
+         *     At most one of `taskId`, `releaseId` and `sprintId` is set — the thing the entry describes. Deleting that thing does NOT delete the entry: the log is history and outlives its subject. Instead the reference is nulled and `targetDeleted` is set, which the UI renders as a muted, unlinked row rather than a link that opens nothing. A null reference with `targetDeleted` false is an entry that never had one (a project-level event such as PAGE_PUBLISHED). Deleting the whole project is the one case that removes entries, because no feed is left to read them in.
+         */
+        ActivityEntry: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            projectId?: string;
+            /** Format: uuid */
+            taskId?: string | null;
+            /** Format: uuid */
+            releaseId?: string | null;
+            /** Format: uuid */
+            sprintId?: string | null;
+            /** @description The task, release or sprint this entry described has been deleted. */
+            targetDeleted?: boolean;
+            /** Format: uuid */
+            actorUserId?: string;
+            /** @example TASK_STATUS_CHANGED */
+            type?: string;
+            /** @description Values interpolated into the localized message. */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt?: string;
         };
         /** @description Fields PATCH /tasks/{taskId} actually applies. Any other key — most notably status, priority and assigneeId, which have dedicated POST transition endpoints — is rejected with 400 UNSUPPORTED_FIELD. On a DONE/ARCHIVED task only the placement fields (parentId, sprintId, releaseId) and version are accepted; anything else answers 422 TASK_IMMUTABLE. */
         TaskUpdate: {
@@ -4503,12 +4540,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Activity entries */
+            /** @description Activity entries, newest first */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ActivityEntry"][];
+                };
             };
             404: components["responses"]["NotFound"];
         };
@@ -4782,13 +4821,18 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Bulk result */
+            /** @description Bulk result — the number of tasks the action changed (skipped tasks are not counted). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": {
+                        updated?: number;
+                    };
+                };
             };
+            400: components["responses"]["BadRequest"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
         };
@@ -5046,6 +5090,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -5078,6 +5123,7 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -5110,11 +5156,16 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getTaskActivity: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: components["parameters"]["page"];
+                size?: components["parameters"]["size"];
+            };
             header?: never;
             path: {
                 taskId: components["parameters"]["taskId"];
@@ -5123,12 +5174,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Activity entries */
+            /** @description Activity entries, newest first */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ActivityEntry"][];
+                };
             };
             404: components["responses"]["NotFound"];
         };
@@ -5894,6 +5947,7 @@ export interface operations {
                 content?: never;
             };
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     updateColumn: {
@@ -6025,14 +6079,17 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Moved */
+            /** @description Moved — the updated task */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
             };
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -6054,12 +6111,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Removed */
+            /** @description Removed — the updated task */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
             };
             404: components["responses"]["NotFound"];
         };
@@ -6292,6 +6351,7 @@ export interface operations {
                     "application/json": components["schemas"]["Sprint"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             422: components["responses"]["Unprocessable"];
         };
     };

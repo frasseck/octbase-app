@@ -145,7 +145,7 @@ func (h *Handler) CloseRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := shared.GetUserID(r)
-	_ = h.writeActivity(m.ProjectID, "", actorID, "RELEASE_CLOSED", map[string]any{"name": m.Name})
+	_ = h.writeReleaseActivity(m.ProjectID, m.ID, actorID, "RELEASE_CLOSED", map[string]any{"name": m.Name})
 	shared.WriteJSON(w, http.StatusOK, m)
 }
 
@@ -171,7 +171,7 @@ func (h *Handler) ReopenRelease(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := shared.GetUserID(r)
-	_ = h.writeActivity(m.ProjectID, "", actorID, "RELEASE_REOPENED", map[string]any{"name": m.Name})
+	_ = h.writeReleaseActivity(m.ProjectID, m.ID, actorID, "RELEASE_REOPENED", map[string]any{"name": m.Name})
 	shared.WriteJSON(w, http.StatusOK, m)
 }
 
