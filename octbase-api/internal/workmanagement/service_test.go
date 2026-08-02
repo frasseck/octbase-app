@@ -138,7 +138,7 @@ func TestAddRelation_SelfRelation(t *testing.T) {
 		ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID1,
 		RelationType: RelationRelatesTo, CreatedAt: "2024-01-01T00:00:00Z",
 	}
-	err := svc.AddRelation(rel)
+	err := svc.AddRelation(projID, rel)
 	if err == nil {
 		t.Fatal("expected error for self-relation, got nil")
 	}
@@ -161,7 +161,7 @@ func TestAddRelation_Duplicate(t *testing.T) {
 		ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID2,
 		RelationType: RelationRelatesTo, CreatedAt: "2024-01-01T00:00:00Z",
 	}
-	if err := svc.AddRelation(rel); err != nil {
+	if err := svc.AddRelation(projID, rel); err != nil {
 		t.Fatalf("first add: %v", err)
 	}
 
@@ -169,7 +169,7 @@ func TestAddRelation_Duplicate(t *testing.T) {
 		ID: "r2", SourceTaskID: taskID1, TargetTaskID: taskID2,
 		RelationType: RelationRelatesTo, CreatedAt: "2024-01-01T00:00:00Z",
 	}
-	err := svc.AddRelation(rel2)
+	err := svc.AddRelation(projID, rel2)
 	if err == nil {
 		t.Fatal("expected error for duplicate relation, got nil")
 	}
@@ -188,7 +188,7 @@ func TestAddRelation_InvalidType(t *testing.T) {
 	// relation_type is plain TEXT with no CHECK constraint, so an unvalidated
 	// value would be accepted and read back to clients that switch on it.
 	for _, rt := range []string{"", "NOT_A_REAL_TYPE", "relates_to", "BLOCKS "} {
-		err := svc.AddRelation(&TaskRelation{
+		err := svc.AddRelation(projID, &TaskRelation{
 			ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID2,
 			RelationType: rt, CreatedAt: "2024-01-01T00:00:00Z",
 		})
@@ -210,13 +210,13 @@ func TestAddRelation_BlockedByCycle(t *testing.T) {
 	seedTask(t, taskRepo, projID, taskID3, StatusPlanned)
 
 	// A blocks B, B blocks C — same setup as TestAddRelation_BlocksCycle.
-	if err := svc.AddRelation(&TaskRelation{
+	if err := svc.AddRelation(projID, &TaskRelation{
 		ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID2,
 		RelationType: RelationBlocks, CreatedAt: "2024-01-01T00:00:00Z",
 	}); err != nil {
 		t.Fatalf("A blocks B: %v", err)
 	}
-	if err := svc.AddRelation(&TaskRelation{
+	if err := svc.AddRelation(projID, &TaskRelation{
 		ID: "r2", SourceTaskID: taskID2, TargetTaskID: taskID3,
 		RelationType: RelationBlocks, CreatedAt: "2024-01-01T00:00:00Z",
 	}); err != nil {
@@ -226,7 +226,7 @@ func TestAddRelation_BlockedByCycle(t *testing.T) {
 	// "A BLOCKED_BY C" is the same cycle as the rejected "C BLOCKS A", just
 	// named from the other end: it writes C-BLOCKS-A as its inverse. Checking
 	// only the request direction let this through.
-	err := svc.AddRelation(&TaskRelation{
+	err := svc.AddRelation(projID, &TaskRelation{
 		ID: "r3", SourceTaskID: taskID1, TargetTaskID: taskID3,
 		RelationType: RelationBlockedBy, CreatedAt: "2024-01-01T00:00:00Z",
 	})
@@ -246,7 +246,7 @@ func TestAddRelation_BlockedByNoCycle(t *testing.T) {
 	seedTask(t, taskRepo, projID, taskID2, StatusPlanned)
 
 	// The guard must not over-reject: a lone BLOCKED_BY forms no cycle.
-	if err := svc.AddRelation(&TaskRelation{
+	if err := svc.AddRelation(projID, &TaskRelation{
 		ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID2,
 		RelationType: RelationBlockedBy, CreatedAt: "2024-01-01T00:00:00Z",
 	}); err != nil {
@@ -262,21 +262,21 @@ func TestAddRelation_BlocksCycle(t *testing.T) {
 	seedTask(t, taskRepo, projID, taskID3, StatusPlanned)
 
 	// A blocks B
-	if err := svc.AddRelation(&TaskRelation{
+	if err := svc.AddRelation(projID, &TaskRelation{
 		ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID2,
 		RelationType: RelationBlocks, CreatedAt: "2024-01-01T00:00:00Z",
 	}); err != nil {
 		t.Fatalf("A blocks B: %v", err)
 	}
 	// B blocks C
-	if err := svc.AddRelation(&TaskRelation{
+	if err := svc.AddRelation(projID, &TaskRelation{
 		ID: "r2", SourceTaskID: taskID2, TargetTaskID: taskID3,
 		RelationType: RelationBlocks, CreatedAt: "2024-01-01T00:00:00Z",
 	}); err != nil {
 		t.Fatalf("B blocks C: %v", err)
 	}
 	// C blocks A — would create a cycle
-	err := svc.AddRelation(&TaskRelation{
+	err := svc.AddRelation(projID, &TaskRelation{
 		ID: "r3", SourceTaskID: taskID3, TargetTaskID: taskID1,
 		RelationType: RelationBlocks, CreatedAt: "2024-01-01T00:00:00Z",
 	})
@@ -299,7 +299,7 @@ func TestAddRelation_Success(t *testing.T) {
 		ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID2,
 		RelationType: RelationBlocks, CreatedAt: "2024-01-01T00:00:00Z",
 	}
-	if err := svc.AddRelation(rel); err != nil {
+	if err := svc.AddRelation(projID, rel); err != nil {
 		t.Fatalf("AddRelation: %v", err)
 	}
 }
@@ -405,7 +405,7 @@ func TestAddRelation_BlocksSymmetry(t *testing.T) {
 		ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID2,
 		RelationType: RelationBlocks, CreatedAt: "2024-01-01T00:00:00Z",
 	}
-	if err := svc.AddRelation(rel); err != nil {
+	if err := svc.AddRelation(projID, rel); err != nil {
 		t.Fatalf("AddRelation: %v", err)
 	}
 
@@ -435,7 +435,7 @@ func TestDeleteRelation_RemovesInverse(t *testing.T) {
 		ID: "r1", SourceTaskID: taskID1, TargetTaskID: taskID2,
 		RelationType: RelationBlocks, CreatedAt: "2024-01-01T00:00:00Z",
 	}
-	if err := svc.AddRelation(rel); err != nil {
+	if err := svc.AddRelation(projID, rel); err != nil {
 		t.Fatalf("AddRelation: %v", err)
 	}
 

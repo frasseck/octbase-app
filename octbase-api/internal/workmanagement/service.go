@@ -124,8 +124,16 @@ func NewService(
 }
 
 // AddRelation validates and creates a task relation plus its symmetric inverse
-// in a single transaction.
-func (s *Service) AddRelation(rel *TaskRelation) error {
+// in a single transaction. sourceProjectID is the (already membership-guarded)
+// project of the source task; the target must exist in the same project.
+// A missing target and a cross-project target answer the same DomainError, so
+// a writer cannot use the response to probe whether a task UUID exists in a
+// project they are not a member of — the same indistinguishability contract as
+// DeleteRelation's scoped lookup and guardSprintAssignment. Before this check
+// the create side accepted any UUID: a cross-project relation's inverse row
+// leaked the source task's ID into the other project's ListRelations, and a
+// nonexistent target rode the FK into a 500 (2026-08-02 review).
+func (s *Service) AddRelation(sourceProjectID string, rel *TaskRelation) error {
 	if rel.SourceTaskID == rel.TargetTaskID {
 		return &DomainError{Code: "TASK_SELF_RELATION", Message: "a task cannot relate to itself"}
 	}
@@ -134,6 +142,17 @@ func (s *Service) AddRelation(rel *TaskRelation) error {
 			Code:    "TASK_RELATION_TYPE_INVALID",
 			Message: "relation type must be one of RELATES_TO, BLOCKS, BLOCKED_BY, DUPLICATES",
 			Field:   "relationType",
+		}
+	}
+	target, err := s.tasks.FindByID(rel.TargetTaskID)
+	if err != nil {
+		return err
+	}
+	if target == nil || target.ProjectID != sourceProjectID {
+		return &DomainError{
+			Code:    "TASK_NOT_FOUND",
+			Message: "target task not found in this project",
+			Field:   "targetTaskId",
 		}
 	}
 	exists, err := s.relations.Exists(rel.SourceTaskID, rel.TargetTaskID, rel.RelationType)

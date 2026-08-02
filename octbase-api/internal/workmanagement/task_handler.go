@@ -159,6 +159,9 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if !h.guardSprintAssignment(w, r, projectID, nil, req.SprintID) {
 		return
 	}
+	if !h.guardReleaseAssignment(w, r, projectID, nil, req.ReleaseID) {
+		return
+	}
 
 	seq, err := NextSeqNumber(h.db, projectID)
 	if err != nil {
@@ -226,6 +229,33 @@ func (h *Handler) guardSprintAssignment(w http.ResponseWriter, r *http.Request, 
 	if sp.Status == SprintStatusActive {
 		shared.WriteError(w, http.StatusUnprocessableEntity, "SPRINT_SCOPE_LOCKED",
 			"a running sprint's scope is locked; plan tasks before starting the sprint")
+		return false
+	}
+	return true
+}
+
+// guardReleaseAssignment is guardSprintAssignment's twin for the release link.
+// tasks.release_id is bare TEXT with no FK, so before this check any string —
+// a typo'd UUID, another project's release — persisted silently and quietly
+// mis-counted RELEASE_HAS_OPEN_TASKS and every release report (2026-08-02
+// review; sprint got the guard first, release did not). nil/empty clears the
+// link and passes; an unchanged value passes so an edit that doesn't touch the
+// release never fails on it. Unknown and cross-project answer the same 422, so
+// the response cannot be used to probe another project's release IDs.
+func (h *Handler) guardReleaseAssignment(w http.ResponseWriter, r *http.Request, projectID string, oldReleaseID, newReleaseID *string) bool {
+	if newReleaseID == nil || *newReleaseID == "" {
+		return true
+	}
+	if oldReleaseID != nil && *oldReleaseID == *newReleaseID {
+		return true
+	}
+	rel, err := h.releases.FindByID(*newReleaseID)
+	if err != nil {
+		shared.WriteServerError(w, r, err)
+		return false
+	}
+	if rel == nil || rel.ProjectID != projectID {
+		shared.WriteError(w, http.StatusUnprocessableEntity, "RELEASE_NOT_FOUND", "release not found")
 		return false
 	}
 	return true
@@ -532,6 +562,9 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !h.guardSprintAssignment(w, r, t.ProjectID, old.SprintID, t.SprintID) {
+		return
+	}
+	if !h.guardReleaseAssignment(w, r, t.ProjectID, old.ReleaseID, t.ReleaseID) {
 		return
 	}
 
@@ -1665,7 +1698,7 @@ func (h *Handler) AddRelation(w http.ResponseWriter, r *http.Request) {
 		ID: shared.NewUUID(), SourceTaskID: taskID, TargetTaskID: req.TargetTaskID,
 		RelationType: req.RelationType, CreatedAt: shared.Now(),
 	}
-	if err := h.svc.AddRelation(rel); err != nil {
+	if err := h.svc.AddRelation(t.ProjectID, rel); err != nil {
 		if !h.writeDomainError(w, err) {
 			shared.WriteServerError(w, r, err)
 		}

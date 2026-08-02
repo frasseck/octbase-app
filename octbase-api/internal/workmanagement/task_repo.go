@@ -626,8 +626,16 @@ func (r *TaskRepo) bulkUpdate(projectID string, taskIDs []string, col, value, no
 	if col == "status" {
 		doneAtClause = `, done_at=CASE WHEN $1='DONE' THEN COALESCE(done_at,$2) ELSE NULL END`
 	}
+	// assignee_id and release_id are nullable links: an empty value means
+	// "clear" and must be stored as SQL NULL, not "", so the "is anyone
+	// assigned?" / release-membership reads downstream stay honest — the same
+	// normalization emptyToNil applies on the single-task paths.
+	var boundValue any = value
+	if value == "" && (col == "assignee_id" || col == "release_id") {
+		boundValue = nil
+	}
 	skipClause := ""
-	args := []any{value, now, taskIDs, projectID}
+	args := []any{boundValue, now, taskIDs, projectID}
 	if len(skipStatuses) > 0 {
 		skipClause = ` AND NOT (status = ANY($5))`
 		args = append(args, skipStatuses)

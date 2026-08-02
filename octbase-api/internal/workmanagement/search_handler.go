@@ -268,6 +268,23 @@ func (h *Handler) BulkUpdateTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// The bulk doors validate their value like the single-task doors do — the
+	// two columns below are bare TEXT with no FK, so an unvalidated bulk value
+	// persisted silently (2026-08-02 review; status and priority were already
+	// checked above). An empty value is the "clear" case and passes both guards;
+	// bulkUpdate stores it as SQL NULL, the same normalization as emptyToNil.
+	if req.Action == "set_assignee" {
+		v := req.Value
+		if !h.requireAssignable(w, r, projectID, &v, "ASSIGNEE_INVALID", "assignee") {
+			return
+		}
+	}
+	if req.Action == "set_release" {
+		v := req.Value
+		if !h.guardReleaseAssignment(w, r, projectID, nil, &v) {
+			return
+		}
+	}
 
 	now := shared.Now()
 	actorID := shared.GetUserID(r)

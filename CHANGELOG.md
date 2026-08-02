@@ -53,6 +53,27 @@ All notable changes to Octbase are documented here.
   and left for a person), finished tasks are left alone, the card moves to the
   *Done* lane, `done_at` is stamped, and the Activity entry is written with the
   empty actor of a system action — the same convention as auto-archive.
+- **A task relation's target must now exist — in the same project.** The
+  create side of relations accepted any UUID: a nonexistent `targetTaskId`
+  rode the foreign key into a raw `500 INTERNAL_ERROR` (a cross-project
+  task-ID existence oracle, 500 vs 201), and a target in another project was
+  accepted outright — the symmetric inverse row then surfaced the caller's
+  task ID in the *other* project's relation list, in both directions, across
+  a PRIVATE boundary. `AddRelation` now answers the same
+  `422 TASK_NOT_FOUND` (field `targetTaskId`) for a missing and a
+  cross-project target, so the response can no longer be used to probe — the
+  same indistinguishability the delete side has had since its own hardening.
+- **`releaseId` and the bulk assignee are validated like their single-task
+  siblings.** `release_id` is bare TEXT with no foreign key, so create, PATCH
+  and bulk `set_release` persisted any string silently — a typo'd or
+  cross-project release ID quietly mis-counted `RELEASE_HAS_OPEN_TASKS` and
+  every release report. All three doors now answer `422 RELEASE_NOT_FOUND`
+  for a release that is not the project's own (unknown and cross-project
+  indistinguishable; sprint assignment got this guard first, release now
+  matches). Bulk `set_assignee` runs the same assignable-membership check as
+  the task panel (`422 ASSIGNEE_INVALID`) — the exact check whose absence
+  once let typo'd UUIDs persist — and an empty bulk value now stores as SQL
+  `NULL` rather than `""`, so "is anyone assigned" reads stay honest.
 - **The five SCM provider errors now speak the user's language — and the guard
   that swore they did has learned why it missed them.** `SCM_REPO_NOT_FOUND`,
   `SCM_AUTH_FAILED`, `SCM_BRANCH_EXISTS`, `SCM_PROVIDER_ERROR` and
