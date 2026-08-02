@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Octbase — UI Style Guide</title>
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/img/favicon.ico" sizes="any">
+<style>
+@font-face{
+  font-family:'IBM Plex Sans';font-style:normal;font-weight:100 700;font-display:swap;
+  src:url('fonts/ibm-plex-sans-latin.woff2') format('woff2');
+}
+:root{
+  --md-primary:#006C4F; --md-on-primary:#FFFFFF; --md-primary-container:#B0EDD0; --md-on-primary-container:#002115;
+  --md-secondary:#4A6455; --md-secondary-container:#CCE8D6; --md-on-secondary-container:#072015;
+  --md-tertiary:#5E6440; --md-tertiary-container:#E3E9BE; --md-on-tertiary-container:#1B1E00;
+  --md-error:#BA1A1A; --md-error-container:#FFDAD6; --md-on-error-container:#410002;
+  --color-purple-container:#EDE7FF; --color-on-purple-container:#4527A0;
+  --md-background:#F6FAF6; --md-on-surface:#191D19; --md-surface-variant:#D6E4D9; --md-on-surface-variant:#3E4940;
+  --md-surface-cl:#FFFFFF; --md-surface-c-low:#F0F5F0; --md-surface-c:#EAF0EA; --md-surface-c-high:#E4EBE4; --md-surface-c-highest:#DFE5DF;
+  --md-outline:#6D7870; --md-outline-variant:#BBCABD;
+  --md-inverse-surface:#2D312D; --md-inverse-on-surface:#ECF2ED;
+  --md-e1:0 1px 2px rgba(0,0,0,.3),0 1px 3px 1px rgba(0,0,0,.15);
+  --md-e2:0 1px 2px rgba(0,0,0,.3),0 2px 6px 2px rgba(0,0,0,.15);
+  --md-e3:0 1px 3px rgba(0,0,0,.3),0 4px 8px 3px rgba(0,0,0,.15);
+  --space-1:.25rem;--space-2:.5rem;--space-3:.75rem;--space-4:1rem;--space-6:1.5rem;--space-8:2rem;
+  --md-xs:.25rem;--md-sm:.5rem;--md-md:.75rem;--md-lg:1rem;--md-xl:1.75rem;--md-full:9999px;
+  /* Priority fills — the tokens the SPAs carry, named here so this guide obeys its own
+     "semantic tokens, never raw hex" rule in the swatches below. */
+  --prio-low:#36B37E; --prio-medium:#F4811F; --prio-high:#DE350B;
+  --prio-critical:#6554C0; --prio-blocker:#BF2600; --prio-custom:#42526E;
+  --prio-on-fill:#FFFFFF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+@page{size:A4;margin:16mm 14mm}
+html{font-size:14px}
+body{font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--md-on-surface);line-height:1.5;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+section{page-break-inside:avoid;margin-bottom:var(--space-8)}
+.page-break{page-break-before:always}
+h1{font-size:2.5rem;font-weight:600;letter-spacing:-.5px;color:var(--md-primary)}
+h2{font-size:1.4rem;font-weight:600;color:var(--md-on-surface);margin-bottom:var(--space-4);padding-bottom:var(--space-2);border-bottom:2px solid var(--md-primary-container);display:flex;align-items:center;gap:var(--space-3)}
+h3{font-size:1rem;font-weight:600;margin:var(--space-6) 0 var(--space-3);color:var(--md-on-surface-variant)}
+p{margin-bottom:var(--space-3);color:var(--md-on-surface-variant)}
+.lead{font-size:1.05rem;color:var(--md-on-surface-variant);max-width:46rem}
+.overline{font-size:.6875rem;font-weight:500;letter-spacing:.8px;text-transform:uppercase;color:var(--md-on-surface-variant)}
+small{color:var(--md-outline)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8125rem;background:var(--md-surface-c);padding:.1rem .35rem;border-radius:var(--md-xs);color:var(--md-on-primary-container)}
+
+/* cover */
+.cover{height:255mm;display:flex;flex-direction:column;justify-content:center;page-break-after:always}
+.cover .mark{width:84px;height:84px;border-radius:20px;background:var(--md-primary);color:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:var(--space-8);box-shadow:var(--md-e3)}
+.cover h1{font-size:3.4rem;line-height:1.05}
+.cover .sub{font-size:1.25rem;color:var(--md-on-surface-variant);margin-top:var(--space-4);max-width:34rem}
+.cover .meta{margin-top:auto;display:flex;gap:var(--space-8);font-size:.8125rem;color:var(--md-outline)}
+.cover .meta b{display:block;color:var(--md-on-surface);font-weight:600;font-size:.95rem}
+
+.grid{display:grid;gap:var(--space-3)}
+.cols-2{grid-template-columns:1fr 1fr}
+.cols-3{grid-template-columns:repeat(3,1fr)}
+.cols-4{grid-template-columns:repeat(4,1fr)}
+
+/* swatches */
+.sw{border-radius:var(--md-md);overflow:hidden;border:1px solid var(--md-outline-variant);box-shadow:var(--md-e1)}
+.sw .chip{height:64px;display:flex;align-items:flex-end;padding:var(--space-2) var(--space-3);font-weight:600;font-size:.8rem}
+.sw .info{padding:var(--space-2) var(--space-3);background:#fff;font-size:.7rem}
+.sw .info b{display:block;font-size:.78rem;color:var(--md-on-surface)}
+.sw .info span{color:var(--md-outline);font-family:ui-monospace,monospace}
+
+/* type scale */
+.type-row{display:flex;align-items:baseline;gap:var(--space-6);padding:var(--space-2) 0;border-bottom:1px solid var(--md-surface-c-high)}
+.type-row .meta{min-width:9rem;color:var(--md-outline);font-size:.75rem;font-family:ui-monospace,monospace}
+
+/* spacing */
+.space-row{display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-2)}
+.space-row .bar{height:18px;background:var(--md-primary-container);border-radius:var(--md-xs)}
+.space-row .lbl{font-family:ui-monospace,monospace;font-size:.75rem;color:var(--md-on-surface-variant);min-width:11rem}
+
+/* icon grid */
+.icon-cell{display:flex;flex-direction:column;align-items:center;gap:var(--space-2);padding:var(--space-3);border:1px solid var(--md-outline-variant);border-radius:var(--md-md);background:#fff}
+.icon-cell svg{color:var(--md-on-surface);width:26px;height:26px}
+.icon-cell span{font-size:.68rem;color:var(--md-outline);font-family:ui-monospace,monospace}
+
+/* component demo */
+.demo{border:1px solid var(--md-outline-variant);border-radius:var(--md-lg);padding:var(--space-6);background:var(--md-background);display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center}
+.icon-svg{vertical-align:middle;flex-shrink:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);min-height:2.5rem;padding:.625rem var(--space-6);border-radius:var(--md-full);border:none;font-family:inherit;font-size:.875rem;font-weight:500;cursor:pointer}
+.btn svg{width:18px;height:18px}
+.btn-sm{min-height:2rem;padding:.375rem var(--space-4);font-size:.8125rem}
+.btn-lg{min-height:3rem;padding:.75rem var(--space-8);font-size:.9375rem}
+.btn-primary{background:var(--md-primary);color:#fff}
+.btn-secondary{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.btn-ghost{background:transparent;color:var(--md-primary)}
+.btn-danger{background:var(--md-error);color:#fff}
+.icon-btn{padding:var(--space-2);border-radius:var(--md-full);background:transparent;border:none;color:var(--md-on-surface-variant);display:inline-flex;cursor:pointer}
+.icon-btn:hover{background:rgba(25,28,26,.08)}
+.badge{display:inline-flex;align-items:center;padding:var(--space-1) var(--space-3);border-radius:var(--md-full);font-size:.75rem;font-weight:500}
+.badge-planned{background:var(--md-surface-c-high);color:var(--md-on-surface-variant)}
+.badge-in-progress{background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.badge-in-review{background:var(--color-purple-container);color:var(--color-on-purple-container)}
+.badge-done{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.card{background:#fff;border-radius:var(--md-md);box-shadow:var(--md-e1);padding:var(--space-4);width:220px;border:1px solid var(--md-outline-variant)}
+/* Dark board lane demo — renders dark regardless of the page theme so the
+   card-on-lane separation is visible. Mirrors the app's dark tokens. */
+.dlane{background:#1D211E;border-radius:var(--md-md);padding:var(--space-2);width:240px}
+.dlane .lbl{font-size:.7rem;font-weight:500;text-transform:uppercase;letter-spacing:.5px;color:#BFC9C1;padding:var(--space-2) var(--space-2) var(--space-3)}
+.dcard{background:#272B27;border:1px solid #6D7870;border-radius:var(--md-md);padding:.6rem .7rem;margin-bottom:var(--space-2)}
+.dcard:last-child{margin-bottom:0}
+.dcard .ttl{font-size:.8rem;font-weight:600;color:#FFFFFF}
+.dcard .sub{font-size:.68rem;color:#BFC9C1;margin-top:.2rem}
+/* Old (broken) treatment — surface-cl fill, no border: vanishes into the lane. */
+.dcard.bad{background:#1B211D;border-color:transparent}
+.field{display:flex;flex-direction:column;gap:.25rem;width:240px}
+.field label{font-size:.75rem;color:var(--md-on-surface-variant);font-weight:500}
+.field input{padding:.6rem .75rem;border:1px solid var(--md-outline);border-radius:var(--md-sm);font-family:inherit;font-size:.875rem;background:#fff}
+.field input:focus{outline:2px solid var(--md-primary);border-color:var(--md-primary)}
+.chiprow{display:flex;gap:var(--space-2);flex-wrap:wrap}
+.sw .chip.sg-mascot{height:7rem;padding:var(--space-2);align-items:center;justify-content:center}
+.sg-mascot img{width:5.75rem;height:auto;opacity:.85}
+
+.principle{display:flex;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid var(--md-surface-c-high)}
+.principle .n{width:28px;height:28px;flex-shrink:0;border-radius:50%;background:var(--md-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.8rem}
+.principle b{color:var(--md-on-surface)}
+
+table.bp{width:100%;border-collapse:collapse;font-size:.82rem}
+table.bp th,table.bp td{text-align:left;padding:var(--space-3);border-bottom:1px solid var(--md-outline-variant);vertical-align:top}
+table.bp th{background:var(--md-surface-c);font-weight:600;color:var(--md-on-surface)}
+table.bp td:first-child{font-family:ui-monospace,monospace;color:var(--md-primary);white-space:nowrap}
+
+.note{background:var(--md-primary-container);color:var(--md-on-primary-container);border-radius:var(--md-md);padding:var(--space-3) var(--space-4);font-size:.85rem;margin-top:var(--space-3)}
+.do-dont{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)}
+.do-dont>div{border-radius:var(--md-md);padding:var(--space-4);font-size:.85rem}
+.do{background:#E7F5EC;border:1px solid #9BD9B5}
+.dont{background:var(--md-error-container);border:1px solid #F5B5AE}
+.do b,.dont b{display:block;margin-bottom:var(--space-2)}
+.footer{text-align:center;color:var(--md-outline);font-size:.7rem;margin-top:var(--space-8);padding-top:var(--space-4);border-top:1px solid var(--md-outline-variant)}
+
+/* priority + type chips — class names match the shipped app.css exactly, so
+   markup copied from this guide works unmodified. */
+.prio-low{background:var(--prio-low);color:var(--prio-on-fill)}.prio-medium{background:var(--prio-medium);color:var(--prio-on-fill)}.prio-high{background:var(--prio-high);color:var(--prio-on-fill)}.prio-critical{background:var(--prio-critical);color:var(--prio-on-fill)}.prio-blocker{background:var(--prio-blocker);color:var(--prio-on-fill)}
+.prio-custom{background:var(--prio-custom);color:var(--prio-on-fill)}
+.prio-badge{font-weight:500;text-transform:uppercase;color:#fff}
+.type-badge{display:inline-flex;align-items:center;justify-content:center;width:1.375rem;height:1.375rem;border-radius:var(--md-xs);font-size:.6875rem;font-weight:700;flex-shrink:0}
+.type-task{background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.type-story{background:var(--md-secondary-container);color:var(--md-on-secondary-container)}
+.type-epic{background:var(--color-purple-container);color:var(--color-on-purple-container)}
+.type-subtask{background:var(--md-surface-c-high);color:var(--md-on-surface-variant);font-size:.5625rem}
+.type-initiative{background:var(--md-tertiary-container,#FFE9C7);color:var(--md-on-tertiary-container,#5C3A00)}
+.type-theme{background:var(--md-inverse-surface);color:var(--md-inverse-on-surface);font-size:.5625rem}
+/* card meta tags + the estimate editor — copied from app.css, same class names */
+.task-seq{font-size:.6875rem;color:var(--md-on-surface-variant);font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;background:var(--md-surface-c);border-radius:var(--md-xs);padding:.0625rem var(--space-1)}
+.due-tag{font-size:.625rem;background:var(--md-surface-c-high);color:var(--md-on-surface-variant);border-radius:var(--md-full);padding:var(--space-1) var(--space-2);white-space:nowrap;display:inline-block}
+.due-overdue{background:var(--md-error-container);color:var(--md-on-error-container);font-weight:500}
+.release-tag{font-size:.625rem;background:var(--md-tertiary-container);color:var(--md-on-tertiary-container);border-radius:var(--md-full);padding:var(--space-1) var(--space-2);white-space:nowrap;display:inline-block}
+.sprint-tag{font-size:.625rem;background:var(--md-secondary-container);color:var(--md-on-secondary-container);border-radius:var(--md-full);padding:var(--space-1) var(--space-2);white-space:nowrap;display:inline-block}
+.estimate-tag{font-size:.625rem;font-weight:600;background:var(--md-secondary-container);color:var(--md-on-secondary-container);border-radius:var(--md-full);padding:var(--space-1) var(--space-2);white-space:nowrap;display:inline-block;font-variant-numeric:tabular-nums}
+.estimate-editor{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
+.estimate-input{width:5rem;padding:.4rem .5rem;border:1px solid var(--md-outline);border-radius:var(--md-sm);font-family:inherit;font-size:.875rem;background:#fff}
+.estimate-unit{font-size:.75rem;color:var(--md-on-surface-variant)}
+.estimate-presets{display:flex;gap:var(--space-1);flex-wrap:wrap}
+.estimate-chip{font-size:.6875rem;line-height:1;padding:var(--space-1) var(--space-2);border:1px solid var(--md-outline-variant);border-radius:var(--md-full);background:var(--md-surface-cl);color:var(--md-on-surface-variant);cursor:pointer;font-variant-numeric:tabular-nums}
+.estimate-chip:hover{background:var(--md-surface-c-high);color:var(--md-on-surface)}
+.estimate-chip.is-active{background:var(--md-secondary-container);border-color:var(--md-secondary-container);color:var(--md-on-secondary-container);font-weight:600}
+
+/* mobile mockups */
+.phone{width:296px;flex:none;border-radius:34px;background:#2D312D;padding:8px;box-shadow:var(--md-e3)}
+.phone-screen{border-radius:26px;overflow:hidden;background:var(--md-background);display:flex;flex-direction:column;height:496px;position:relative}
+.m-appbar{background:var(--md-primary);color:#fff;display:flex;align-items:center;gap:.5rem;padding:.7rem .8rem;font-weight:600;font-size:.9rem}
+.m-appbar .sp{flex:1}
+.m-appbar svg{width:20px;height:20px}
+.m-body{flex:1;overflow:hidden;padding:var(--space-3)}
+.m-seg{display:flex;gap:.35rem;margin-bottom:.7rem}
+.m-seg .s{border:1px solid var(--md-outline-variant);background:var(--md-surface-cl);border-radius:var(--md-full);padding:.22rem .55rem;font-size:.68rem;color:var(--md-on-surface-variant);white-space:nowrap}
+.m-seg .s.on{background:var(--md-primary);color:#fff;border-color:var(--md-primary)}
+.m-card{background:var(--md-surface-cl);border:1px solid var(--md-outline-variant);border-radius:var(--md-md);padding:.55rem .7rem;margin-bottom:.55rem;box-shadow:var(--md-e1)}
+.m-card .ttl{font-weight:500;font-size:.82rem;line-height:1.3}
+.m-card .sub{font-size:.68rem;color:var(--md-on-surface-variant);margin-top:.15rem}
+.m-cardmeta{display:flex;gap:.35rem;align-items:center;margin-top:.4rem}
+.m-row{display:flex;align-items:center;gap:.6rem}
+.m-row .ic{width:2rem;height:2rem;flex:none;display:grid;place-items:center;border-radius:var(--md-sm);background:var(--md-primary-container);color:var(--md-on-primary-container)}
+.m-row .ic svg{width:18px;height:18px}
+.m-fab{position:absolute;right:.8rem;bottom:4.2rem;width:2.75rem;height:2.75rem;border-radius:var(--md-lg);background:var(--md-primary);color:#fff;display:grid;place-items:center;box-shadow:var(--md-e3)}
+.m-nav{display:flex;background:var(--md-surface-cl);border-top:1px solid var(--md-outline-variant)}
+.m-nav .it{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:.4rem 0 .5rem;font-size:.56rem;color:var(--md-on-surface-variant)}
+.m-nav .it svg{width:18px;height:18px}
+.m-nav .it .pill{display:grid;place-items:center;width:2.2rem;height:1.3rem;border-radius:var(--md-full)}
+.m-nav .it.on{color:var(--md-primary)}
+.m-nav .it.on .pill{background:var(--md-primary-container)}
+/* task-detail phone with bottom sheet */
+.m-detail .dttl{font-weight:600;font-size:1rem;line-height:1.25;margin:.1rem 0 .5rem}
+.m-prop{display:flex;align-items:center;gap:.5rem;min-height:2.1rem;padding:.3rem .5rem;background:var(--md-surface-cl);border:1px solid var(--md-outline-variant);border-radius:var(--md-sm);margin-bottom:.35rem;font-size:.78rem}
+.m-prop .pl{color:var(--md-on-surface-variant);width:4.2rem;flex:none}
+.m-prop .pv{flex:1;font-weight:500}
+.m-scrim{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.m-sheet{position:absolute;left:0;right:0;bottom:0;background:var(--md-surface-cl);border-radius:var(--md-xl) var(--md-xl) 0 0;box-shadow:var(--md-e3);padding:.6rem .8rem 1rem}
+.m-grip{width:2.2rem;height:.25rem;border-radius:var(--md-full);background:var(--md-outline-variant);margin:0 auto .6rem}
+.m-sheet .st{font-weight:600;font-size:.85rem;margin-bottom:.5rem}
+.m-opt{display:flex;align-items:center;gap:.5rem;min-height:2.1rem;padding:.3rem .45rem;border-radius:var(--md-sm);font-size:.82rem}
+.m-opt.sel{background:var(--md-primary-container);color:var(--md-on-primary-container);font-weight:600}
+.m-opt .ck{margin-left:auto;color:var(--md-primary)}
+
+/* ── ON-SCREEN PRESENTATION ──
+   The document is authored for A4 print (that's what the PDF is rendered from).
+   These rules apply to screens ONLY (@media screen) — print/PDF is untouched —
+   and frame it like the PDF: a centered column of white "page" cards on a soft
+   tinted canvas, with comfortable margins, instead of raw full-bleed content. */
+@media screen{
+  html{background:var(--md-surface-c-low)}
+  body{background:transparent;max-width:64rem;margin:0 auto;padding:var(--space-8) var(--space-4) var(--space-12)}
+  .cover,section{
+    background:#fff;border:1px solid var(--md-outline-variant);border-radius:var(--md-lg);
+    box-shadow:var(--md-e1);padding:clamp(1.5rem,3.2vw,2.75rem);margin-bottom:var(--space-6);
+  }
+  .cover{height:auto;min-height:60vh;padding-block:clamp(2rem,6vw,4rem)}
+  section{page-break-inside:auto}            /* logical breaks only matter for print */
+  .footer{margin-top:var(--space-8)}
+}
+@media screen and (max-width:48rem){
+  body{padding-left:var(--space-3);padding-right:var(--space-3)}
+}
+</style>
+</head>
+<body>
+
+<!-- ICON SYMBOL DEFS -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<g id="i-home"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></g>
+<g id="i-board"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/></g>
+<g id="i-backlog"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></g>
+<g id="i-sprint"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></g>
+<g id="i-milestone"><path d="M6 22V2.8a.8.8 0 0 1 1.17-.71l11.38 5.69a.8.8 0 0 1 0 1.44L6 15.5"/></g>
+<g id="i-release"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></g>
+<g id="i-project"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></g>
+<g id="i-page"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></g>
+<g id="i-doc"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></g>
+<g id="i-search"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></g>
+<g id="i-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></g>
+<g id="i-bell"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></g>
+<g id="i-menu"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></g>
+<g id="i-close"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></g>
+<g id="i-add"><path d="M5 12h14"/><path d="M12 5v14"/></g>
+<g id="i-edit"><path d="M13 21h8"/><path d="m15 5 4 4"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></g>
+<g id="i-delete"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></g>
+<g id="i-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></g>
+<g id="i-refresh"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></g>
+<g id="i-filter"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></g>
+<g id="i-sort"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/></g>
+<g id="i-kebab"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></g>
+<g id="i-attach"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></g>
+<g id="i-link"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></g>
+<g id="i-view"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></g>
+<g id="i-comment"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/></g>
+<g id="i-branch"><path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/></g>
+<g id="i-check"><path d="M20 6 9 17l-5-5"/></g>
+<g id="i-chevron-left"><path d="m15 18-6-6 6-6"/></g>
+<g id="i-chevron-right"><path d="m9 18 6-6-6-6"/></g>
+<g id="i-chevron-down"><path d="m6 9 6 6 6-6"/></g>
+<g id="i-warning"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></g>
+<g id="i-logout"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></g>
+<g id="i-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g>
+<g id="i-drag"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></g>
+<g id="i-calendar"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></g>
+<g id="i-time"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></g>
+<g id="i-image"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></g>
+<g id="i-archive"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></g>
+<g id="i-external"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></g>
+<g id="i-expand"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></g>
+<g id="i-save"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></g>
+</defs></svg>
+
+<!-- ╔══ COVER ══╗ -->
+<div class="cover">
+  <div class="mark"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-board"/></svg></div>
+  <div class="overline">Design System · v1.7</div>
+  <h1>Octbase<br>UI Style Guide</h1>
+  <div class="sub">A consistent, modern Material Design 3 language for the Octbase project-management application — shared tokens, a unified icon system, components, and the rules for both surfaces: the full desktop app and the phone companion.</div>
+  <div class="meta">
+    <div><b>Foundation</b>Material Design 3</div>
+    <div><b>Typeface</b>IBM Plex Sans</div>
+    <div><b>Palette</b>Forest green · light · dark · octopus</div>
+    <div><b>Surfaces</b>Desktop app · Mobile companion</div>
+  </div>
+</div>
+
+<!-- ╔══ PRINCIPLES ══╗ -->
+<section>
+  <h2><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--md-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>Design Principles</h2>
+  <div class="principle"><div class="n">1</div><div><b>Consistent before clever.</b> One token, one component, one pattern per job. Two places that do the same thing look and behave identically.</div></div>
+  <div class="principle"><div class="n">2</div><div><b>Icons carry recurring actions.</b> Close, edit, delete, add, refresh, filter, menu and friends render as icon buttons with an accessible label + tooltip — not text buttons. Text buttons are reserved for primary, page-level, or ambiguous actions.</div></div>
+  <div class="principle"><div class="n">3</div><div><b>Modern &amp; calm.</b> Generous whitespace on a 4-pt grid, soft elevation, fully rounded interactive surfaces, a restrained green palette.</div></div>
+  <div class="principle"><div class="n">4</div><div><b>Two surfaces, one language.</b> The <em>desktop app</em> serves laptops, desktops and tablets (incl. iPad); <em>phones</em> are routed server-side to a purpose-built <em>mobile companion</em>. Both share the same tokens, palette, icon set and backend — they differ in layout, not in look. A <em>narrowed desktop window</em> still runs the full app with a collapsible drawer; only the board scrolls horizontally by design.
+  <br><small><strong>The one deliberate exception — wording, not meaning</strong> (resolved 2026-07-30 — this
+  guide said the surfaces &ldquo;differ in layout, not in look&rdquo; and said nothing about text, while the
+  mobile companion had already been shortening labels): the mobile companion <em>may</em> use a shorter label
+  where the desktop wording does not fit a phone cell, and must do it through <em>its own key</em> in
+  <code>octbase-mobile/locales</code> — never by editing a shared key. Shipped examples: the Vocabulary
+  setting reads &ldquo;Classic project management&rdquo; on desktop and &ldquo;Classic&rdquo; on mobile;
+  enabling MFA reads &ldquo;Enable two-factor authentication&rdquo; on desktop and &ldquo;Enable 2FA&rdquo; on
+  mobile; the notifications tab is <code>nav.notifications</code> (German &ldquo;Nachrichten&rdquo;) while the
+  view title stays &ldquo;Benachrichtigungen&rdquo;. The limit is strict: <b>the short form must mean the same
+  thing</b> — abbreviate or drop a qualifier, never rename the concept, and never let the two surfaces use
+  different vocabulary for the same object. Both locales move together, and the change gets a changelog entry
+  like any other user-visible text.</small></div></div>
+  <div class="principle"><div class="n">5</div><div><b>Accessible — WCAG 2.2 AA.</b> Every icon-only control carries <code>aria-label</code> + <code>title</code>; focus is always visible; hit targets ≥ 40 px for standalone and icon-only controls; color is never the only signal.
+  <br><small><strong>The one deliberate exception</strong> (resolved 2026-07-29 — this guide used to
+  mandate ≥ 40 px while also defining a 32 px <code>sm</code> button, and said nothing about which won):
+  the <code>sm</code> · 32 px button is permitted <em>inline in tables and dense rows</em>, where a 40 px
+  control would break the row rhythm. It still clears WCAG 2.2 AA, whose <em>Target Size (Minimum)</em>
+  threshold is 24 × 24 px. Everywhere else — toolbars, dialogs, anything icon-only — the 40 px floor
+  applies, and <code>.icon-btn</code> carries it as an explicit
+  <code>min-width</code>/<code>min-height</code> rather than leaving it to padding to add up. On phones the
+  floor is higher still: <code>--touch</code> · 2.75 rem (≥ 44 px).</small></div></div>
+</section>
+
+<!-- ╔══ COLOR ══╗ -->
+<section class="page-break">
+  <h2>Color</h2>
+  <p>A forest-green M3 palette. Use semantic tokens — never raw hex — in CSS rules and generated markup.</p>
+  <h3>Key roles</h3>
+  <div class="grid cols-4">
+    <div class="sw"><div class="chip" style="background:#006C4F;color:#fff">Primary</div><div class="info"><b>Primary</b><span>#006C4F</span></div></div>
+    <div class="sw"><div class="chip" style="background:#B0EDD0;color:#002115">Container</div><div class="info"><b>Primary container</b><span>#B0EDD0</span></div></div>
+    <div class="sw"><div class="chip" style="background:#CCE8D6;color:#072015">Secondary</div><div class="info"><b>Secondary container</b><span>#CCE8D6</span></div></div>
+    <div class="sw"><div class="chip" style="background:#E3E9BE;color:#1B1E00">Tertiary</div><div class="info"><b>Tertiary container</b><span>#E3E9BE</span></div></div>
+    <div class="sw"><div class="chip" style="background:#BA1A1A;color:#fff">Error</div><div class="info"><b>Error</b><span>#BA1A1A</span></div></div>
+    <div class="sw"><div class="chip" style="background:#FFDAD6;color:#410002">Error c.</div><div class="info"><b>Error container</b><span>#FFDAD6</span></div></div>
+    <div class="sw"><div class="chip" style="background:#F6FAF6;color:#191D19;border-bottom:1px solid #ddd">Background</div><div class="info"><b>Background</b><span>#F6FAF6</span></div></div>
+    <div class="sw"><div class="chip" style="background:#191D19;color:#fff">On-surface</div><div class="info"><b>On-surface</b><span>#191D19</span></div></div>
+  </div>
+  <h3>Surface containers (white → green-tinted)</h3>
+  <div class="grid cols-4">
+    <div class="sw"><div class="chip" style="background:#FFFFFF;border-bottom:1px solid #ddd">cl</div><div class="info"><span>#FFFFFF</span></div></div>
+    <div class="sw"><div class="chip" style="background:#F0F5F0">c-low</div><div class="info"><span>#F0F5F0</span></div></div>
+    <div class="sw"><div class="chip" style="background:#EAF0EA">c</div><div class="info"><span>#EAF0EA</span></div></div>
+    <div class="sw"><div class="chip" style="background:#DFE5DF">c-highest</div><div class="info"><span>#DFE5DF</span></div></div>
+  </div>
+  <h3>Dark theme</h3>
+  <p>Both apps ship the matching M3 <b>dark palette</b> for the same green seed. It applies automatically from the OS (<code>@media (prefers-color-scheme:dark)</code>) and can be pinned with <code>:root[data-theme="dark"|"light"]</code>. The token <em>names</em> are identical — only their values flip — so semantic markup needs no theme branching.</p>
+  <p><b>No flash of the wrong theme.</b> A pinned theme is read from <code>localStorage</code> and stamped onto <code>&lt;html&gt;</code> by <code>js/theme-init.js</code>, which is loaded <b>synchronously in <code>&lt;head&gt;</code>, before the stylesheet</b> — so the first paint is already correct. Two constraints follow and both are load-bearing: it must stay a <b>classic, non-<code>defer</code>, non-<code>module</code></b> script (module scripts are always deferred, which reintroduces the flash), and it must stay an <b>external file rather than inline</b>, so the Caddy CSP can remain <code>script-src 'self'</code> without <code>'unsafe-inline'</code>. Both SPAs share the <code>octbase-theme</code> key, since they are served from one origin (<code>/</code> and <code>/m/</code>).</p>
+  <p>Primary text (<code>--md-on-surface</code> / <code>--md-on-background</code>) is <b>pure white</b> <code>#FFFFFF</code> — deliberately brighter than M3's stock near-white, lifting body text from ~13:1 to <b>~17:1</b> on the <code>#191C1A</code> background for a crisper dark reading experience. Muted/secondary text stays <code>--md-on-surface-variant</code> <code>#BFC9C1</code> (~9:1), which preserves the primary/secondary hierarchy precisely because primary text moved further away from it.</p>
+  <div class="grid cols-4">
+    <div class="sw"><div class="chip" style="background:#7ADCAD;color:#003825">Primary</div><div class="info"><b>Primary</b><span>#7ADCAD</span></div></div>
+    <div class="sw"><div class="chip" style="background:#005138;color:#97F9C9">Container</div><div class="info"><b>Primary container</b><span>#005138</span></div></div>
+    <div class="sw"><div class="chip" style="background:#191C1A;color:#FFFFFF;border-bottom:1px solid #333">Background</div><div class="info"><b>Background</b><span>#191C1A · text #FFFFFF</span></div></div>
+    <div class="sw"><div class="chip" style="background:#1B211D;color:#FFFFFF;border-bottom:1px solid #333">Surface cl</div><div class="info"><b>Surface (cl)</b><span>#1B211D · text #FFFFFF</span></div></div>
+  </div>
+  <h3>Cards on a surface (dark)</h3>
+  <p>Dark surface containers are clustered in luminance, so the light-mode pattern — a brighter fill plus a drop shadow — no longer separates a card from the lane it sits on (the shadow disappears on a dark background). Board/task cards in dark mode therefore use a <b>lighter container</b> (<code>--md-surface-c-high</code> <code>#272B27</code>) <em>and</em> a <b>1&nbsp;px muted-outline border</b> (<code>#6D7870</code>). The fill difference alone can't reach 3:1 between adjacent dark surfaces, so the border carries it — <code>#6D7870</code> is <b>3.5:1</b> on the lane and <b>3.1:1</b> on the card fill, clearing <b>WCAG&nbsp;2.1 SC&nbsp;1.4.11</b> (Non-text Contrast, ≥3:1) on both edges while staying intentionally subtle. The same border keeps light-mode external/read-only cards visible, since those share the lane fill.</p>
+  <div class="demo" style="background:#191C1A;border-color:#404943">
+    <div class="dlane">
+      <div class="lbl">In progress · correct</div>
+      <div class="dcard"><div class="ttl">Wire up the icon registry</div><div class="sub">OCT-142 · L. Frasseck</div></div>
+      <div class="dcard"><div class="ttl">Dark-mode contrast pass</div><div class="sub">OCT-148 · unassigned</div></div>
+    </div>
+    <div class="dlane">
+      <div class="lbl">Before · too dark</div>
+      <div class="dcard bad"><div class="ttl">Wire up the icon registry</div><div class="sub">OCT-142 · L. Frasseck</div></div>
+      <div class="dcard bad"><div class="ttl">Dark-mode contrast pass</div><div class="sub">OCT-148 · unassigned</div></div>
+    </div>
+  </div>
+  <h3>Octopus theme</h3>
+  <p>An optional third, light-style theme keyed to Octbase's octopus mascot — a warm coral/salmon palette sampled from the painted artwork that used to be the mascot (coral-red body, orange highlights, blush-pink suckers), kept as <code>img/octopus_small_original.png</code>. Unlike dark mode it <b>never engages from the OS preference</b>: it applies only when the user explicitly cycles to it (<code>:root[data-theme="octopus"]</code>). It overrides the same semantic token set as the dark block, so markup needs no theme branching.</p>
+  <div class="grid cols-4">
+    <div class="sw"><div class="chip" style="background:#C03A2F;color:#fff">Primary</div><div class="info"><b>Primary</b><span>#C03A2F</span></div></div>
+    <div class="sw"><div class="chip" style="background:#FFDAD3;color:#410200">Container</div><div class="info"><b>Primary container</b><span>#FFDAD3</span></div></div>
+    <div class="sw"><div class="chip" style="background:#FFF8F6;color:#271715;border-bottom:1px solid #ddd">Background</div><div class="info"><b>Background</b><span>#FFF8F6</span></div></div>
+    <div class="sw"><div class="chip" style="background:#FCEBE6;color:#271715;border-bottom:1px solid #ddd">Surface c</div><div class="info"><b>Surface (c)</b><span>#FCEBE6</span></div></div>
+  </div>
+
+  <h3>Octopus mascot</h3>
+  <p>The decorative octopus in the bottom-right corner of the viewport is <code>img/octopus_small.png</code> — a stylized line-art octopus, black on transparency. It replaced the photo-realistic coral painting that used to hold that filename (kept as <code>img/octopus_small_original.png</code>, since the Octopus palette above was sampled from it), and it is drawn in <b>every</b> theme rather than only under <code>[data-theme="octopus"]</code>, which is what the full-colour painting had constrained it to.</p>
+  <p>Because the source is a <b>single colour</b>, one theme rule covers the whole problem: <code>filter: invert(1)</code> flips it to white on Dark, where black line work would otherwise sit invisibly on a near-black surface. That is exact for monochrome art and needs none of the <code>hue-rotate</code> chain the wordmark uses to reach a specific colour. It stays an <code>&lt;img&gt;</code> deliberately — a CSS <code>mask</code> would give per-theme tinting but silently renders nothing in the <code>file://</code> standalone bundle, because Chrome refuses CSS-referenced subresources across <code>file://</code> origins where an <code>&lt;img&gt;</code> is still allowed. Light and Octopus are both light-surfaced, so they take the artwork as it is.</p>
+  <p>It sits at <code>opacity:.85</code>, is <code>aria-hidden</code> with <code>pointer-events:none</code>, and is <code>position:fixed</code> below the interactive overlays, so it is invisible to assistive technology and can never intercept a click or cover a control.</p>
+  <div class="grid cols-3">
+    <div class="sw"><div class="chip sg-mascot" style="background:#f8f8f8"><img src="img/octopus_small.png" alt=""></div><div class="info"><b>Light</b><span>--app-bg #f8f8f8</span></div></div>
+    <div class="sw"><div class="chip sg-mascot" style="background:#12150F"><img src="img/octopus_small.png" alt="" style="filter:invert(1)"></div><div class="info"><b>Dark</b><span>#12150F · invert(1)</span></div></div>
+    <div class="sw"><div class="chip sg-mascot" style="background:#FBEDE9"><img src="img/octopus_small.png" alt=""></div><div class="info"><b>Octopus</b><span>--app-bg #FBEDE9</span></div></div>
+  </div>
+</section>
+
+<!-- ╔══ TYPOGRAPHY ══╗ -->
+<section>
+  <h2>Typography</h2>
+  <p><b>IBM Plex Sans</b>, self-hosted (weights 100–700). Monospace stack for branch names, code and <code>kbd</code>.</p>
+  <div class="type-row"><span class="meta">1.5rem / 600</span><span style="font-size:1.5rem;font-weight:600">Page title — Sprint board</span></div>
+  <div class="type-row"><span class="meta">1rem / 600</span><span style="font-size:1rem;font-weight:600">Section title</span></div>
+  <div class="type-row"><span class="meta">0.875rem / 400</span><span style="font-size:.875rem">Body text — the default reading size for descriptions and content.</span></div>
+  <div class="type-row"><span class="meta">0.875rem / 500</span><span style="font-size:.875rem;font-weight:500">Label / button</span></div>
+  <div class="type-row"><span class="meta">0.6875rem / 500</span><span class="overline">Overline · caption</span></div>
+</section>
+
+<!-- ╔══ SPACING & SHAPE ══╗ -->
+<section>
+  <h2>Spacing &amp; Shape</h2>
+  <h3>Spacing scale — 4-pt grid</h3>
+  <div class="space-row"><span class="lbl">--space-1 · 4px</span><div class="bar" style="width:4px"></div></div>
+  <div class="space-row"><span class="lbl">--space-2 · 8px</span><div class="bar" style="width:8px"></div></div>
+  <div class="space-row"><span class="lbl">--space-3 · 12px</span><div class="bar" style="width:12px"></div></div>
+  <div class="space-row"><span class="lbl">--space-4 · 16px (default)</span><div class="bar" style="width:16px"></div></div>
+  <div class="space-row"><span class="lbl">--space-6 · 24px</span><div class="bar" style="width:24px"></div></div>
+  <div class="space-row"><span class="lbl">--space-8 · 32px</span><div class="bar" style="width:32px"></div></div>
+  <div class="space-row"><span class="lbl">--space-12 · 48px</span><div class="bar" style="width:48px"></div></div>
+  <div class="space-row"><span class="lbl">--space-16 · 64px</span><div class="bar" style="width:64px"></div></div>
+  <h3>Corner radius</h3>
+  <p class="lead">Corrected 2026-07-29 against the shipped CSS. <code>lg</code> was
+  previously labelled “dialogs” and <code>xl</code> “bottom sheet”; in practice
+  <code>lg</code> is what the section panels use (release, sprint and project
+  cards, dashboard and settings sections, the admin and audit lists), and
+  <strong>dialogs sit on <code>xl</code> alongside the bottom sheet</strong> —
+  which is also where Material 3 puts them. The task card is the
+  <code>md</code> entry and was always conformant.</p>
+  <div class="demo">
+    <div style="text-align:center"><div style="width:80px;height:54px;background:var(--md-primary-container);border-radius:4px;margin-bottom:6px"></div><small>xs · 4 — type badges</small></div>
+    <div style="text-align:center"><div style="width:80px;height:54px;background:var(--md-primary-container);border-radius:8px;margin-bottom:6px"></div><small>sm · 8 — inputs</small></div>
+    <div style="text-align:center"><div style="width:80px;height:54px;background:var(--md-primary-container);border-radius:12px;margin-bottom:6px"></div><small>md · 12 — cards</small></div>
+    <div style="text-align:center"><div style="width:80px;height:54px;background:var(--md-primary-container);border-radius:16px;margin-bottom:6px"></div><small>lg · 16 — section panels</small></div>
+    <div style="text-align:center"><div style="width:80px;height:54px;background:var(--md-primary-container);border-radius:28px;margin-bottom:6px"></div><small>xl · 28 — dialogs, bottom sheet</small></div>
+    <div style="text-align:center"><div style="width:80px;height:54px;background:var(--md-primary-container);border-radius:9999px;margin-bottom:6px"></div><small>full — buttons, chips, nav</small></div>
+  </div>
+</section>
+
+<!-- ╔══ ICONOGRAPHY ══╗ -->
+<section class="page-break">
+  <h2><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--md-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-board"/></svg>Iconography</h2>
+  <p>One coherent <b>outline icon set</b>, drawn from <a href="https://lucide.dev/">Lucide</a> (ISC-licensed) — 24×24 viewBox, <code>stroke-width: 2</code>, round caps and joins, <code>currentColor</code>. It replaces the previous mix of emoji and Unicode glyphs. The official Lucide path data is vendored into a single <code>ICONS</code> registry (no runtime dependency, so the disk-served demo and offline builds keep working) and emitted in JS through one <code>icon(name, {size})</code> helper, so one glyph means one concept everywhere.</p>
+  <p>Three sizes, and only three: <code>sm</code> 16&nbsp;px for glyphs sitting inline with text, <code>md</code> 20&nbsp;px for controls, buttons and nav, <code>hero</code> 48&nbsp;px for empty-state illustrations. Any other value — including a stray numeric px — is snapped to the nearest of these by <code>iconPx()</code>, so the set cannot drift back to a dozen ad-hoc sizes.</p>
+  <p>The grid below is <b>generated from the shipped <code>ICONS</code> registry</b> at page load, not transcribed from it: all <span id="icon-count">…</span> icons the app can render appear here, and a new one shows up the moment it is added to <code>js/icons.js</code>. Adding an icon to the app is therefore the whole job — this page cannot fall behind it.</p>
+  <div class="grid cols-4" id="icongrid"></div>
+  <div class="note">Each icon-only control pairs the glyph with an i18n-driven <code>aria-label</code> and <code>title</code> tooltip — never ship an icon without both.</div>
+</section>
+
+<!-- ╔══ COMPONENTS ══╗ -->
+<section class="page-break">
+  <h2>Components</h2>
+
+  <h3>Buttons — for primary &amp; ambiguous actions</h3>
+  <div class="demo">
+    <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg>Save</button>
+    <button class="btn btn-secondary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-add"/></svg>New project</button>
+    <button class="btn btn-ghost">Cancel</button>
+    <button class="btn btn-danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-delete"/></svg>Delete</button>
+  </div>
+
+  <h3>Button sizes — always content-sized, never full-width</h3>
+  <div class="demo" style="align-items:flex-end">
+    <div style="text-align:center"><button class="btn btn-primary btn-sm">Small</button><br><small>sm · 32px — inline / table</small></div>
+    <div style="text-align:center"><button class="btn btn-primary">Medium</button><br><small>md · 40px — default</small></div>
+    <div style="text-align:center"><button class="btn btn-primary btn-lg">Large</button><br><small>lg · 48px — page CTA</small></div>
+  </div>
+
+  <h3>Icon buttons — for recurring actions</h3>
+  <div class="demo">
+    <button class="icon-btn" title="Edit" aria-label="Edit"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-edit"/></svg></button>
+    <button class="icon-btn" title="Delete" aria-label="Delete"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-delete"/></svg></button>
+    <button class="icon-btn" title="Copy" aria-label="Copy"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-copy"/></svg></button>
+    <button class="icon-btn" title="Filter" aria-label="Filter"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-filter"/></svg></button>
+    <button class="icon-btn" title="Refresh" aria-label="Refresh"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-refresh"/></svg></button>
+    <button class="icon-btn" title="More" aria-label="More"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-kebab"/></svg></button>
+    <button class="icon-btn" title="Close" aria-label="Close"><svg class="icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-close"/></svg></button>
+  </div>
+
+  <h3>Segmented switch — for a small, mutually exclusive choice</h3>
+  <div class="demo">
+    <div class="seg-switch" role="radiogroup" aria-label="Theme">
+      <button type="button" role="radio" aria-checked="false"><span>System</span></button>
+      <button type="button" role="radio" aria-checked="true"><svg class="icon-svg icon-svg--sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg><span>Light</span></button>
+      <button type="button" role="radio" aria-checked="false"><span>Dark</span></button>
+    </div>
+  </div>
+  <p><code>.seg-switch</code> — M3 segmented buttons: one <code>role="radiogroup"</code> of <code>role="radio"</code> buttons, 2–3 options. The selected segment gets <code>aria-checked="true"</code>, a check icon, and the secondary-container fill; unselected segments show only their label. Used for the Settings page's language, theme and vocabulary pickers — identically on desktop and mobile — and for the project's effort-estimation unit in <strong>Task types &amp; priorities</strong>. This is the shared control for that kind of choice, not per-field dropdowns or bottom sheets; one implementation serves them all (<code>segSwitch()</code> in <code>js/framework.js</code>).</p>
+
+  <h3>Status chips</h3>
+  <div class="demo">
+    <span class="badge badge-planned">Planned</span>
+    <span class="badge badge-in-progress">In progress</span>
+    <span class="badge badge-in-review">In review</span>
+    <span class="badge badge-done">Done</span>
+  </div>
+
+  <h3>Priority badges — solid fill, never the only signal</h3>
+  <div class="demo">
+    <span class="badge prio-badge prio-low">Low</span>
+    <span class="badge prio-badge prio-medium">Medium</span>
+    <span class="badge prio-badge prio-high">High</span>
+    <span class="badge prio-badge prio-critical">Critical</span>
+    <span class="badge prio-badge prio-blocker">Blocker</span>
+    <span class="badge prio-badge prio-custom">Custom</span>
+  </div>
+  <p>The five built-in priorities are fixed; <code>prio-custom</code> (slate)
+  renders any admin-defined project priority added under <em>Task types &amp;
+  priorities</em>. <strong>BLOCKER</strong> is more than a colour: a task cannot
+  be moved to DONE while any of its <em>open</em> child tasks still carries it
+  (the API answers <code>422 TASK_HAS_BLOCKER</code>). A child that is already
+  DONE or ARCHIVED does not count — a finished blocker blocks nothing, and
+  counting it would strand the parent, since the guard would demand a priority
+  change on a task whose priority it could no longer reach.</p>
+
+  <h3>Card meta tags — pill-shaped, and each one optional</h3>
+  <div class="demo">
+    <span class="task-seq">OCT-142</span>
+    <span class="estimate-tag">8</span>
+    <span class="estimate-tag">7.5 h</span>
+    <span class="due-tag">12 Aug</span>
+    <span class="due-tag due-overdue">2 Jul</span>
+    <span class="release-tag">1.1 Autumn</span>
+    <span class="sprint-tag">Sprint 14</span>
+  </div>
+  <p>The meta row under a board card's title, reused verbatim on backlog and
+  task-list rows. Every tag is <strong>rendered only when it has a value</strong> —
+  none of them has an empty state, because an empty pill reads as a value of
+  its own. That matters most for <code>estimate-tag</code>: a blank estimate
+  would say <em>zero effort</em>, which is a different claim from
+  <em>unestimated</em>, so an unestimated task simply has no tag. It is also
+  absent entirely in a project that does not estimate, and on the container
+  types (epic, initiative, theme) that cannot carry an estimate. Points render
+  bare (<code>8</code>), hours carry their unit (<code>7.5&nbsp;h</code>), both
+  in tabular figures so a column of them aligns.</p>
+  <p>Colour is never the only signal here: <code>due-overdue</code> pairs the
+  error container with a weight bump, and every tag carries a <code>title</code>
+  naming what it is, since a bare number on a card is otherwise ambiguous.</p>
+
+  <h3>Estimate editor — a free number field with shortcuts</h3>
+  <div class="demo" style="flex-direction:column;align-items:flex-start;gap:.75rem">
+    <span class="estimate-editor">
+      <input class="estimate-input" type="number" value="8" aria-label="Story points">
+      <span class="estimate-presets">
+        <button type="button" class="estimate-chip">1</button>
+        <button type="button" class="estimate-chip">2</button>
+        <button type="button" class="estimate-chip">3</button>
+        <button type="button" class="estimate-chip">5</button>
+        <button type="button" class="estimate-chip is-active">8</button>
+        <button type="button" class="estimate-chip">13</button>
+        <button type="button" class="estimate-chip">21</button>
+      </span>
+    </span>
+    <span class="estimate-editor">
+      <input class="estimate-input" type="number" value="7.5" aria-label="Estimated hours">
+      <span class="estimate-unit">h</span>
+    </span>
+  </div>
+  <p>The Fibonacci chips are <strong>sugar over the input, not a scale</strong>:
+  the field accepts any whole number 0–100 (hours: 0–1000, two decimals), so a
+  team on a different scale is never boxed in. Clicking the active chip clears
+  the estimate, which is how the shortcut undoes itself. Hours get no chips —
+  there is no conventional set — just the field and its unit suffix.</p>
+
+  <h3>Work-item type chips</h3>
+  <div class="demo">
+    <span class="type-badge type-theme" title="Theme">TH</span>
+    <span class="type-badge type-initiative" title="Initiative">I</span>
+    <span class="type-badge type-epic" title="Epic">E</span>
+    <span class="type-badge type-story" title="Story">S</span>
+    <span class="type-badge type-task" title="Task">T</span>
+    <span class="type-badge type-subtask" title="Subtask">ST</span>
+  </div>
+  <p><b>These six are the whole set.</b> A work item is a theme, initiative,
+  epic, story, task or subtask — there is no <em>bug</em> or <em>chore</em>
+  type, and a defect is simply a task (usually a high-priority one). Earlier
+  revisions of this guide defined <code>.type-bug</code> and
+  <code>.type-chore</code> classes that the app has never shipped; they are gone,
+  and the classes below are exactly what <code>app.css</code> carries.</p>
+  <p>A fixed 22&nbsp;px square (<code>--md-xs</code> radius) carrying a bold
+  one- or two-letter symbol, never the full word — the <code>title</code>
+  tooltip (and an i18n-driven label elsewhere in the row) carries the full type
+  name. The hierarchy runs theme&nbsp;→&nbsp;initiative&nbsp;→&nbsp;epic&nbsp;→&nbsp;story&nbsp;→&nbsp;task&nbsp;→&nbsp;subtask;
+  <em>theme</em> and <em>initiative</em> are optional levels enabled per project.
+  Inside the <em>Task types &amp; priorities</em> settings modal the chip is
+  enlarged to a 24&nbsp;px square (<code>.ts-level .type-badge</code>) so the
+  symbol stays legible alongside its toggle label.</p>
+
+  <h3>Rich-text editor — one control, four places</h3>
+  <p>The same editor renders the task description, the comment composer, the
+  inline comment-edit box and the reply box. It is a
+  <code>contenteditable</code> surface (<code>.rt-editor</code>) under a
+  <code>.rt-toolbar</code> of <code>.rt-tool</code> icon buttons — the standard
+  icon-button treatment, one glyph per command, <code>aria-label</code> and
+  <code>title</code> on each.</p>
+  <table class="bp">
+    <tr><th>Property</th><th>Value</th><th>Why</th></tr>
+    <tr><td>Height</td><td><code>min-height: 7.2rem</code>, <code>max-height: 40rem</code>, <code>resize: vertical</code></td><td>The drag handle lets a long comment be written at the height its writer wants rather than in a fixed well. The cap is raised, not removed, so pasted content still stops growing somewhere.</td></tr>
+    <tr><td>Focus</td><td><code>outline: 2px solid --md-primary</code>, inset</td><td>Same focus ring as every other input; inset so it doesn't overlap the toolbar seam.</td></tr>
+    <tr><td>Drop target</td><td><code>.rt-drop-active</code> — dashed primary outline + primary-container fill</td><td>Every editor accepts a dropped or pasted file, not just the description. The state must be visible before the drop, not after.</td></tr>
+    <tr><td>Empty state</td><td><code>[data-placeholder]:empty::before</code></td><td><code>contenteditable</code> has no native placeholder.</td></tr>
+    <tr><td>Images</td><td><code>max-width: 100%</code>, <code>--md-xs</code> radius</td><td>An inserted image renders as the picture while writing, identically to how it will render once posted.</td></tr>
+  </table>
+  <div class="note">The editor is available wherever text is authored, including on a <b>DONE or ARCHIVED</b> task's Comments tab: immutability freezes what a finished task <em>says</em> — title, description, type, dates, status — not the discussion about it.</div>
+
+  <h3>Card · form field</h3>
+  <div class="demo" style="align-items:flex-start">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="badge badge-in-progress" style="font-size:.65rem">In progress</span><button class="icon-btn" title="More" aria-label="More"><svg class="icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-kebab"/></svg></button></div>
+      <div style="font-weight:600;margin:.5rem 0 .25rem">Wire up the icon registry</div>
+      <small>OCT-142 · assigned to L. Frasseck</small>
+    </div>
+    <div class="field"><label>Project name</label><input value="Octbase"></div>
+  </div>
+
+  <h3>Progressive disclosure — capping a long list</h3>
+  <p>A list long enough to hurt is drawn a page at a time, and the rest arrives as the
+  reader scrolls. Today that is the board lane (<code>.board-lane-more</code>, the
+  project's <code>boardLaneLimit</code>, 20 by default); the pattern is the same
+  wherever a container can grow without bound.</p>
+  <p>Two rules make the difference between paging and losing things. <strong>The count
+  never pages.</strong> A lane's badge reports the whole lane, not the drawn part — a
+  count that shrank with the render would say cards had been deleted.
+  <strong>The control is a button, not a bare sentinel.</strong> Scroll position is how
+  a pointer user reaches the rest, but it is not an affordance: a keyboard user needs
+  something focusable and a screen-reader user needs it to say what is held back. So
+  the sentinel <em>is</em> the button, and scrolling to it simply activates it.</p>
+  <div class="demo" style="flex-direction:column;align-items:stretch;gap:12px;max-width:20rem">
+    <button type="button" style="display:block;width:100%;padding:8px 12px;border:1px dashed var(--md-outline);border-radius:var(--md-sm);background:transparent;color:var(--md-on-surface-variant);cursor:pointer;font-size:.8125rem;text-align:center">Load 51 more cards</button>
+  </div>
+  <table>
+    <tr><th>Rule</th><th>Applies</th></tr>
+    <tr><td>Dashed <code>1&nbsp;px --md-outline</code>, centred, full lane width</td><td>Reads as a boundary in the list rather than as another item in it — it is not a card and must not look like one.</td></tr>
+    <tr><td>Names the remainder</td><td>&ldquo;Load 51 more cards&rdquo;, never a bare &ldquo;Show more&rdquo;: the number is the reader's only evidence that the count and the render disagree on purpose.</td></tr>
+    <tr><td>Disappears when exhausted</td><td>Its absence is the signal that the list is whole. It is never shown disabled.</td></tr>
+    <tr><td>Never hides a just-placed item</td><td>Something the reader created or dragged in is drawn wherever it lands, cap or no cap — otherwise the action appears to have done nothing.</td></tr>
+  </table>
+  <div class="dos">
+    <div class="do"><b>Do</b>Keep the container's count honest · say how many remain · let scrolling activate the same control a click would</div>
+    <div class="dont"><b>Don't</b>Page the count along with the render · use an invisible scroll sentinel with no focusable equivalent · cap a list so hard that a new item lands out of sight</div>
+  </div>
+
+  <h3>Transient messages — snackbar and banner</h3>
+  <p>Two shapes, and the choice between them is <strong>who has to act</strong>. A
+  <em>snackbar</em> reports something that already happened and needs nobody; a
+  <em>banner</em> reports a condition that persists until the reader decides. Neither
+  is ever the only place an outcome appears — a failed save must also leave the form
+  in its failed state.</p>
+  <div class="demo" style="flex-direction:column;align-items:stretch;gap:12px">
+    <div style="display:flex;align-items:center;gap:12px;padding:16px;border-radius:var(--md-xs);background:var(--md-inverse-surface);color:var(--md-inverse-on-surface);box-shadow:var(--md-e3);min-width:18rem;max-width:35.5rem;font-size:.875rem">Project saved</div>
+    <div style="display:flex;align-items:center;gap:12px;padding:16px;border-radius:var(--md-xs);background:var(--md-error);color:var(--md-on-error);box-shadow:var(--md-e3);min-width:18rem;max-width:35.5rem;font-size:.875rem">Could not save the project</div>
+    <div style="display:inline-flex;align-items:center;gap:12px;padding:8px 16px;border-radius:var(--md-xs);background:var(--md-inverse-surface);color:var(--md-inverse-on-surface);box-shadow:var(--md-e3);align-self:center">
+      <span style="font-size:.875rem">This content has changed</span>
+      <button class="btn btn-primary" style="padding:4px 12px;font-size:.8125rem">Reload</button>
+    </div>
+  </div>
+  <table>
+    <tr><th>Rule</th><th>Snackbar <code>.toast</code></th><th>Banner <code>.content-stale-bar</code></th></tr>
+    <tr><td>Purpose</td><td>Confirms an action that is already done, or reports that it failed.</td><td>A background condition the reader must resolve — today: someone else changed what is on screen.</td></tr>
+    <tr><td>Position</td><td>Bottom centre, stacked, <code>slideUp</code> 200 ms.</td><td>Below the top bar, centred, <code>z-index</code> under dialogs.</td></tr>
+    <tr><td>Dismissal</td><td><strong>Automatic — 3.5 s.</strong> Never carries the only copy of anything.</td><td><strong>Never automatic.</strong> It stays until its action is taken or the condition clears.</td></tr>
+    <tr><td>Actions</td><td>None. A snackbar the reader must click is a banner.</td><td>Exactly one, and it is the resolution — <em>Reload</em>.</td></tr>
+    <tr><td>Colour</td><td>Inverse surface; <code>--md-error</code> only for failures.</td><td>Inverse surface. Not error — stale is not broken.</td></tr>
+    <tr><td>Shape</td><td colspan="2"><code>--md-xs</code> · 4 px and <code>--md-e3</code>. Deliberately the flattest radius in the system: these float over content and must not read as cards.</td></tr>
+    <tr><td>Announcement</td><td colspan="2">The container is a live region. Errors are <code>aria-live="assertive"</code>, everything else <code>polite</code> (WCAG 4.1.3 Status Messages) — set per message, not once.</td></tr>
+  </table>
+  <div class="dos">
+    <div class="do"><b>Do</b>Say what happened in the user's words · keep it to one line · let a failure also show up where it happened</div>
+    <div class="dont"><b>Don't</b>Put an action in a snackbar that vanishes in 3.5 s · use error red for a stale-content banner · stack more than one banner · report progress with either — that is what a spinner and <code>aria-busy</code> are for</div>
+  </div>
+</section>
+
+<!-- ╔══ LAYOUT ══╗ -->
+<section class="page-break">
+  <h2>Layout</h2>
+  <p>The <b>card/box views</b> — dashboard, projects, repositories, sprints, releases, settings — lay their cards out in one shared <b>two-column grid</b> (<code>.grid-2col</code>), so those pages read consistently. Three kinds of view are deliberately outside it: the <b>board</b> keeps its horizontal kanban layout; the <b>list/table views</b> (backlog, task list, pages, activity, archive, mindmap) are full-width because a table has nothing to pair with; and the <b>statistics page</b> uses the metrics layout below.</p>
+  <div class="grid cols-2">
+    <div class="card" style="width:auto">
+      <div style="font-weight:600;margin-bottom:.5rem">Repository connections</div>
+      <small>Boxes share the row as two equal columns.</small>
+    </div>
+    <div class="card" style="width:auto">
+      <div style="font-weight:600;margin-bottom:.5rem">Add repository</div>
+      <div class="field" style="width:auto;margin-top:.5rem"><label>Display name</label><input value=""></div>
+    </div>
+  </div>
+  <p style="margin-top:var(--space-4)">Columns are <code>repeat(2, minmax(0, 1fr))</code> above the <code>1024px</code> (<code>64rem</code>) Expanded breakpoint and a single <code>1fr</code> below it, with <code>gap: space-4</code> and <code>align-items: start</code>. <code>minmax(0,1fr)</code> stops wide children (long titles, progress bars) from forcing overflow; <code>align-items:start</code> lets each box keep its natural height rather than stretching to match a taller neighbour. Section labels that must break a row (e.g. the sprint <em>Active / Planned / Completed</em> headings) span both columns with <code>grid-column: 1 / -1</code>.</p>
+  <div class="note">One layout primitive for all of these views: add <code>class="grid-2col"</code> to the content wrapper. Don't hand-roll per-view column counts or cap a view's width below the others.</div>
+
+  <h3>Metrics layout — the one documented exception</h3>
+  <p>A <b>metrics page</b> — today the project statistics page, and anything
+  built like it — is the one card view that does <em>not</em> use
+  <code>.grid-2col</code>, because its content is not a column of boxes to be
+  read in order but a set of independently sized readings. It uses two
+  <code>auto-fit</code> grids instead:</p>
+  <table class="bp">
+    <tr><th>Utility</th><th>Track</th><th>Carries</th></tr>
+    <tr><td><code>.stat-tiles</code></td><td><code>repeat(auto-fit, minmax(9.5rem, 1fr))</code></td><td>The headline KPI tiles. Small, uniform, read at a glance — forcing two per row would waste most of the width and push the charts below the fold.</td></tr>
+    <tr><td><code>.stats-grid</code></td><td><code>repeat(auto-fit, minmax(22rem, 1fr))</code></td><td>The chart cards. 22&nbsp;rem is the width below which an axis stops being legible, so the track floor — not a column count — decides how many fit. Two columns at 1024&nbsp;px, three on a wide desktop.</td></tr>
+  </table>
+  <p>A chart that needs more than one column takes
+  <code>.stats-card.wide</code>, the same escape hatch
+  <code>.grid-2col</code> gives its section labels — but it is capped at
+  <b>two columns</b>, not the full row. It falls back to
+  <code>grid-column: 1 / -1</code> and lifts to <code>span 2</code> under a
+  <code>@container (min-width: 44.75rem)</code> query (two 22&nbsp;rem tracks
+  plus the gap: exactly when the second column exists). The query is on the
+  grid rather than the viewport because the sidebar collapses, so container
+  width decides the column count. Beyond two columns a headline chart stops
+  gaining information and just stretches its plot area into empty space, and
+  the sibling cards fill the rest of the row instead. Both grids keep
+  <code>align-items: start</code> so a tall chart never stretches its
+  neighbours.</p>
+  <div class="note">This exception is <b>scoped to metrics pages</b>, and it is the reason the "no three-column grids" rule below says <em>card/box</em> views. It is not a licence to <code>auto-fit</code> anywhere a two-column grid feels tight — if a new view wants it, it belongs in this table first.</div>
+
+  <h3>Rules</h3>
+  <div class="do-dont">
+    <div class="do"><b>Do</b>Use <code>.grid-2col</code> for card/box content views · use <code>.stat-tiles</code> / <code>.stats-grid</code> for a metrics page · let the grid size the forms (a form sits in one half-width column) · keep boxes at natural height with <code>align-items:start</code>.</div>
+    <div class="dont"><b>Don't</b>Full-width (100%) forms · three-or-more-column grids in a card/box view · a fresh hand-rolled <code>grid-template-columns</code> when one of the three utilities fits · ad-hoc <code>max-width</code> caps that make one view narrower than its siblings · a two-column grid on the board.</div>
+  </div>
+</section>
+
+<!-- ╔══ CHARTS ══╗ -->
+<section class="page-break">
+  <h2><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--md-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16v-5"/><path d="M12 16V7"/><path d="M17 16v-8"/></svg>Charts &amp; data display</h2>
+  <p>Octbase draws the sprint burndown, the velocity trend and the statistics
+  page. Charts are <b>hand-rolled inline SVG</b> — no chart library, no runtime
+  dependency, consistent with the rest of the stack. They share one set of
+  <code>.report-*</code> marks so the sprint report and the statistics page read
+  as one system rather than two.</p>
+
+  <h3>The colour rule — one hue per chart</h3>
+  <p>This is the rule that constrains everything else, and it is not a
+  preference. The app ships <b>four themes</b> (light, dark, octopus, and the
+  system-followed pair), and each one <b>redefines <code>--md-primary</code></b>.
+  A hard-coded categorical palette — one colour per status, one per type —
+  would be tuned against exactly one of them and would clash or fail contrast in
+  the other three.</p>
+  <p>So: <b>every chart is a single series in a single hue</b>
+  (<code>--md-primary</code>), and categories are told apart by their
+  <b>row or axis label</b>, never by colour. The only charts that carry two
+  series are the burndown (actual vs. ideal) and the velocity (committed vs.
+  completed) — and both separate the second series by <b>texture and weight</b>
+  rather than hue: the ideal line is a dashed <code>--md-outline</code>, the
+  committed bar is the muted <code>--md-outline-variant</code> behind the solid
+  primary. Those two, and only those two, get a <code>.report-legend</code>.</p>
+  <div class="do-dont">
+    <div class="do"><b>Do</b>One hue per chart, from a theme token · distinguish series by dash, weight or fill density · label every category in text · let a legend appear only where a second series exists.</div>
+    <div class="dont"><b>Don't</b>A per-status or per-type colour scale · raw hex in a mark · colour as the only difference between two things · a legend on a single-series chart (the labels already say it).</div>
+  </div>
+
+  <h3>Marks</h3>
+  <table class="bp">
+    <tr><th>Class</th><th>Role</th></tr>
+    <tr><td><code>.report-grid</code></td><td>Horizontal gridlines — <code>--md-outline-variant</code> at 50&nbsp;% opacity. Behind the data, never competing with it.</td></tr>
+    <tr><td><code>.report-axis-label</code></td><td>10&nbsp;px <code>--md-on-surface-variant</code>. The smallest type in the system; nothing else may go below it.</td></tr>
+    <tr><td><code>.report-line-actual</code> · <code>-ideal</code></td><td>Solid primary vs. dashed outline. The dash <em>is</em> the distinction.</td></tr>
+    <tr><td><code>.report-bar-completed</code> · <code>-committed</code></td><td>Solid primary vs. muted outline-variant, <code>rx: 2</code>.</td></tr>
+    <tr><td><code>.report-legend</code> · <code>.report-swatch</code></td><td>Two-series charts only.</td></tr>
+    <tr><td><code>.report-note</code></td><td>The caption under a chart: sample size, an unestimated-task count, an overdue warning. Where a chart's honesty caveats live.</td></tr>
+    <tr><td><code>.dist-track</code></td><td>The horizontal magnitude bar used for distributions (status, type, priority, per-person load) — a labelled row, not a pie.</td></tr>
+  </table>
+
+  <h3>Accessibility &amp; honesty</h3>
+  <div class="principle"><div class="n">1</div><div><b>Every chart is <code>role="img"</code> with an <code>aria-label</code></b> that states what it plots. A screen reader gets the sentence, not the geometry.</div></div>
+  <div class="principle"><div class="n">2</div><div><b>Every mark carries a <code>&lt;title&gt;</code></b> so hovering a bar or point reads out its value. A chart you can only estimate by eye is a decoration.</div></div>
+  <div class="principle"><div class="n">3</div><div><b>A zero is a zero, not a gap.</b> A quiet week is a zero-height bar that still occupies its slot — dropping it silently rewrites the trend.</div></div>
+  <div class="principle"><div class="n">4</div><div><b>Say what is missing.</b> Where a projection is incomplete — committed tasks with no estimate, a 90-day cycle-time sample — the count goes in the <code>.report-note</code> rather than being quietly folded in as zero.</div></div>
+  <div class="principle"><div class="n">5</div><div><b>Median beside average</b> wherever one straggler can drag a mean somewhere no real item lives (cycle time). Never the average alone.</div></div>
+
+  <div class="note">A new chart inherits all of the above by using the <code>.report-*</code> marks. If it seems to need a second hue, it almost certainly needs a second chart, or a labelled row per category.</div>
+</section>
+
+<!-- ╔══ MOBILE COMPANION ══╗ -->
+<section class="page-break">
+  <h2><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--md-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-home"/></svg>Mobile companion</h2>
+  <p>Phones get a <b>purpose-built companion app</b> (served at <code>/m/</code>) — not a squeezed desktop. It reuses every shared token (color, type, spacing, radius, elevation) and the same icon set, but the layout is authored mobile-first for one-handed use on a 360–430&nbsp;px phone. It is an <b>enhancement, not a replacement</b>: it covers the day-to-day flows (My&nbsp;Work, projects, board, backlog, task detail, comments, create, search, notifications) and hands the rest off to desktop rather than cramming it in.</p>
+
+  <div class="demo" style="background:#fff;justify-content:center;gap:var(--space-8);align-items:flex-start">
+    <!-- Phone 1 · My Work -->
+    <div style="text-align:center">
+      <div class="phone"><div class="phone-screen">
+        <div class="m-appbar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-user"/></svg>
+          <span class="sp">My Work</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bell"/></svg>
+        </div>
+        <div class="m-body">
+          <div class="m-seg"><span class="s on">Assigned</span><span class="s">Reported</span><span class="s">Watching</span></div>
+          <div class="m-card">
+            <div class="ttl">Wire up the icon registry</div>
+            <div class="m-cardmeta"><span class="type-badge type-task" style="width:1.1rem;height:1.1rem;font-size:.55rem" title="Task">T</span><span class="badge prio-badge prio-high" style="font-size:.55rem">High</span><small style="margin-left:auto">OCT-142</small></div>
+          </div>
+          <div class="m-card">
+            <div class="ttl">Board column drag is janky on Safari</div>
+            <div class="m-cardmeta"><span class="type-badge type-task" style="width:1.1rem;height:1.1rem;font-size:.55rem" title="Task">T</span><span class="badge prio-badge prio-critical" style="font-size:.55rem">Critical</span><span class="badge badge-in-progress" style="font-size:.6rem">In progress</span><small style="margin-left:auto">OCT-138</small></div>
+          </div>
+          <div class="m-card"><div class="m-row"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-project"/></svg></span><div style="flex:1;min-width:0"><div class="ttl">Octbase</div><div class="sub">12 open · 3 in review</div></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--md-outline)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-right"/></svg></div></div>
+        </div>
+        <div class="m-fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-add"/></svg></div>
+        <div class="m-nav">
+          <div class="it on"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-home"/></svg></span><span>My Work</span></div>
+          <div class="it"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-project"/></svg></span><span>Projects</span></div>
+          <div class="it"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-search"/></svg></span><span>Search</span></div>
+          <div class="it"><span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-bell"/></svg></span><span>Inbox</span></div>
+        </div>
+      </div></div>
+      <small>My Work · top app bar, FAB, bottom nav</small>
+    </div>
+
+    <!-- Phone 2 · Task detail + bottom sheet -->
+    <div style="text-align:center">
+      <div class="phone"><div class="phone-screen m-detail">
+        <div class="m-appbar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-chevron-left"/></svg>
+          <span class="sp">OCT-142</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-kebab"/></svg>
+        </div>
+        <div class="m-body">
+          <div class="dttl">Wire up the icon registry</div>
+          <div class="m-cardmeta" style="margin:0 0 .6rem"><span class="type-badge type-task" style="width:1.1rem;height:1.1rem;font-size:.55rem" title="Task">T</span><span class="badge badge-in-progress" style="font-size:.6rem">In progress</span></div>
+          <div class="m-prop"><span class="pl">Status</span><span class="pv">In progress</span></div>
+          <div class="m-prop"><span class="pl">Priority</span><span class="pv">High</span></div>
+          <div class="m-prop"><span class="pl">Assignee</span><span class="pv">L. Frasseck</span></div>
+        </div>
+        <div class="m-scrim"></div>
+        <div class="m-sheet">
+          <div class="m-grip"></div>
+          <div class="st">Status</div>
+          <div class="m-opt">Planned</div>
+          <div class="m-opt sel">In progress<svg class="ck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-check"/></svg></div>
+          <div class="m-opt">In review</div>
+          <div class="m-opt">Done</div>
+        </div>
+      </div></div>
+      <small>Task detail · property rows + bottom sheet</small>
+    </div>
+  </div>
+
+  <h3>Mobile patterns</h3>
+  <table class="bp">
+    <tr><th>Pattern</th><th>Token / rule</th><th>Notes</th></tr>
+    <tr><td>Top app bar</td><td><code>--app-bar-h: 3.5rem</code> + <code>--safe-top</code></td><td>Sticky, primary-colored; lead = back or profile, trailing = one context action.</td></tr>
+    <tr><td>Bottom nav</td><td><code>--bottom-nav-h: 3.75rem</code> + <code>--safe-bottom</code></td><td>Four destinations — My&nbsp;Work · Projects · Search · Inbox; active tab gets a primary-container pill behind the icon.</td></tr>
+    <tr><td>FAB</td><td><code>3.5rem</code>, radius <code>--md-lg</code></td><td>Single primary create action, floats clear of the bottom nav.</td></tr>
+    <tr><td>Bottom sheet</td><td><code>max-height: 85dvh</code>, scrim <code>.45</code></td><td>Replaces desktop dropdowns/dialogs for pick-one choices (status, priority, assignee).</td></tr>
+    <tr><td>Filter chips</td><td><code>.seg-scroll</code> (sticky, h-scroll)</td><td>Board column switcher &amp; list filters; active chip is solid primary.</td></tr>
+    <tr><td>Touch targets</td><td><code>--touch: 2.75rem</code> (≥ 44px)</td><td>Every interactive row, chip and icon button clears the minimum.</td></tr>
+    <tr><td>Safe areas</td><td><code>env(safe-area-inset-*)</code></td><td>App bar and bottom nav reserve the notch / home-indicator insets.</td></tr>
+    <tr><td>iOS zoom guard</td><td>inputs at <code>font-size: 1rem</code></td><td>≥ 16px text stops Mobile Safari auto-zooming on focus.</td></tr>
+  </table>
+
+  <div class="note">On tablet/desktop widths the mobile app doesn't stretch edge-to-edge — it presents as a <b>centered ~430px phone frame</b> (<code>@media (min-width:768px)</code>), so it stays usable when previewed or opened directly.</div>
+
+  <h3>Rules</h3>
+  <div class="do-dont">
+    <div class="do"><b>Do</b>Reuse the shared tokens &amp; icon set · keep targets ≥ <code>--touch</code> · use bottom sheets for pick-one · offer <em>“Open on desktop”</em> for anything the phone omits — never a dead end.</div>
+    <div class="dont"><b>Don't</b>Port desktop dialogs/drawers verbatim · add a 5th+ bottom-nav tab · build phone-only colors or type · hide an omitted feature with no hand-off link.</div>
+  </div>
+</section>
+
+<!-- ╔══ RESPONSIVE ══╗ -->
+<section class="page-break">
+  <h2>Responsive</h2>
+  <p>Routing is <b>device-based, decided server-side</b> at the desktop app's Caddy front door — not by a CSS breakpoint. A <b>phone</b> User-Agent hitting <code>/</code> gets a <code>302</code> to the mobile companion under <code>/m/</code>; everything else — desktops, laptops and <b>tablets incl. iPad</b> (their UA omits the <code>Mobile</code> token) — stays on the full desktop app. <code>/api/*</code> is never redirected, so both surfaces share the same origin + JWT cookies. Within the desktop app a single <code>1024px</code> (<code>64rem</code>) breakpoint is all the chrome needs; a narrowed window keeps the full app and never collapses into a phone layout.</p>
+  <table class="bp">
+    <tr><th>Context</th><th>Surface</th><th>Layout</th></tr>
+    <tr><td>Phone<br>UA matches iPhone / Android-mobile / …</td><td>Mobile companion (<code>/m/</code>)</td><td>Purpose-built one-handed app — bottom nav, FAB, bottom sheets, full-screen task detail (see <em>Mobile companion</em>).</td></tr>
+    <tr><td>Narrow desktop<br>&lt; 1024px (laptop / tablet)</td><td>Desktop app (<code>/</code>)</td><td>Off-canvas drawer + scrim, hamburger toggle in the app bar; card/box views collapse to one column; the board scrolls horizontally.</td></tr>
+    <tr><td>Desktop<br>≥ 1024px</td><td>Desktop app (<code>/</code>)</td><td>Permanent drawer; full multi-column layout; card/box views use the two-column grid.</td></tr>
+  </table>
+  <h3>Two-column content grid</h3>
+  <p>Every card/box view except the board — dashboard, projects, repositories, sprints, releases, settings — lays its sections out with the shared <code>.grid-2col</code> utility: two equal <code>minmax(0,1fr)</code> columns at ≥ 1024px, collapsing to one column below it. <code>minmax(0,…)</code> stops long titles and progress bars from forcing overflow; <code>align-items:start</code> keeps each box at its natural height.</p>
+  <h3>Dialogs &amp; overlays</h3>
+  <p>Every dialog (<code>.modal</code>, incl. confirm/delete) is sized <code>width:min(30rem, calc(100vw − 2·space-4))</code> (wide variant <code>38rem</code>) so it never exceeds the viewport nor sits edge-to-edge; the backdrop keeps <code>space-4</code> padding and is pinned to <code>100dvh</code>. Height is capped at <code>min(90vh, 100dvh − 2·space-4)</code> and only the body scrolls, so the <code>.modal-footer</code> actions stay pinned and reachable at any height. The command palette, shortcuts, notifications and login box scale the same way.</p>
+  <h3>Task panel</h3>
+  <p>Task details open in a fixed-width side sheet (<code>#task-panel</code>, sized to <code>--panel-w</code>) that slides in from the right over the content. Its tab strip (<code>.panel-tabs</code> — Details · Comments · Relations · Branches …) keeps one consistent desktop look across tabs.</p>
+  <h3>Rules</h3>
+  <div class="do-dont">
+    <div class="do"><b>Do</b>Use <code>min()/clamp()/%</code> widths · <code>minmax(0,1fr)</code> grid tracks · <code>min-height:0</code> on scrolling flex children · the single <code>1024</code> breakpoint · the shared <code>.grid-2col</code> for card/box views.</div>
+    <div class="dont"><b>Don't</b>Fixed pixel widths wider than the viewport · phone-specific layouts (mobile is redirected, not restyled) · horizontal scroll outside the board · icon-only buttons without labels · ad-hoc breakpoints (600/767/800/900/1160).</div>
+  </div>
+</section>
+
+<div class="footer">Octbase UI Style Guide · v1.7 · Built on Material Design 3 · Lucide icons · IBM Plex Sans · Desktop app + Mobile companion</div>
+
+<!-- The icon grid is generated from the shipped registry, not a copy of it. -->
+<script type="module" src="js/styleguide-icons.js"></script>
+</body>
+</html>

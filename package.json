@@ -1,0 +1,30 @@
+{
+  "name": "octbase",
+  "private": true,
+  "description": "Octbase workspace root — build tooling only. The Go API is not an npm package.",
+  "workspaces": [
+    "octbase-shared",
+    "octbase-frontend",
+    "octbase-mobile"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspace octbase-frontend",
+    "types:generate": "openapi-typescript octbase-api/api/openapi.yaml -o octbase-frontend/types/openapi.d.ts",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run"
+  },
+  "devDependencies": {
+    "eslint": "^10.8.0",
+    "eslint-plugin-no-unsanitized": "^4.1.5",
+    "globals": "^17.8.0",
+    "jsdom": "25.0.1",
+    "openapi-typescript": "^7.13.0",
+    "typescript": "5.7.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  }
+}

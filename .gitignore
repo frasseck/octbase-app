@@ -1,0 +1,37 @@
+# API binary and database
+octbase-api/octbase-api
+octbase-api/octbase.db
+
+# Postgres data (podman-compose bind mount)
+/pgdata/
+
+# Uploaded attachment files (podman-compose bind mount; ATTACHMENTS_DIR)
+/attachments/
+
+# Go build cache
+octbase-api/vendor/
+
+.vscode
+.env.local
+.env
+
+# Editor and OS
+.DS_Store
+*.swp
+*.swo
+.venv-octbase-tests
+
+# Stray run output (nohup, redirected logs)
+nohup.out
+*.log
+
+# Python cache and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# Build output (37b stage 2)
+node_modules/
+*/dist/
+# The standalone-demo artifact (one self-contained IIFE bundle, opened from
+# disk — see octbase-frontend/vite.standalone.config.js). Built, not committed.
+*/dist-standalone/

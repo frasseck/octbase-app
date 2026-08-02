@@ -1,0 +1,80 @@
+# octbase-frontend — the desktop SPA and the site's front door (Caddy).
+#
+# ⚠ BUILD CONTEXT IS THE REPOSITORY ROOT, not this directory:
+#     podman build -f octbase-frontend/Containerfile .
+# podman-compose.yml sets it accordingly. The reason is @octbase/shared: since
+# 37b stage 3 the SPA imports the shared modules from a workspace package that
+# lives outside this directory, so a context rooted here cannot see the code the
+# app is built from.
+#
+# WHAT CHANGED AT 37b STAGE 3. Until then this image shipped the SOURCE tree and
+# only minified it in place (esbuild, whitespace/syntax only), because every
+# file index.html loaded sat in js/. With the shared modules gone from js/ that
+# is no longer true — an unbundled source tree would 404 on its own imports — so
+# the build stage now runs the real Vite build and the image ships dist/. That
+# is stage 5's container work arriving early because stage 3 forced it; the rest
+# of stage 5 (retiring the ?v= stamping and its tooling) is untouched, and
+# index.html's stamped theme-init.js/app.css URLs still pass through the build.
+#
+# Identifier mangling stays OFF in the Vite config (esbuild.keepNames) for the
+# same reason it was off here: the data-act dispatch keys handlers by fn.name.
+#
+# Base images are pinned by digest, not tag — a floating tag lets a regressed or
+# compromised upstream rebuild flow in silently. The tag comment above each FROM
+# records what the digest stood for when pinned (an inline comment on a FROM line
+# is a parse error). Refresh procedure: docs/operations.md ("Refreshing container
+# base-image pins").
+#
+# hi/nodejs:latest
+FROM registry.access.redhat.com/hi/nodejs@sha256:7cfaa58a32411b544fd0aa279231a95171209da3d53f5ab0fc982b518b46dbb9 AS jsbuild
+USER root
+WORKDIR /build
+# Manifests first, so a source-only change reuses the cached npm install layer.
+# All four are needed: `npm ci` refuses to run against a lockfile whose
+# workspaces it cannot see, even to build just one of them.
+COPY package.json package-lock.json ./
+COPY octbase-shared/package.json ./octbase-shared/
+COPY octbase-frontend/package.json ./octbase-frontend/
+COPY octbase-mobile/package.json ./octbase-mobile/
+RUN npm ci --no-audit --no-fund
+COPY octbase-shared/ ./octbase-shared/
+COPY octbase-frontend/ ./octbase-frontend/
+# vite.config.js imports its plugins from outside its own directory, so they
+# have to be in the image or the config fails to load at all — the build dies at
+# "Module not found" before it compiles a line:
+#   vite-hash-classic-assets  content-hashes the classic scripts the bundler
+#                             cannot touch (theme-init.js and friends) and
+#                             rewrites their <script src> in the HTML — 37b
+#                             stage 5, which is what retired the ?v= stamping
+#   vite-strip-html-comments  drops the HTML comments from the built pages
+# A glob, not a file list. Naming them one by one is a trap the repo has already
+# sprung once in this file (the explicit asset list that left theme-init.js out
+# of the image), and again here: adding the second plugin broke the image build
+# while `npm run build` on a host stayed green, because the host has all of
+# scripts/ and the image has only what this line copies.
+COPY scripts/vite-*.mjs ./scripts/
+# `build:site` is `vite build` alone — deliberately not the workspace's `build`,
+# which also emits dist-standalone/, the file:// demo artifact that has no place
+# in a served image.
+RUN npm run build:site --workspace @octbase/frontend
+
+# hi/caddy:latest
+FROM registry.access.redhat.com/hi/caddy@sha256:fdd504a92a9032448a09411adcf2a3c86ceccf3340b90e9b6e1ad01e794f334e
+COPY octbase-frontend/caddy/Caddyfile /etc/caddy/Caddyfile
+# Optional installation-password snippets, selected at runtime by the Caddyfile's
+# `import auth-{$OCTBASE_SITE_AUTH:}.caddy`: auth-on.caddy (basic_auth) when a
+# hash is configured, auth-.caddy (no-op) otherwise. Both must exist in the
+# image so `import` resolves in either state. See caddy/auth-on.caddy.
+COPY octbase-frontend/caddy/auth-.caddy /etc/caddy/auth-.caddy
+COPY octbase-frontend/caddy/auth-on.caddy /etc/caddy/auth-on.caddy
+# The built site: index.html plus the hashed assets/, the three static pages
+# (/docs.html, /user-guide.html, /styleguide.html), /privacy.html, the classic
+# scripts the bundler must not touch (js/theme-init.js and the two single-script
+# page helpers), and the verbatim locales/, img/ and fonts/ directories.
+COPY --from=jsbuild /build/octbase-frontend/dist/ /usr/share/caddy/
+# Swagger UI's self-hosted assets, which /docs.html loads by absolute path — not
+# part of the module graph, so the build never sees them. Self-hosted rather
+# than CDN-loaded so the strict Content-Security-Policy (script-src/style-src
+# 'self') in caddy/Caddyfile allows them to load.
+COPY octbase-frontend/vendor /usr/share/caddy/vendor
+EXPOSE 8080

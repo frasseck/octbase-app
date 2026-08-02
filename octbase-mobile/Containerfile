@@ -1,0 +1,63 @@
+# octbase-mobile — phone-first companion SPA. Served like octbase-frontend
+# (Caddy, same CSP, /api reverse-proxied to octbase-api) and reached under /m/.
+#
+# ⚠ BUILD CONTEXT IS THE REPOSITORY ROOT, not this directory:
+#     podman build -f octbase-mobile/Containerfile .
+# Same reason as octbase-frontend/Containerfile — read that one for the full
+# argument. In short: since 37b stage 3 the app imports @octbase/shared, which
+# lives outside this directory, and the image ships the built dist/ rather than
+# a minified copy of the source tree, because an unbundled source tree would
+# 404 on its own imports.
+#
+# Identifier mangling stays OFF in the Vite config (esbuild.keepNames) for the
+# same reason it was off here: `_register` (js/core.js) keys the delegation
+# registries by each handler function's own fn.name. Naming files is no longer
+# a hazard either — the entry is one module and the bundler follows its imports,
+# so the "explicit file list fell out of sync and left js/theme-init.js and
+# js/qrcode.js out of the image" failure cannot recur.
+#
+# Base images are pinned by digest, not tag — a floating tag lets a regressed or
+# compromised upstream rebuild flow in silently. The tag comment above each FROM
+# records what the digest stood for when pinned (an inline comment on a FROM line
+# is a parse error). Refresh procedure: docs/operations.md ("Refreshing container
+# base-image pins").
+#
+# hi/nodejs:latest
+FROM registry.access.redhat.com/hi/nodejs@sha256:7cfaa58a32411b544fd0aa279231a95171209da3d53f5ab0fc982b518b46dbb9 AS jsbuild
+USER root
+WORKDIR /build
+# Manifests first, so a source-only change reuses the cached npm install layer.
+# All four are needed: `npm ci` refuses to run against a lockfile whose
+# workspaces it cannot see, even to build just one of them.
+COPY package.json package-lock.json ./
+COPY octbase-shared/package.json ./octbase-shared/
+COPY octbase-frontend/package.json ./octbase-frontend/
+COPY octbase-mobile/package.json ./octbase-mobile/
+RUN npm ci --no-audit --no-fund
+COPY octbase-shared/ ./octbase-shared/
+COPY octbase-mobile/ ./octbase-mobile/
+# vite.config.js imports its plugins from outside its own directory, so they
+# have to be in the image or the config fails to load at all — the build dies at
+# "Module not found" before it compiles a line:
+#   vite-hash-classic-assets  content-hashes the classic scripts the bundler
+#                             cannot touch (theme-init.js and the two vendored
+#                             UMD libraries) and rewrites their <script src> in
+#                             the HTML — 37b stage 5, which retired ?v= stamping
+#   vite-strip-html-comments  drops the HTML comments from the built pages
+# A glob, not a file list — see octbase-frontend/Containerfile for why: the
+# explicit list is exactly what broke when the second plugin was added, and it
+# broke only in the image, because a host build has all of scripts/.
+COPY scripts/vite-*.mjs ./scripts/
+# `build:site` is `vite build` alone — deliberately not the workspace's `build`,
+# which also emits dist-standalone/, the file:// demo artifact the Playwright
+# mobile suite loads; it has no place in a served image.
+RUN npm run build:site --workspace @octbase/mobile
+
+# hi/caddy:latest
+FROM registry.access.redhat.com/hi/caddy@sha256:fdd504a92a9032448a09411adcf2a3c86ceccf3340b90e9b6e1ad01e794f334e
+COPY octbase-mobile/caddy/Caddyfile /etc/caddy/Caddyfile
+# The built site: index.html plus the hashed assets/, js/theme-init.js (the one
+# classic script the bundler must not touch) and the verbatim locales/, img/
+# and fonts/ directories.
+COPY --from=jsbuild /build/octbase-mobile/dist/ /usr/share/caddy/
+EXPOSE 8080

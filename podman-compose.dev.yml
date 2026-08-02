@@ -1,0 +1,44 @@
+# Development-only override: adds a Mailpit mail-capture container and points
+# the API's SMTP at it, so the invitation and task-change mail paths can be
+# exercised without delivering anything to a real inbox.
+#
+#   podman-compose -f podman-compose.yml -f podman-compose.dev.yml up -d
+#
+# NEVER deploy this override to a client stack: Mailpit's mailbox holds every
+# message the API sends, including password-reset and invitation links. The
+# production front door (octbase-frontend/caddy/Caddyfile.tls) does not proxy
+# /mailpit, and the base podman-compose.yml contains no Mailpit service.
+services:
+  octbase-api:
+    environment:
+      OCTBASE_SMTP_HOST: "${OCTBASE_SMTP_HOST:-mailpit}"
+      OCTBASE_SMTP_PORT: "${OCTBASE_SMTP_PORT:-1025}"
+    depends_on:
+      mailpit:
+        condition: service_started
+
+  # Mailpit is an SMTP test server: it accepts every message the API sends and
+  # holds it in a searchable web UI / REST API instead of delivering it. SMTP
+  # listens on 1025; the web UI and REST API (e.g. GET /api/v1/messages) are
+  # on 8025.
+  mailpit:
+    image: docker.io/axllent/mailpit:latest
+    restart: always
+    environment:
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      MP_MAX_MESSAGES: "5000"
+      # Serve the UI + API under /mailpit/ so the dev frontend Caddy can
+      # reverse-proxy it on the app origin (http://localhost:8080/mailpit/).
+      # The API then lives at /mailpit/api/v1/...
+      MP_WEBROOT: "mailpit"
+      # Captured mail includes password-reset and invitation links, so the
+      # UI/API stays behind basic auth even on a local stack.
+      MP_UI_AUTH: "${MAILPIT_UI_AUTH:-octbase:octbase}"
+    # Bind the web UI to localhost only — it is a dev tool, not a service.
+    ports:
+      - "127.0.0.1:${MAILPIT_HTTP_PORT:-8025}:8025"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M

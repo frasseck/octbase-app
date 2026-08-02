@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: registry.access.redhat.com/hi/postgresql:18
+    environment:
+      POSTGRES_DB: octbase
+      POSTGRES_USER: octbase
+      POSTGRES_PASSWORD: octbase
+    volumes:
+      - octbase_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U octbase"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  octbase-api:
+    image: localhost/octbase-api:latest
+    build:
+      context: .
+      dockerfile: Containerfile
+    ports:
+      - "8000:8000"
+    environment:
+      OCTBASE_DATABASE_URL: "postgres://octbase:octbase@postgres:5432/octbase?sslmode=disable"
+      OCTBASE_DEMO_MODE: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  octbase_data:

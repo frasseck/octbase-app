@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Datenschutz &amp; Impressum | Octbase</title>
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/img/favicon.ico" sizes="any">
+<!--
+  OPERATOR NOTE / BETREIBERHINWEIS
+  ────────────────────────────────
+  Octbase is deployed as one stack per client. Every [BRACKETED] placeholder
+  below MUST be replaced with the operating entity's real details before this
+  deployment is made available to users. Legal review of the final text is the
+  operator's responsibility; the factual statements about what the software
+  stores are maintained together with the code (see docs/operations.md,
+  "GDPR & data subject requests").
+-->
+<style>
+:root {
+  --md-primary:              #006C4F;
+  --md-on-primary:           #FFFFFF;
+  --md-surface:              #F6FAF6;
+  --md-on-surface:           #191D19;
+  --md-on-surface-variant:   #3E4940;
+  --md-surface-c-low:        #F0F5F0;
+  --md-surface-c:            #EAF0EA;
+  --md-outline:              #6D7870;
+  --md-outline-variant:      #BBCABD;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-primary:              #7ADCAD;
+    --md-surface:              #191C1A;
+    --md-on-surface:           #FFFFFF;
+    --md-on-surface-variant:   #BFC9C1;
+    --md-surface-c-low:        #1B211D;
+    --md-surface-c:            #1D211E;
+    --md-outline:              #899389;
+    --md-outline-variant:      #404943;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  line-height: 1.65;
+  font-size: 15px;
+}
+main { max-width: 760px; margin: 0 auto; padding: 40px 24px 80px; }
+header.page { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+header.page img { height: 32px; }
+nav.jump { margin: 16px 0 40px; font-size: 14px; color: var(--md-on-surface-variant); }
+nav.jump a { margin-right: 16px; }
+h1 { font-size: 1.7rem; font-weight: 600; color: var(--md-primary); margin: 48px 0 16px; }
+h1:first-of-type { margin-top: 24px; }
+h2 { font-size: 1.15rem; font-weight: 600; margin: 32px 0 8px; }
+p, ul, table { margin-bottom: 12px; color: var(--md-on-surface); }
+ul { padding-left: 22px; }
+a { color: var(--md-primary); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border: 1px solid var(--md-outline-variant); vertical-align: top; }
+th { background: var(--md-surface-c-low); }
+.placeholder { background: var(--md-surface-c); border: 1px dashed var(--md-outline); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-style: italic; }
+.lang-note { font-size: 13px; color: var(--md-on-surface-variant); }
+.tablewrap { overflow-x: auto; }
+footer { margin-top: 56px; border-top: 1px solid var(--md-outline-variant); padding-top: 16px; font-size: 13px; color: var(--md-on-surface-variant); }
+</style>
+</head>
+<body>
+<main>
+  <header class="page">
+    <img src="img/octbase_logo.svg" alt="Octbase">
+  </header>
+  <nav class="jump">
+    <a href="#datenschutz">Datenschutzerklärung</a>
+    <a href="#privacy-en">Privacy policy (English)</a>
+    <a href="#imprint">Impressum / Imprint</a>
+    <a href="index.html">← Octbase</a>
+  </nav>
+
+  <!-- ═══════════════ DEUTSCH ═══════════════ -->
+  <h1 id="datenschutz">Datenschutzerklärung</h1>
+  <p class="lang-note">Deutsche Fassung; <a href="#privacy-en">English version below</a>.</p>
+
+  <h2>1. Verantwortliche Stelle</h2>
+  <div class="placeholder">[NAME UND RECHTSFORM DES BETREIBERS], [ADRESSE], [E-MAIL-KONTAKT FÜR DATENSCHUTZANFRAGEN]</div>
+  <p>Diese Octbase-Instanz wird ausschliesslich für die Organisation betrieben, die sie
+  einsetzt. Es findet keine gemeinsame Nutzung mit anderen Kunden statt (eine Instanz pro Kunde).</p>
+
+  <h2>2. Welche Daten verarbeitet werden</h2>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Kategorie</th><th>Daten</th><th>Zweck / Rechtsgrundlage</th></tr>
+    <tr><td>Benutzerkonto</td><td>E-Mail-Adresse, Anzeigename, Passwort (nur als bcrypt-Hash), Rolle, Status, Zeitpunkt der letzten Anmeldung</td><td>Bereitstellung des Dienstes (Vertragserfüllung)</td></tr>
+    <tr><td>Arbeitsinhalte</td><td>Von Ihnen erstellte Projekte, Aufgaben, Kommentare, Seiten, Anhänge — verknüpft mit Ihrem Konto</td><td>Bereitstellung des Dienstes (Vertragserfüllung)</td></tr>
+    <tr><td>Sicherheitsprotokoll (Audit-Log)</td><td>Administrative Aktionen und An-/Abmeldungen mit IP-Adresse und Browser-Kennung (User-Agent)</td><td>Nachvollziehbarkeit sicherheitsrelevanter Vorgänge (berechtigtes Interesse)</td></tr>
+    <tr><td>Aktivitätsverlauf</td><td>Projektbezogene Aktionen (z.&nbsp;B. „Aufgabe verschoben") mit Benutzer-ID</td><td>Team-Transparenz (Vertragserfüllung)</td></tr>
+    <tr><td>E-Mail-Versand</td><td>Ihre E-Mail-Adresse bei Einladungen und Benachrichtigungen</td><td>Bereitstellung des Dienstes</td></tr>
+  </table>
+  </div>
+  <p>Es werden <strong>keine</strong> Analyse-, Tracking- oder Werbedienste eingesetzt.
+  Die Anwendung lädt keine Ressourcen von Drittservern.</p>
+
+  <h2>3. Cookies und lokaler Speicher</h2>
+  <ul>
+    <li><strong>refresh_token</strong> (HttpOnly-Cookie): hält Ihre Sitzung aufrecht; läuft automatisch ab. Technisch erforderlich.</li>
+    <li><strong>refresh_present</strong> (Cookie): merkt nur, <em>dass</em> eine Sitzung besteht (kein Inhalt). Technisch erforderlich.</li>
+    <li><strong>localStorage</strong>: Sprachwahl, Farbschema und Ansichtseinstellungen. Verbleibt auf Ihrem Gerät und wird nicht übertragen.</li>
+  </ul>
+  <p>Da nur technisch erforderliche Cookies verwendet werden, ist keine Einwilligung (Cookie-Banner) erforderlich.</p>
+
+  <h2>4. Speicherdauer</h2>
+  <ul>
+    <li>Kontodaten: bis zur Löschung des Kontos.</li>
+    <li>Sicherheitsprotokoll und Aktivitätsverlauf: standardmässig 365 Tage, danach automatische Löschung. <span class="placeholder-inline">[ABWEICHENDE FRIST DES BETREIBERS, FALLS KONFIGURIERT]</span></li>
+    <li>Abgelaufene Sitzungen und nicht angenommene Einladungen werden automatisch entfernt.</li>
+  </ul>
+
+  <h2>5. Ihre Rechte</h2>
+  <p>Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung
+  und Datenübertragbarkeit sowie ein Beschwerderecht bei der zuständigen Aufsichtsbehörde
+  (in der Schweiz: EDÖB; in der EU: die Datenschutzbehörde Ihres Landes).</p>
+  <p>Bei der Löschung eines Kontos werden alle persönlichen Angaben entfernt bzw. unkenntlich
+  gemacht; von Ihnen erstellte Arbeitsinhalte bleiben der Organisation unter der Kennzeichnung
+  „Deleted user" erhalten. Wenden Sie sich für Anfragen an die oben genannte Kontaktadresse.</p>
+
+  <h2>6. Hosting und Weitergabe</h2>
+  <div class="placeholder">[HOSTING-STANDORT/-ANBIETER DES BETREIBERS, z.&nbsp;B. „Gehostet in der Schweiz bei …"; AUFTRAGSVERARBEITER, FALLS VORHANDEN]</div>
+  <p>Daten werden nicht an Dritte verkauft oder zu Werbezwecken weitergegeben.</p>
+
+  <!-- ═══════════════ ENGLISH ═══════════════ -->
+  <h1 id="privacy-en">Privacy policy</h1>
+  <p class="lang-note">English version; <a href="#datenschutz">deutsche Fassung oben</a>.</p>
+
+  <h2>1. Controller</h2>
+  <div class="placeholder">[OPERATOR LEGAL NAME], [ADDRESS], [PRIVACY CONTACT EMAIL]</div>
+  <p>This Octbase instance is operated exclusively for the organization using it;
+  it is not shared with other customers (one instance per client).</p>
+
+  <h2>2. What data is processed</h2>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Category</th><th>Data</th><th>Purpose / legal basis</th></tr>
+    <tr><td>User account</td><td>Email address, display name, password (stored only as a bcrypt hash), role, status, last login time</td><td>Providing the service (contract)</td></tr>
+    <tr><td>Work content</td><td>Projects, tasks, comments, pages and attachments you create, linked to your account</td><td>Providing the service (contract)</td></tr>
+    <tr><td>Security audit log</td><td>Administrative actions and sign-ins with IP address and browser user agent</td><td>Traceability of security-relevant events (legitimate interest)</td></tr>
+    <tr><td>Activity feed</td><td>Project-level actions (e.g. "task moved") with your user ID</td><td>Team transparency (contract)</td></tr>
+    <tr><td>Email delivery</td><td>Your email address for invitations and notifications</td><td>Providing the service</td></tr>
+  </table>
+  </div>
+  <p>No analytics, tracking or advertising services are used. The application loads
+  no resources from third-party servers.</p>
+
+  <h2>3. Cookies and local storage</h2>
+  <ul>
+    <li><strong>refresh_token</strong> (HttpOnly cookie): keeps your session alive; expires automatically. Strictly necessary.</li>
+    <li><strong>refresh_present</strong> (cookie): records only <em>that</em> a session exists (no content). Strictly necessary.</li>
+    <li><strong>localStorage</strong>: language, color scheme and view preferences. Stays on your device and is never transmitted.</li>
+  </ul>
+  <p>Only strictly necessary cookies are used, so no consent banner is required.</p>
+
+  <h2>4. Retention</h2>
+  <ul>
+    <li>Account data: until the account is deleted.</li>
+    <li>Security audit log and activity feed: 365 days by default, then purged automatically. <span class="placeholder-inline">[OPERATOR-CONFIGURED PERIOD, IF DIFFERENT]</span></li>
+    <li>Expired sessions and unaccepted invitations are removed automatically.</li>
+  </ul>
+
+  <h2>5. Your rights</h2>
+  <p>You have the right to access, rectification, erasure, restriction of processing and
+  data portability, and the right to lodge a complaint with the competent supervisory
+  authority (Switzerland: FDPIC; EU: your national data protection authority).</p>
+  <p>When an account is deleted, all personal details are erased or anonymized; work
+  content you created remains available to the organization, attributed to
+  "Deleted user". Direct requests to the contact address above.</p>
+
+  <h2>6. Hosting and disclosure</h2>
+  <div class="placeholder">[OPERATOR'S HOSTING LOCATION/PROVIDER, e.g. "Hosted in Switzerland at …"; SUB-PROCESSORS, IF ANY]</div>
+  <p>Data is never sold or shared for advertising purposes.</p>
+
+  <!-- ═══════════════ IMPRESSUM ═══════════════ -->
+  <h1 id="imprint">Impressum / Imprint</h1>
+  <div class="placeholder">
+    [NAME UND RECHTSFORM / LEGAL NAME]<br>
+    [STRASSE, PLZ ORT, LAND / FULL ADDRESS]<br>
+    [E-MAIL] · [TELEFON, FALLS VORHANDEN]<br>
+    [HANDELSREGISTER-NR. / COMPANY REGISTER NO., FALLS VORHANDEN]<br>
+    [VERTRETUNGSBERECHTIGTE PERSON / AUTHORIZED REPRESENTATIVE]
+  </div>
+  <p class="lang-note">Software: Octbase — betrieben als kundenindividuelle Instanz /
+  operated as a per-client instance.</p>
+
+  <footer>
+    <a href="index.html">← Octbase</a>
+  </footer>
+</main>
+</body>
+</html>

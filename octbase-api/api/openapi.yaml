@@ -1,0 +1,2318 @@
+openapi: "3.0.3"
+info:
+  title: Octbase API
+  version: "0.4.0"
+  description: |
+    REST API for Octbase — a focused project-management tool (tasks, boards,
+    releases, sprints, wiki pages, SCM integration) for a single, invitation-only
+    team.
+
+    **Authentication:** All routes require a JWT **Bearer** access token in the
+    `Authorization` header, except the public auth/invitation routes, the
+    HMAC-authenticated webhook receivers, and the unauthenticated ops endpoints
+    (`/api/v1/health`, `/api/v1/version`, `/api/v1/meta/enums`, `/api/v1/config`, `/metrics`,
+    `/openapi.yaml`, `/docs`). Obtain an access token from `POST /api/v1/auth/login`;
+    it is returned as `{ "accessToken", "expiresIn" }`. A long-lived refresh token is
+    set as an HttpOnly cookie and rotated on every `POST /api/v1/auth/refresh`.
+
+    **Authorization:** Two layers, both enforced server-side. A global role
+    (`SUPER_ADMIN`, `ADMIN`, `USER`, `GUEST`) and a per-project membership role
+    (`PROJECT_OWNER`, `PROJECT_ADMIN`, `PROJECT_MEMBER`, `PROJECT_VIEWER`). The
+    effective project permission matrix is available at
+    `GET /api/v1/projects/{projectId}/permissions`.
+
+    **Error format:** All errors return
+    `{ "code": "ERROR_CODE", "message": "...", "messageKey": "...", "details": {...} }`
+    (`messageKey`/`details` optional).
+
+    **Pagination:** List endpoints accept `?page=0&size=20` (zero-indexed pages,
+    default size 20).
+
+    **Rate limits:** Public auth routes are limited to 120 requests/min per IP;
+    `/api/v1/users` (user management) to 60 requests/min.
+  contact:
+    name: Octbase
+    url: https://www.octbase.ch
+
+servers:
+  - url: /
+    description: Current server origin
+
+security:
+  - bearerAuth: []
+
+tags:
+  - { name: Ops, description: Health, version, metrics and metadata }
+  - { name: Auth, description: Login, refresh, logout, invitations }
+  - { name: Admin, description: Legacy admin panel — invitations, imports, users (ADMIN+) }
+  - { name: Audit, description: Audit log (SUPER_ADMIN) }
+  - { name: Users, description: User management (SUPER_ADMIN) and the current user }
+  - { name: Notifications, description: In-app notifications and preferences }
+  - { name: Dashboard, description: Personal settings dashboard — language and theme preferences }
+  - { name: MFA, description: TOTP multi-factor authentication enrollment and verification }
+  - { name: Projects, description: Projects and memberships }
+  - { name: Tasks, description: Tasks, comments, links, attachments, relations }
+  - { name: Boards, description: Boards, columns and external columns }
+  - { name: Planning, description: Releases and sprints }
+  - { name: Categories, description: Task categories and templates (API only) }
+  - { name: Docs, description: Wiki pages, revisions and references }
+  - { name: SCM, description: Repository connections and branch references }
+  - { name: Search, description: Cross-project and per-project search }
+  - { name: Realtime, description: Server-Sent Events and presence }
+  - { name: Webhooks, description: HMAC-authenticated SCM webhooks }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    page: { name: page, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+    size: { name: size, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 20 } }
+    projectId: { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+    taskId: { name: taskId, in: path, required: true, schema: { type: string, format: uuid } }
+    boardId: { name: boardId, in: path, required: true, schema: { type: string, format: uuid } }
+    pageId: { name: pageId, in: path, required: true, schema: { type: string, format: uuid } }
+    userId: { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+
+  responses:
+    BadRequest: { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Insufficient permissions, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Resource not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: Conflict / version mismatch, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unprocessable: { description: Business-rule violation (e.g. LAST_OWNER, RELEASE_HAS_OPEN_TASKS), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    TooManyRequests: { description: Rate limit exceeded }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: VALIDATION_ERROR }
+        message: { type: string }
+        messageKey: { type: string }
+        details: { type: object, additionalProperties: true }
+
+    CountDistribution:
+      type: array
+      description: >
+        One bucket per enum value, in the domain's own presentation order and
+        including the empty ones, so a chart drawn from it keeps its shape
+        between reloads. Values outside the built-in set (a project's custom
+        priority, a board-lane status) follow the known ones alphabetically
+        rather than being dropped.
+      items:
+        type: object
+        properties:
+          key: { type: string }
+          count: { type: integer }
+
+    Enums:
+      type: object
+      properties:
+        taskStatuses: { type: array, items: { type: string }, example: [PLANNED, IN_PROGRESS, IN_REVIEW, DONE, ARCHIVED] }
+        taskPriorities: { type: array, items: { $ref: '#/components/schemas/Priority' } }
+        taskTypes: { type: array, items: { $ref: '#/components/schemas/TaskType' } }
+        globalRoles: { type: array, items: { $ref: '#/components/schemas/GlobalRole' } }
+        projectRoles: { type: array, items: { $ref: '#/components/schemas/ProjectRole' } }
+        roles: { type: array, items: { $ref: '#/components/schemas/ProjectRole' }, description: Deprecated alias of projectRoles }
+        relationTypes: { type: array, items: { $ref: '#/components/schemas/RelationType' } }
+        visibilities: { type: array, items: { $ref: '#/components/schemas/Visibility' } }
+        estimationUnits: { type: array, items: { $ref: '#/components/schemas/EstimationUnit' } }
+        releaseStatuses: { type: array, items: { $ref: '#/components/schemas/ReleaseStatus' } }
+        pageStatuses: { type: array, items: { $ref: '#/components/schemas/PageStatus' } }
+        branchTypes: { type: array, items: { $ref: '#/components/schemas/BranchType' } }
+        scmProviders: { type: array, items: { $ref: '#/components/schemas/Provider' } }
+
+    GlobalRole: { type: string, enum: [SUPER_ADMIN, ADMIN, USER, GUEST] }
+    ProjectRole: { type: string, enum: [PROJECT_OWNER, PROJECT_ADMIN, PROJECT_MEMBER, PROJECT_VIEWER] }
+    Priority: { type: string, enum: [LOW, MEDIUM, HIGH, CRITICAL, BLOCKER] }
+    TaskType: { type: string, enum: [TASK, STORY, EPIC, SUBTASK, INITIATIVE, THEME], description: 'Types form a strict hierarchy: THEME → INITIATIVE → EPIC → STORY → TASK → SUBTASK. THEME and INITIATIVE are opt-in per project (themeEnabled/initiativeEnabled project settings)' }
+    RelationType: { type: string, enum: [RELATES_TO, BLOCKS, BLOCKED_BY, DUPLICATES] }
+    Visibility: { type: string, enum: [PUBLIC, PRIVATE] }
+    EstimationUnit: { type: string, enum: [NONE, POINTS, HOURS], default: NONE, description: "Project setting: the unit tasks are estimated in. NONE (the default) means the project does not estimate at all and no estimate field appears in its UI. Only a project owner/admin may change it; an unknown value is rejected with 422 ESTIMATION_UNIT_INVALID. Switching is non-destructive — estimates stored under the other unit are kept and reappear if the project switches back." }
+    ReleaseStatus: { type: string, enum: [PLANNED, CLOSED] }
+    PageStatus: { type: string, enum: [DRAFT, PUBLISHED, ARCHIVED] }
+    BranchType: { type: string, enum: [feature, bugfix, hotfix, release] }
+    Provider: { type: string, enum: [FAKE_GITLAB, GITHUB, BITBUCKET] }
+    TaskStatus:
+      type: string
+      description: >
+        Canonical statuses are PLANNED, IN_PROGRESS, IN_REVIEW, DONE, ARCHIVED.
+        Custom board-lane names are also valid statuses, so this is an open string.
+      example: IN_PROGRESS
+
+    AuthToken:
+      type: object
+      properties:
+        accessToken: { type: string }
+        expiresIn: { type: integer, description: Access-token lifetime in seconds }
+
+    MfaChallenge:
+      type: object
+      description: Returned instead of AuthToken when the account has MFA enabled.
+      properties:
+        mfaRequired: { type: boolean, example: true }
+        challengeToken: { type: string, description: Short-lived, single-purpose token for POST /auth/mfa/verify }
+        expiresIn: { type: integer, description: Challenge-token lifetime in seconds }
+
+    Preferences:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        language: { type: string, example: en }
+        theme: { type: string, example: system }
+
+    MfaEnrollment:
+      type: object
+      properties:
+        otpauthUrl: { type: string, description: otpauth:// URI for client-side QR rendering }
+        secret: { type: string, description: Manual-entry fallback for the same secret }
+
+    MfaRecoveryCodes:
+      type: object
+      properties:
+        recoveryCodes:
+          type: array
+          items: { type: string }
+          description: Shown once at generation time; only hashes are stored thereafter.
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminUser:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            globalRole: { $ref: '#/components/schemas/GlobalRole' }
+            status: { type: string, enum: [ACTIVE, DISABLED] }
+            mfaEnabled: { type: boolean }
+
+    Membership:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        role: { $ref: '#/components/schemas/ProjectRole' }
+        assignedByUserId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    MemberWithUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/ProjectRole' }
+        joinedAt: { type: string, format: date-time }
+
+    AssignableUser:
+      type: object
+      description: A candidate for a task's assignee or reviewer on one project.
+      properties:
+        userId: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        role:
+          type: string
+          description: Project role; empty for a global admin who is not a member of the project.
+        globalRole: { type: string, enum: [SUPER_ADMIN, ADMIN, USER, GUEST] }
+        member: { type: boolean, description: Whether the user holds a membership row in this project. }
+        avatarUpdatedAt: { type: string, nullable: true }
+
+    Project:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        abbreviation: { type: string, description: Task key prefix, e.g. DP }
+        description: { type: string }
+        visibility: { $ref: '#/components/schemas/Visibility' }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        themeEnabled: { type: boolean, description: 'Project setting: THEME hierarchy level enabled (admin-only toggle)' }
+        initiativeEnabled: { type: boolean, description: 'Project setting: INITIATIVE hierarchy level enabled (admin-only toggle)' }
+        estimationUnit: { $ref: '#/components/schemas/EstimationUnit' }
+        boardLaneLimit:
+          type: integer
+          minimum: 0
+          maximum: 500
+          default: 20
+          description: >-
+            Project setting (admin-only toggle): how many cards a board lane
+            draws at once, the rest loading as the reader scrolls. Purely a
+            display cap — every task stays on its lane and the lane's count
+            badge reports the full size. 0 means unlimited (draw every card).
+            Out of range is 422 BOARD_LANE_LIMIT_INVALID.
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+
+    ProjectPriority:
+      type: object
+      description: Admin-defined additional task priority of a project (on top of the built-in LOW/MEDIUM/HIGH/CRITICAL/BLOCKER set)
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        name: { type: string }
+        rank: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Task:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        taskType: { $ref: '#/components/schemas/TaskType' }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        priority: { $ref: '#/components/schemas/Priority' }
+        parentId: { type: string, format: uuid, nullable: true, description: 'Hierarchy parent — a task of the type one level up (required for SUBTASK, absent for EPIC)' }
+        assigneeId: { type: string, format: uuid, nullable: true }
+        reporterId: { type: string, format: uuid, nullable: true }
+        reviewerId: { type: string, format: uuid, nullable: true }
+        releaseId: { type: string, format: uuid, nullable: true }
+        sprintId: { type: string, format: uuid, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        boardColumnId: { type: string, format: uuid, nullable: true }
+        boardRank: { type: integer }
+        seqNumber: { type: integer, nullable: true }
+        externalRef: { type: string }
+        storyPoints:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: >-
+            Effort estimate in story points. Writable only while the project's
+            estimationUnit is POINTS (otherwise 422 ESTIMATION_UNIT_INACTIVE),
+            and only on the estimable leaf types STORY/TASK/SUBTASK (otherwise
+            422 ESTIMATION_NOT_ALLOWED_FOR_TYPE). null means *unestimated*,
+            which is distinct from a deliberate estimate of 0. A value stored
+            under a unit the project has since switched away from is kept and
+            still returned, but is dormant: it cannot be changed until the
+            project switches back (clearing it with null stays possible).
+        estimateHours:
+          type: number
+          format: double
+          nullable: true
+          minimum: 0
+          maximum: 1000
+          description: >-
+            Effort estimate in hours, at most two decimal places. This is an
+            *estimate*, not logged or tracked time. Writable only while the
+            project's estimationUnit is HOURS; same type, null and dormancy
+            rules as storyPoints.
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+
+    TaskComment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        authorId: { type: string, format: uuid }
+        authorName: { type: string, description: Author display name, resolved on read }
+        parentId: { type: string, format: uuid, nullable: true, description: Parent comment this is a reply to; null for top-level comments }
+        text: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+
+    TaskLink:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        url: { type: string }
+        title: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    TaskAttachment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        filename: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        externalUrl: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    TaskRelation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sourceTaskId: { type: string, format: uuid }
+        targetTaskId: { type: string, format: uuid }
+        relationType: { $ref: '#/components/schemas/RelationType' }
+        createdAt: { type: string, format: date-time }
+
+    Board:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        name: { type: string }
+        isDefault: { type: boolean }
+        minColumns: { type: integer }
+        maxColumns: { type: integer }
+        isSprintBoard: { type: boolean }
+        sprintId: { type: string, format: uuid, nullable: true }
+        sprint: { $ref: '#/components/schemas/Sprint' }
+        columns: { type: array, items: { $ref: '#/components/schemas/BoardColumn' } }
+        externalColumns: { type: array, items: { $ref: '#/components/schemas/BoardExternalColumn' } }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+
+    BoardColumn:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        boardId: { type: string, format: uuid }
+        name: { type: string }
+        status: { type: string }
+        position: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+
+    BoardExternalColumn:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        boardId: { type: string, format: uuid }
+        sourceColumnId: { type: string, format: uuid }
+        sourceBoardId: { type: string, format: uuid }
+        sourceBoardName: { type: string }
+        sourceColumnName: { type: string }
+        sourceColumnStatus: { type: string }
+        position: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Release:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        name: { type: string }
+        goal: { type: string }
+        dueDate: { type: string, format: date, nullable: true }
+        status: { $ref: '#/components/schemas/ReleaseStatus' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+
+    Sprint:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        name: { type: string }
+        goal: { type: string }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        status: { type: string, enum: [PLANNED, ACTIVE, COMPLETED] }
+        releaseId: { type: string, format: uuid, nullable: true }
+        # Board scope of the sprint. For PLANNED/ACTIVE sprints these are filled
+        # live from current sprint-board membership; for a COMPLETED sprint they
+        # hold the totals snapshotted at completion (e.g. 2 of 5 done). Server-
+        # computed, ignored on write.
+        committedCount: { type: integer, readOnly: true }
+        completedCount: { type: integer, readOnly: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+
+    TaskUpdate:
+      description: >-
+        Fields PATCH /tasks/{taskId} actually applies. Any other key — most
+        notably status, priority and assigneeId, which have dedicated POST
+        transition endpoints — is rejected with 400 UNSUPPORTED_FIELD. On a
+        DONE/ARCHIVED task only the placement fields (parentId, sprintId,
+        releaseId) and version are accepted; anything else answers 422
+        TASK_IMMUTABLE.
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        taskType: { $ref: '#/components/schemas/TaskType' }
+        parentId: { type: string, format: uuid, nullable: true }
+        releaseId: { type: string, format: uuid, nullable: true }
+        sprintId: { type: string, format: uuid, nullable: true }
+        dueDate: { type: string, format: date, nullable: true }
+        storyPoints: { type: integer, nullable: true, minimum: 0, maximum: 100, description: 'Story-point estimate. Requires the project''s estimationUnit to be POINTS (else 422 ESTIMATION_UNIT_INACTIVE) and an estimable leaf type — STORY/TASK/SUBTASK (else 422 ESTIMATION_NOT_ALLOWED_FOR_TYPE, which also blocks retyping an estimated task into a container). Out of range answers 422 STORY_POINTS_INVALID. Send null to clear, which is accepted even while the unit is dormant so a wrong value is never stranded.' }
+        estimateHours: { type: number, format: double, nullable: true, minimum: 0, maximum: 1000, description: 'Hours estimate (at most 2 decimal places; an estimate, not logged time). Requires estimationUnit HOURS; same type/clear rules as storyPoints. Out of range or too precise answers 422 ESTIMATE_HOURS_INVALID.' }
+        version: { type: integer, description: 'The version this edit is based on; a stale value answers 409 VERSION_CONFLICT.' }
+
+    ReleaseUpdate:
+      description: >-
+        Fields PATCH /releases/{releaseId} actually applies. Any other key is
+        rejected with 400 UNSUPPORTED_FIELD — status in particular transitions
+        only via POST /releases/{releaseId}/close and /reopen.
+      type: object
+      properties:
+        name: { type: string }
+        goal: { type: string }
+        dueDate: { type: string, format: date, nullable: true }
+        version: { type: integer, description: 'The version this edit is based on; a stale value answers 409 VERSION_CONFLICT.' }
+
+    SprintUpdate:
+      description: >-
+        Fields PATCH /sprints/{sprintId} actually applies. Any other key is
+        rejected with 400 UNSUPPORTED_FIELD — status in particular transitions
+        only via POST /sprints/{sprintId}/start and /complete.
+      type: object
+      properties:
+        name: { type: string }
+        goal: { type: string }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        releaseId: { type: string, format: uuid, nullable: true }
+        version: { type: integer, description: 'The version this edit is based on; a stale value answers 409 VERSION_CONFLICT.' }
+
+    TaskCategory:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        color: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    TaskTemplate:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        name: { type: string }
+        titleTemplate: { type: string }
+        descriptionTemplate: { type: string }
+        taskType: { $ref: '#/components/schemas/TaskType' }
+        priority: { $ref: '#/components/schemas/Priority' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    Page:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        parentPageId: { type: string, format: uuid, nullable: true }
+        title: { type: string }
+        slug: { type: string }
+        content: { type: string, description: AsciiDoc source }
+        renderedHtml: { type: string }
+        status: { $ref: '#/components/schemas/PageStatus' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        version: { type: integer }
+
+    PageRevision:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        pageId: { type: string, format: uuid }
+        content: { type: string }
+        message: { type: string }
+        authorId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    PageReference:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        pageId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    RepositoryConnection:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        provider: { $ref: '#/components/schemas/Provider' }
+        displayName: { type: string }
+        repositoryUrl: { type: string }
+        defaultBranch: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    BranchReference:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        repositoryId: { type: string, format: uuid }
+        branchName: { type: string }
+        branchType: { $ref: '#/components/schemas/BranchType' }
+        prStatus: { type: string }
+        prUrl: { type: string }
+        prNumber: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        kind: { type: string }
+        projectId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid }
+        pageId: { type: string, format: uuid }
+        message: { type: string }
+        isRead: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    NotificationPreference:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        kind: { type: string }
+        inApp: { type: boolean }
+        email: { type: boolean }
+
+paths:
+  # ───────────────────────── Ops ─────────────────────────
+  /api/v1/health:
+    get:
+      tags: [Ops]
+      summary: Deep health check (DB pool + migration version)
+      operationId: health
+      security: []
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Degraded (DB down or migration mismatch) }
+  /health:
+    get:
+      tags: [Ops]
+      summary: Health check alias
+      operationId: healthAlias
+      security: []
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Degraded }
+  /api/v1/version:
+    get:
+      tags: [Ops]
+      summary: API name and version
+      operationId: version
+      security: []
+      responses:
+        '200': { description: Version info }
+  /api/v1/meta/enums:
+    get:
+      tags: [Ops]
+      summary: Canonical enum values
+      operationId: enums
+      security: []
+      responses:
+        '200': { description: Enums, content: { application/json: { schema: { $ref: '#/components/schemas/Enums' } } } }
+  /api/v1/config:
+    get:
+      tags: [Ops]
+      summary: Public runtime config (optional-feature flags, edition, app version)
+      description: >
+        Non-secret runtime configuration the SPA reads once at boot: the set of
+        optional-feature flags, driven by OCTBASE_FEATURE_* env vars (e.g.
+        taskView ← OCTBASE_FEATURE_TASKVIEW, default on) and the deployment
+        edition (jiraCsvImport ← OCTBASE_EDITION: included in ENTERPRISE,
+        activatable in BUSINESS via OCTBASE_OPTION_JIRA_IMPORT, never in
+        TEAM), the edition itself (TEAM | BUSINESS | ENTERPRISE, default
+        ENTERPRISE), the app version (← OCTBASE_APP_VERSION), shown as the
+        small version tag in the UI, and the installation limits (maxUsers ←
+        OCTBASE_MAX_USERS, maxUploadMb ← OCTBASE_MAX_UPLOAD_MB,
+        maxUserStorageMb ← OCTBASE_MAX_USER_STORAGE_MB; 0 = unlimited) for
+        display purposes — every limit is enforced server-side.
+      operationId: config
+      security: []
+      responses:
+        '200':
+          description: Feature flags, deployment edition and app version
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  features:
+                    type: object
+                    additionalProperties: { type: boolean }
+                    example: { taskView: true, jiraCsvImport: true }
+                  edition: { type: string, enum: [TEAM, BUSINESS, ENTERPRISE], example: "ENTERPRISE" }
+                  version: { type: string, example: "1.0.0" }
+                  limits:
+                    type: object
+                    description: Installation limits (0 = unlimited); informational, enforced server-side.
+                    properties:
+                      maxUsers: { type: integer, example: 5 }
+                      maxUploadMb: { type: integer, example: 10 }
+                      maxUserStorageMb: { type: integer, example: 512 }
+  /metrics:
+    get:
+      tags: [Ops]
+      summary: Prometheus metrics (restricted to private networks in TLS config)
+      operationId: metrics
+      security: []
+      responses:
+        '200': { description: Prometheus exposition format, content: { text/plain: {} } }
+  /openapi.yaml:
+    get:
+      tags: [Ops]
+      summary: This OpenAPI document
+      operationId: openapiDoc
+      security: []
+      responses:
+        '200': { description: OpenAPI YAML, content: { application/yaml: {} } }
+  /docs:
+    get:
+      tags: [Ops]
+      summary: Interactive API docs
+      operationId: docsUi
+      security: []
+      responses:
+        '200': { description: HTML docs viewer, content: { text/html: {} } }
+
+  # ───────────────────────── Auth ─────────────────────────
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email + password
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: >-
+            Access token issued (refresh token set as HttpOnly cookie), OR — when
+            the account has MFA enabled — a short-lived mfaChallengeToken instead,
+            to be exchanged at POST /api/v1/auth/mfa/verify.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/AuthToken'
+                  - $ref: '#/components/schemas/MfaChallenge'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /api/v1/auth/mfa/verify:
+    post:
+      tags: [Auth]
+      summary: Exchange an MFA challenge token + TOTP/recovery code for real tokens
+      operationId: verifyMfaChallenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, code]
+              properties:
+                challengeToken: { type: string }
+                code: { type: string }
+      responses:
+        '200':
+          description: Access token issued; refresh token set as HttpOnly cookie
+          content: { application/json: { schema: { $ref: '#/components/schemas/AuthToken' } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the refresh cookie and issue a new access token
+      operationId: refresh
+      security: []
+      responses:
+        '200': { description: New access token, content: { application/json: { schema: { $ref: '#/components/schemas/AuthToken' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current refresh token and clear the cookie
+      operationId: logout
+      security: []
+      responses:
+        '204': { description: Logged out }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /api/v1/auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request a self-service password reset email
+      operationId: forgotPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202':
+          description: >-
+            Always returned with the same body, whether or not an account with
+            that email exists or is active (no user enumeration). When it does,
+            a single-use reset link valid for 60 minutes is emailed; a new
+            request invalidates any earlier unused link for the account.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /api/v1/auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Set a new password using an emailed reset token
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, format: password }
+      responses:
+        '204':
+          description: >-
+            Password updated; every refresh token of the account is revoked, so
+            all existing sessions end. The reset token is single-use.
+        '400':
+          description: >-
+            Unknown, expired, or already-used token — stable code
+            RESET_TOKEN_INVALID; the cases are deliberately indistinguishable.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /api/v1/auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change your own password (authenticated)
+      description: >-
+        A signed-in user rotates their own password by proving the current one.
+        On success every other session is revoked while the caller's own session
+        is kept, so other devices are logged out but this one stays signed in.
+      operationId: changePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, format: password }
+                newPassword: { type: string, format: password }
+      responses:
+        '204':
+          description: >-
+            Password updated; every OTHER refresh token of the account is
+            revoked. The caller's session is re-established.
+        '401':
+          description: >-
+            Not authenticated, or the current password is wrong — stable code
+            CURRENT_PASSWORD_INVALID.
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: The authenticated user with global role
+      operationId: authMe
+      responses:
+        '200': { description: Current user, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/invitations/{token}:
+    get:
+      tags: [Auth]
+      summary: Look up a pending invitation by token
+      operationId: getInvitation
+      security: []
+      parameters: [ { name: token, in: path, required: true, schema: { type: string } } ]
+      responses:
+        '200': { description: Invitation details }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/invitations/{token}/accept:
+    post:
+      tags: [Auth]
+      summary: Accept an invitation and set a password
+      operationId: acceptInvitation
+      security: []
+      parameters: [ { name: token, in: path, required: true, schema: { type: string } } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                displayName: { type: string }
+                password: { type: string, format: password }
+      responses:
+        '200': { description: Account activated, content: { application/json: { schema: { $ref: '#/components/schemas/AuthToken' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/invitations:
+    post:
+      tags: [Auth]
+      summary: Create an invitation (ADMIN+)
+      operationId: createInvitation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                globalRole: { $ref: '#/components/schemas/GlobalRole' }
+      responses:
+        '201': { description: Invitation created }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ───────────────────────── Admin ─────────────────────────
+  /api/v1/admin/users:
+    get:
+      tags: [Admin]
+      summary: List users (ADMIN+)
+      operationId: adminListUsers
+      responses:
+        '200': { description: Users, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminUser' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/users/{userId}:
+    parameters: [ { $ref: '#/components/parameters/userId' } ]
+    patch:
+      tags: [Admin]
+      summary: Update a user (ADMIN+)
+      operationId: adminUpdateUser
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, properties: { displayName: { type: string }, globalRole: { $ref: '#/components/schemas/GlobalRole' } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/users/{userId}/reset-password:
+    parameters: [ { $ref: '#/components/parameters/userId' } ]
+    post:
+      tags: [Admin]
+      summary: Reset a user's password (ADMIN+)
+      operationId: adminResetPassword
+      responses:
+        '200': { description: Password reset / invitation re-issued }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────────────────── Audit ─────────────────────────
+  /api/v1/audit-logs:
+    get:
+      tags: [Audit]
+      summary: List audit-log entries (SUPER_ADMIN)
+      operationId: listAuditLogs
+      parameters: [ { $ref: '#/components/parameters/page' }, { $ref: '#/components/parameters/size' } ]
+      responses:
+        '200': { description: Audit log entries }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ───────────────────── User management ─────────────────────
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: List users (SUPER_ADMIN, rate-limited 60/min)
+      operationId: listUsers
+      parameters: [ { $ref: '#/components/parameters/page' }, { $ref: '#/components/parameters/size' } ]
+      responses:
+        '200': { description: Users, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AdminUser' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    post:
+      tags: [Users]
+      summary: Create a user (SUPER_ADMIN)
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                displayName: { type: string }
+                globalRole: { $ref: '#/components/schemas/GlobalRole' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /api/v1/users/{userId}:
+    parameters: [ { $ref: '#/components/parameters/userId' } ]
+    get:
+      tags: [Users]
+      summary: Get a user (SUPER_ADMIN)
+      operationId: getUser
+      responses:
+        '200': { description: User, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Users]
+      summary: Update a user (SUPER_ADMIN)
+      operationId: updateUser
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { email: { type: string, format: email }, displayName: { type: string }, globalRole: { $ref: '#/components/schemas/GlobalRole' } } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Users]
+      summary: Delete a user (SUPER_ADMIN)
+      operationId: deleteUser
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/users/{userId}/disable:
+    parameters: [ { $ref: '#/components/parameters/userId' } ]
+    patch:
+      tags: [Users]
+      summary: Enable/disable a user (SUPER_ADMIN); disabling revokes refresh tokens
+      operationId: disableUser
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { disabled: { type: boolean } } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─────────────── Current user & notifications ───────────────
+  /api/v1/users/me:
+    get:
+      tags: [Users]
+      summary: The current user
+      operationId: usersMe
+      responses:
+        '200': { description: Current user, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/users/me/avatar:
+    post:
+      tags: [Users]
+      summary: Upload my profile picture
+      description: Multipart image (PNG/JPEG/GIF/WebP, max 2 MiB) in a `file` part. SVG is rejected.
+      operationId: usersMeAvatarUpload
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { description: Avatar stored, content: { application/json: { schema: { type: object, properties: { avatarUpdatedAt: { type: string } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { description: Image too large }
+        '415': { description: Unsupported image type }
+    delete:
+      tags: [Users]
+      summary: Remove my profile picture
+      operationId: usersMeAvatarDelete
+      responses:
+        '204': { description: Removed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/users/{userId}/avatar:
+    get:
+      tags: [Users]
+      summary: A user's profile picture
+      description: Raw image bytes, or 404 if the user has no avatar. Any authenticated user may view any user's avatar.
+      operationId: usersAvatarGet
+      parameters:
+        - { name: userId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The image, content: { image/png: {}, image/jpeg: {}, image/gif: {}, image/webp: {} } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: No avatar }
+  /api/v1/users/me/dashboard:
+    get:
+      tags: [Users]
+      summary: My Work dashboard aggregation
+      operationId: usersMeDashboard
+      responses:
+        '200': { description: Dashboard data }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/users/me/notifications:
+    get:
+      tags: [Notifications]
+      summary: List my notifications
+      operationId: listNotifications
+      parameters: [ { $ref: '#/components/parameters/page' }, { $ref: '#/components/parameters/size' } ]
+      responses:
+        '200': { description: Notifications, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Notification' } } } } }
+  /api/v1/users/me/notifications/{id}:
+    parameters: [ { name: id, in: path, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Notifications]
+      summary: Mark a notification read/unread
+      operationId: updateNotification
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { isRead: { type: boolean } } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Notification' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/users/me/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark all my notifications as read
+      operationId: readAllNotifications
+      responses:
+        '204': { description: All marked read }
+  /api/v1/users/me/notification-preferences:
+    get:
+      tags: [Notifications]
+      summary: Get my per-kind notification preferences
+      operationId: getNotificationPreferences
+      responses:
+        '200': { description: Preferences, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NotificationPreference' } } } } }
+    patch:
+      tags: [Notifications]
+      summary: Update my notification preferences
+      operationId: updateNotificationPreferences
+      requestBody: { required: true, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NotificationPreference' } } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NotificationPreference' } } } } }
+  /api/v1/users/me/preferences:
+    get:
+      tags: [Dashboard]
+      summary: Get my language/theme preferences
+      operationId: getPreferences
+      responses:
+        '200': { description: Preferences, content: { application/json: { schema: { $ref: '#/components/schemas/Preferences' } } } }
+    patch:
+      tags: [Dashboard]
+      summary: Update my language/theme preferences
+      operationId: updatePreferences
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Preferences' } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Preferences' } } } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/users/me/mfa/enroll:
+    post:
+      tags: [MFA]
+      summary: Begin MFA enrollment (generates a pending TOTP secret)
+      description: >
+        Requires the account password for re-authentication when called with a
+        normal access token, so a stolen access token alone cannot enable MFA.
+        The forced-enrollment-at-login flow (scoped enrollment token) is exempt.
+      operationId: enrollMfa
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { password: { type: string, format: password } } } } } }
+      responses:
+        '200': { description: Enrollment started, content: { application/json: { schema: { $ref: '#/components/schemas/MfaEnrollment' } } } }
+        '401': { description: Password re-authentication required (stable code REAUTH_REQUIRED) }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/users/me/mfa/confirm:
+    post:
+      tags: [MFA]
+      summary: Confirm MFA enrollment with a TOTP code, activating MFA
+      operationId: confirmMfa
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [code], properties: { code: { type: string } } } } } }
+      responses:
+        '200': { description: MFA enabled, content: { application/json: { schema: { $ref: '#/components/schemas/MfaRecoveryCodes' } } } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/users/me/mfa/disable:
+    post:
+      tags: [MFA]
+      summary: Disable MFA (requires the current password or a valid code)
+      operationId: disableMfa
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { password: { type: string }, code: { type: string } } } } } }
+      responses:
+        '204': { description: MFA disabled }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/users/me/mfa/recovery-codes/regenerate:
+    post:
+      tags: [MFA]
+      summary: Regenerate recovery codes (requires the current password or a valid code)
+      operationId: regenerateMfaRecoveryCodes
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { password: { type: string }, code: { type: string } } } } } }
+      responses:
+        '200': { description: New recovery codes, content: { application/json: { schema: { $ref: '#/components/schemas/MfaRecoveryCodes' } } } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  # ───────────────────────── Projects ─────────────────────────
+  /api/v1/projects:
+    get:
+      tags: [Projects]
+      summary: List projects visible to the user
+      operationId: listProjects
+      parameters: [ { $ref: '#/components/parameters/page' }, { $ref: '#/components/parameters/size' } ]
+      responses:
+        '200': { description: Projects, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Project' } } } } }
+    post:
+      tags: [Projects]
+      summary: Create a project
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, abbreviation]
+              properties:
+                name: { type: string }
+                abbreviation: { type: string }
+                description: { type: string }
+                visibility: { $ref: '#/components/schemas/Visibility' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/projects/{projectId}:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Projects]
+      summary: Get a project
+      operationId: getProject
+      responses:
+        '200': { description: Project, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Projects]
+      summary: Update a project
+      description: >-
+        Ordinary members may edit name/description/visibility. The project
+        settings — themeEnabled, initiativeEnabled and estimationUnit —
+        additionally require project owner/admin, and answer 403 FORBIDDEN
+        otherwise. Unknown keys are rejected with 400 UNSUPPORTED_FIELD —
+        status in particular changes only via POST /projects/{projectId}/archive.
+      operationId: updateProject
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Projects]
+      summary: Delete a project
+      operationId: deleteProject
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/projects/{projectId}/archive:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    post:
+      tags: [Projects]
+      summary: Archive a project (owner only)
+      description: >
+        Freezes the project: every write route answers 409 PROJECT_ARCHIVED
+        while reads keep working. Reversible via the unarchive route below.
+      operationId: archiveProject
+      responses:
+        '200': { description: Archived, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/projects/{projectId}/unarchive:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    post:
+      tags: [Projects]
+      summary: Put an archived project back into ACTIVE (owner only)
+      description: >
+        The way out of the archived state. It cannot be done through PATCH
+        /projects/{projectId}, which is itself frozen while the project is
+        archived. Idempotent on a project that is already active.
+      operationId: unarchiveProject
+      responses:
+        '200': { description: Active again, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/projects/{projectId}/permissions:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Projects]
+      summary: The caller's effective permission matrix for the project
+      operationId: getProjectPermissions
+      responses:
+        '200': { description: Permission map }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/projects/{projectId}/activity:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Projects]
+      summary: Project activity feed
+      operationId: getProjectActivity
+      parameters: [ { $ref: '#/components/parameters/page' }, { $ref: '#/components/parameters/size' } ]
+      responses:
+        '200': { description: Activity entries }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────────────── Memberships ─────────────────────
+  /api/v1/projects/{projectId}/members:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Projects]
+      summary: List members (with user details)
+      operationId: listMembers
+      responses:
+        '200': { description: Members, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/MemberWithUser' } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/projects/{projectId}/assignable-users:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Projects]
+      summary: List users assignable as a task's assignee or reviewer
+      description: >-
+        The project's members plus every active global ADMIN/SUPER_ADMIN account.
+        Global admins reach projects without a membership row, so a picker fed
+        from the member list alone would exclude them.
+      operationId: listAssignableUsers
+      responses:
+        '200': { description: Assignable users, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AssignableUser' } } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/projects/{projectId}/memberships:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Projects]
+      summary: List memberships
+      operationId: listMemberships
+      responses:
+        '200': { description: Memberships, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Membership' } } } } }
+    post:
+      tags: [Projects]
+      summary: Add a member
+      operationId: addMembership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, role]
+              properties:
+                userId: { type: string, format: uuid }
+                role: { $ref: '#/components/schemas/ProjectRole' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Membership' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /api/v1/projects/{projectId}/memberships/{userId}:
+    parameters: [ { $ref: '#/components/parameters/projectId' }, { $ref: '#/components/parameters/userId' } ]
+    patch:
+      tags: [Projects]
+      summary: Update a member's role
+      operationId: updateMembership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { $ref: '#/components/schemas/ProjectRole' }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Membership' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [Projects]
+      summary: Remove a member
+      operationId: removeMembership
+      responses:
+        '204': { description: Removed }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  # ───────────────────────── Tasks ─────────────────────────
+  /api/v1/projects/{projectId}/tasks:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Tasks]
+      summary: List/filter tasks
+      operationId: listTasks
+      parameters:
+        - { $ref: '#/components/parameters/page' }
+        - { $ref: '#/components/parameters/size' }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: assigneeId, in: query, schema: { type: string, format: uuid } }
+        - { name: taskType, in: query, schema: { $ref: '#/components/schemas/TaskType' } }
+        - { name: type, in: query, description: 'Alias for taskType; what existing clients send.', schema: { $ref: '#/components/schemas/TaskType' } }
+        - { name: parentId, in: query, schema: { type: string, format: uuid } }
+        - { name: priority, in: query, schema: { $ref: '#/components/schemas/Priority' } }
+        - { name: releaseId, in: query, schema: { type: string, format: uuid } }
+        - { name: sprintId, in: query, schema: { type: string, format: uuid } }
+        - { name: sortBy, in: query, description: 'Sort key: created_at (default), updated_at, priority or title.', schema: { type: string, enum: [created_at, updated_at, priority, title] } }
+        - { name: order, in: query, description: 'Sort direction: desc (default) or asc.', schema: { type: string, enum: [asc, desc] } }
+        # Free-text search is its own operation (searchTasks, /tasks/search?q=);
+        # this route never read a `q` and silently ignored it.
+      responses:
+        '200':
+          description: Tasks (one page; the body stays a bare array)
+          headers:
+            X-Total-Count: { description: 'Total tasks matching the filters across all pages, so a client can tell a full page from a truncated listing.', schema: { type: integer } }
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Task' } } } }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    post:
+      tags: [Tasks]
+      summary: Create a task
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string }
+                description: { type: string }
+                taskType: { $ref: '#/components/schemas/TaskType' }
+                priority: { $ref: '#/components/schemas/Priority' }
+                parentId: { type: string, format: uuid, description: 'Hierarchy parent (required for SUBTASK)' }
+                assigneeId: { type: string, format: uuid }
+                releaseId: { type: string, format: uuid }
+                sprintId: { type: string, format: uuid }
+                dueDate: { type: string, format: date }
+                storyPoints: { type: integer, nullable: true, minimum: 0, maximum: 100, description: 'Effort estimate in story points. Validated exactly as on PATCH /tasks/{taskId}: requires the project''s estimationUnit to be POINTS (else 422 ESTIMATION_UNIT_INACTIVE), an estimable leaf type (else 422 ESTIMATION_NOT_ALLOWED_FOR_TYPE) and a value in range (else 422 STORY_POINTS_INVALID). Omitted or null creates an unestimated task; 0 is a deliberate estimate.' }
+                estimateHours: { type: number, format: double, nullable: true, minimum: 0, maximum: 1000, description: 'Effort estimate in hours (max 2 decimal places). Requires estimationUnit HOURS; same rules as storyPoints, with 422 ESTIMATE_HOURS_INVALID out of range.' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/projects/{projectId}/tasks/bulk:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    post:
+      tags: [Tasks]
+      summary: Bulk action on multiple tasks
+      operationId: bulkTasks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskIds, action]
+              properties:
+                taskIds: { type: array, items: { type: string, format: uuid }, minItems: 1, maxItems: 500 }
+                action: { type: string }
+                value: { type: string }
+      responses:
+        '200': { description: Bulk result }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        # VALIDATION_ERROR (empty taskIds) or BULK_TOO_MANY_TASKS (over maxItems).
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/projects/{projectId}/backlog:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Tasks]
+      summary: Backlog tasks (not in an active sprint)
+      operationId: getBacklog
+      responses:
+        '200': { description: Tasks, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Task' } } } } }
+  /api/v1/projects/{projectId}/search/tasks:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Search]
+      summary: Search tasks in a project
+      operationId: searchTasks
+      # Shorter than minLength answers 200 with an empty result set rather than an
+      # error: pg_trgm extracts no trigram below 3 characters, so a 1- or 2-character
+      # pattern cannot use the GIN indexes and would sequentially scan.
+      parameters: [ { name: q, in: query, required: true, schema: { type: string, minLength: 3, maxLength: 500 } } ]
+      responses:
+        '200': { description: Matching tasks, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Task' } } } } }
+  /api/v1/tasks/{taskId}:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    get:
+      tags: [Tasks]
+      summary: Get a task
+      operationId: getTask
+      responses:
+        '200': { description: Task, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Tasks]
+      summary: Update a task
+      operationId: updateTask
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TaskUpdate' } } } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [Tasks]
+      summary: Delete a task
+      operationId: deleteTask
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/v1/tasks/{taskId}/archive:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    post: { tags: [Tasks], summary: Archive a task, operationId: archiveTask, responses: { '200': { description: Archived, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/tasks/{taskId}/reopen:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    post: { tags: [Tasks], summary: Reopen a task, operationId: reopenTask, responses: { '200': { description: Reopened, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/tasks/{taskId}/pin:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    post: { tags: [Tasks], summary: Pin or unpin a task, operationId: setTaskPin, requestBody: { required: true, content: { application/json: { schema: { type: object, required: [pinned], properties: { pinned: { type: boolean } } } } } }, responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/tasks/{taskId}/copy:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    post: { tags: [Tasks], summary: Copy a task, operationId: copyTask, responses: { '201': { description: Copy created, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/tasks/{taskId}/assign:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    post:
+      tags: [Tasks]
+      summary: Assign a task
+      description: >-
+        assigneeId and reviewerId must name a member of the project or a global
+        admin — the set returned by GET /api/v1/projects/{projectId}/assignable-users.
+        Anything else is rejected with 422 ASSIGNEE_INVALID / REVIEWER_INVALID.
+        Sending null or an empty string clears the field and is always allowed.
+      operationId: assignTask
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { assigneeId: { type: string, format: uuid, nullable: true }, reviewerId: { type: string, format: uuid, nullable: true }, version: { type: integer, description: Optional task version the change is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /api/v1/tasks/{taskId}/status:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    post:
+      tags: [Tasks]
+      summary: Change task status (fails with TASK_HAS_BLOCKER when moving to DONE while a child task has BLOCKER priority)
+      operationId: setTaskStatus
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/TaskStatus' }, version: { type: integer, description: Optional task version the change is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /api/v1/tasks/{taskId}/priority:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    post:
+      tags: [Tasks]
+      summary: Change task priority
+      operationId: setTaskPriority
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [priority], properties: { priority: { $ref: '#/components/schemas/Priority' }, version: { type: integer, description: Optional task version the change is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/v1/tasks/{taskId}/activity:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    get: { tags: [Tasks], summary: Task activity feed, operationId: getTaskActivity, responses: { '200': { description: Activity entries }, '404': { $ref: '#/components/responses/NotFound' } } }
+
+  /api/v1/tasks/{taskId}/comments:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    get: { tags: [Tasks], summary: List comments, operationId: listComments, responses: { '200': { description: Comments, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TaskComment' } } } } } } }
+    post:
+      tags: [Tasks]
+      summary: Add a comment (supports @mention and threaded replies)
+      operationId: addComment
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [text], properties: { text: { type: string }, parentId: { type: string, format: uuid, nullable: true, description: When set, threads this comment as a reply to an existing comment on the same task } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskComment' } } } } }
+  /api/v1/tasks/{taskId}/comments/{commentId}:
+    parameters: [ { $ref: '#/components/parameters/taskId' }, { name: commentId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Tasks]
+      summary: Edit a comment
+      operationId: updateComment
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [text], properties: { text: { type: string }, version: { type: integer, description: Optional comment version the edit is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/TaskComment' } } } }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete: { tags: [Tasks], summary: Delete a comment, operationId: deleteComment, responses: { '204': { description: Deleted }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
+
+  /api/v1/tasks/{taskId}/links:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    get: { tags: [Tasks], summary: List links, operationId: listLinks, responses: { '200': { description: Links, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TaskLink' } } } } } } }
+    post:
+      tags: [Tasks]
+      summary: Add a link
+      operationId: addLink
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [url], properties: { url: { type: string }, title: { type: string } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskLink' } } } } }
+  /api/v1/tasks/{taskId}/links/{linkId}:
+    parameters: [ { $ref: '#/components/parameters/taskId' }, { name: linkId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    delete: { tags: [Tasks], summary: Delete a link, operationId: deleteLink, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+
+  /api/v1/tasks/{taskId}/attachments:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    get: { tags: [Tasks], summary: List attachments, operationId: listAttachments, responses: { '200': { description: Attachments, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TaskAttachment' } } } } } } }
+    post:
+      tags: [Tasks]
+      summary: Record an external-link attachment (metadata only, no bytes)
+      description: Records an attachment that points at an external URL. For uploading file bytes use POST /api/v1/tasks/{taskId}/attachments/upload.
+      operationId: addAttachment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                filename: { type: string }
+                contentType: { type: string }
+                sizeBytes: { type: integer, format: int64 }
+                externalUrl: { type: string }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskAttachment' } } } }, '400': { $ref: '#/components/responses/BadRequest' } }
+  /api/v1/tasks/{taskId}/attachments/upload:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    post:
+      tags: [Tasks]
+      summary: Upload a file attachment (multipart, size/type bounded)
+      description: >
+        Streams an uploaded file under a server-generated storage key. The size is
+        capped (OCTBASE_MAX_UPLOAD_MB, default 25 MiB) and the content type must be
+        on the server allowlist; both the declared and byte-sniffed type are checked.
+        SVG is rejected. Returns 503 when uploads are not configured.
+      operationId: uploadAttachment
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, required: [file], properties: { file: { type: string, format: binary } } } } } }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskAttachment' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { description: Uploaded file exceeds the maximum allowed size }
+        '415': { description: Disallowed file type }
+        '503': { description: File uploads are not configured }
+  /api/v1/tasks/{taskId}/attachments/{attachmentId}:
+    parameters: [ { $ref: '#/components/parameters/taskId' }, { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    delete: { tags: [Tasks], summary: Delete an attachment, operationId: deleteAttachment, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/tasks/{taskId}/attachments/{attachmentId}/content:
+    parameters: [ { $ref: '#/components/parameters/taskId' }, { name: attachmentId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Tasks]
+      summary: Download attachment bytes
+      description: Streams the stored file. Images are served inline (Content-Disposition inline) to back the inline preview; all other types download. X-Content-Type-Options nosniff is always set. Enforces the same task-visibility guard as the task read.
+      operationId: downloadAttachment
+      responses:
+        '200': { description: Attachment bytes, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { description: File uploads are not configured }
+
+  /api/v1/tasks/{taskId}/relations:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    get: { tags: [Tasks], summary: List relations, operationId: listRelations, responses: { '200': { description: Relations, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TaskRelation' } } } } } } }
+    post:
+      tags: [Tasks]
+      summary: Add a relation
+      operationId: addRelation
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [targetTaskId, relationType], properties: { targetTaskId: { type: string, format: uuid }, relationType: { $ref: '#/components/schemas/RelationType' } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskRelation' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /api/v1/tasks/{taskId}/relations/{relationId}:
+    parameters: [ { $ref: '#/components/parameters/taskId' }, { name: relationId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    delete: { tags: [Tasks], summary: Delete a relation, operationId: deleteRelation, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/projects/{projectId}/relations:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Tasks], summary: List all task relations in a project, operationId: listProjectRelations, responses: { '200': { description: Relations, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TaskRelation' } } } } } } }
+
+  /api/v1/tasks/{taskId}/branches:
+    parameters: [ { $ref: '#/components/parameters/taskId' } ]
+    get: { tags: [SCM], summary: List branch references for a task, operationId: listBranches, responses: { '200': { description: Branches, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/BranchReference' } } } } } } }
+    post:
+      tags: [SCM]
+      summary: Create a branch reference
+      operationId: addBranch
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [repositoryId, branchName], properties: { repositoryId: { type: string, format: uuid }, branchName: { type: string }, branchType: { $ref: '#/components/schemas/BranchType' } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/BranchReference' } } } } }
+  /api/v1/tasks/{taskId}/branches/{branchId}:
+    parameters: [ { $ref: '#/components/parameters/taskId' }, { name: branchId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    delete: { tags: [SCM], summary: Delete a branch reference, operationId: deleteBranch, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/tasks/{taskId}/branches/{branchId}/pull-request:
+    parameters: [ { $ref: '#/components/parameters/taskId' }, { name: branchId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [SCM]
+      summary: Open a pull/merge request for a branch via the connected provider
+      operationId: createPullRequest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, description: Defaults to the branch name when omitted }
+                body: { type: string }
+                targetBranch: { type: string, description: Defaults to the connection's default branch }
+      responses:
+        '201': { description: Pull request opened, content: { application/json: { schema: { type: object, properties: { number: { type: integer }, url: { type: string }, status: { type: string } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { description: Upstream SCM provider error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ───────────────────────── Boards ─────────────────────────
+  /api/v1/projects/{projectId}/boards:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Boards], summary: List boards, operationId: listBoards, responses: { '200': { description: Boards, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Board' } } } } } } }
+    post:
+      tags: [Boards]
+      summary: Create a board
+      operationId: createBoard
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, isDefault: { type: boolean } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } } }
+  /api/v1/projects/{projectId}/boards/default:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Boards], summary: Get the default board, operationId: getDefaultBoard, responses: { '200': { description: Board, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/boards/{boardId}:
+    parameters: [ { $ref: '#/components/parameters/boardId' } ]
+    get: { tags: [Boards], summary: Get a board, operationId: getBoard, responses: { '200': { description: Board, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+    patch:
+      tags: [Boards]
+      summary: Update a board
+      operationId: updateBoard
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Board' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete: { tags: [Boards], summary: Delete a board, operationId: deleteBoard, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/boards/{boardId}/columns:
+    parameters: [ { $ref: '#/components/parameters/boardId' } ]
+    post:
+      tags: [Boards]
+      summary: Add a column (lane). The lane's status doubles as a task status.
+      operationId: addColumn
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, status: { type: string, description: 'Task status this lane represents (defaults to PLANNED). A custom status becomes assignable to the project''s tasks; unique per board.' }, position: { type: integer } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/BoardColumn' } } } }, '409': { $ref: '#/components/responses/Conflict' } }
+  /api/v1/boards/{boardId}/columns/{columnId}:
+    parameters: [ { $ref: '#/components/parameters/boardId' }, { name: columnId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Boards]
+      summary: Rename/re-status/reorder a column
+      operationId: updateColumn
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { name: { type: string }, status: { type: string, description: 'Task status this lane represents; changing it retags the lane''s non-DONE/ARCHIVED tasks to the new status. Unique per board.' }, position: { type: integer }, version: { type: integer, description: Optional column version the edit is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/BoardColumn' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+    delete: { tags: [Boards], summary: Delete a column. The lane's tasks are detached back to the backlog (they keep their status)., operationId: deleteColumn, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/boards/{boardId}/external-columns:
+    parameters: [ { $ref: '#/components/parameters/boardId' } ]
+    get: { tags: [Boards], summary: List external columns, operationId: listExternalColumns, responses: { '200': { description: External columns, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/BoardExternalColumn' } } } } } } }
+    post:
+      tags: [Boards]
+      summary: Map a lane to an external (SCM) state
+      operationId: addExternalColumn
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BoardExternalColumn' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/BoardExternalColumn' } } } } }
+  /api/v1/boards/{boardId}/external-columns/{externalColumnId}:
+    parameters: [ { $ref: '#/components/parameters/boardId' }, { name: externalColumnId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    delete: { tags: [Boards], summary: Delete an external column, operationId: deleteExternalColumn, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/boards/{boardId}/move-task:
+    parameters: [ { $ref: '#/components/parameters/boardId' } ]
+    post:
+      tags: [Boards]
+      summary: Move a task to a column / rank on the board
+      description: >-
+        The task adopts the target lane's status (422 TASK_IMMUTABLE when a
+        DONE/ARCHIVED task would change status — reordering within its lane is
+        still allowed; 422 TASK_HAS_BLOCKER when moving into a DONE lane while
+        a child holds BLOCKER priority).
+        Moving a task onto a sprint board enrolls it in that board's sprint.
+        Once the sprint is ACTIVE its scope is locked, so a task not already in
+        the sprint cannot be added (422 SPRINT_SCOPE_LOCKED); tasks already in
+        the sprint may still be moved between lanes.
+      operationId: moveTask
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [taskId, boardColumnId], properties: { taskId: { type: string, format: uuid }, boardColumnId: { type: string, format: uuid }, boardRank: { type: integer }, version: { type: integer, description: Optional task version the move is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
+      responses: { '200': { description: Moved }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /api/v1/boards/{boardId}/remove-task:
+    parameters: [ { $ref: '#/components/parameters/boardId' } ]
+    post:
+      tags: [Boards]
+      summary: Remove a task from the board
+      operationId: removeTaskFromBoard
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [taskId], properties: { taskId: { type: string, format: uuid } } } } } }
+      responses: { '200': { description: Removed }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  # ───────────────────── Releases & sprints ─────────────────────
+  /api/v1/projects/{projectId}/releases:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Planning], summary: List releases, operationId: listReleases, responses: { '200': { description: Releases, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Release' } } } } } } }
+    post:
+      tags: [Planning]
+      summary: Create a release
+      operationId: createRelease
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, goal: { type: string }, dueDate: { type: string, format: date } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Release' } } } } }
+  /api/v1/releases/{releaseId}:
+    parameters: [ { name: releaseId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get: { tags: [Planning], summary: Get a release, operationId: getRelease, responses: { '200': { description: Release, content: { application/json: { schema: { $ref: '#/components/schemas/Release' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+    patch:
+      tags: [Planning]
+      summary: Update a release
+      operationId: updateRelease
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReleaseUpdate' } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Release' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+    delete: { tags: [Planning], summary: Delete a release, operationId: deleteRelease, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/releases/{releaseId}/close:
+    parameters: [ { name: releaseId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Planning]
+      summary: Close a release (fails with RELEASE_HAS_OPEN_TASKS if open tasks remain)
+      operationId: closeRelease
+      responses: { '200': { description: Closed, content: { application/json: { schema: { $ref: '#/components/schemas/Release' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /api/v1/releases/{releaseId}/reopen:
+    parameters: [ { name: releaseId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Planning]
+      summary: Reopen a closed release
+      operationId: reopenRelease
+      responses: { '200': { description: Reopened, content: { application/json: { schema: { $ref: '#/components/schemas/Release' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+  /api/v1/projects/{projectId}/sprints:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Planning], summary: List sprints, operationId: listSprints, responses: { '200': { description: Sprints, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Sprint' } } } } } } }
+    post:
+      tags: [Planning]
+      summary: Create a sprint
+      operationId: createSprint
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, goal: { type: string }, startDate: { type: string, format: date }, endDate: { type: string, format: date }, releaseId: { type: string, format: uuid, nullable: true } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Sprint' } } } }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /api/v1/sprints/{sprintId}:
+    parameters: [ { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get: { tags: [Planning], summary: Get a sprint, operationId: getSprint, responses: { '200': { description: Sprint, content: { application/json: { schema: { $ref: '#/components/schemas/Sprint' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+    patch:
+      tags: [Planning]
+      summary: Update a sprint
+      operationId: updateSprint
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/SprintUpdate' } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Sprint' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+    delete: { tags: [Planning], summary: Delete a sprint, operationId: deleteSprint, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/sprints/{sprintId}/start:
+    parameters: [ { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Planning]
+      summary: Start a sprint (only one ACTIVE per project)
+      operationId: startSprint
+      responses: { '200': { description: Started, content: { application/json: { schema: { $ref: '#/components/schemas/Sprint' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+  /api/v1/sprints/{sprintId}/complete:
+    parameters: [ { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Planning]
+      summary: Complete a sprint (unfinished tasks return to the backlog)
+      operationId: completeSprint
+      responses: { '200': { description: Completed, content: { application/json: { schema: { $ref: '#/components/schemas/Sprint' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+
+  # ───────────────────────── Reports ─────────────────────────
+  /api/v1/sprints/{sprintId}/burndown:
+    parameters: [ { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [Reports]
+      summary: Burndown for an ACTIVE or COMPLETED sprint, by task count or effort
+      description: >
+        One point per calendar day (UTC) of the sprint window: remaining =
+        the committed work not yet DONE/ARCHIVED at the end of that day,
+        reconstructed on read from activity_entries status transitions (with
+        tasks.done_at as fallback), plus the ideal straight line from
+        committed to 0. `unit` selects what is measured — `tasks` (the
+        default) counts tickets, `points`/`hours` burn down the estimates
+        themselves. An effort unit must match the project's active
+        estimationUnit; asking for one it does not use is 422
+        ESTIMATION_UNIT_INACTIVE rather than a silent fall back to counting.
+        Unestimated committed tasks weigh 0 and are reported in
+        `unestimated`. `unit` and `unestimated` appear only for an effort
+        request, so `?unit=tasks` and the no-param call are byte-identical to
+        what clients consumed before effort existed. For an ACTIVE sprint,
+        days in the future have remaining = null. History recorded before the
+        1.0.x status payloads lacks them on some transition kinds, so older
+        burndowns render approximately; the reconstruction also relies on
+        activity retention (OCTBASE_ACTIVITY_RETENTION_DAYS, default 365)
+        covering the sprint window. Requires project membership.
+      operationId: sprintBurndown
+      parameters:
+        - name: unit
+          in: query
+          schema: { type: string, enum: [tasks, points, hours], default: tasks }
+      responses:
+        '200':
+          description: Burndown series
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sprintId: { type: string, format: uuid }
+                  name: { type: string }
+                  status: { type: string, enum: [ACTIVE, COMPLETED] }
+                  startDate: { type: string, format: date }
+                  endDate: { type: string, format: date }
+                  committed: { type: number, description: Committed task count, or committed effort for an effort unit }
+                  unit: { type: string, enum: [points, hours], description: Echoed back for an effort request only, so a chart cannot mislabel its axis }
+                  unestimated: { type: integer, description: Committed tasks carrying no estimate (effort requests only) }
+                  points:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date: { type: string, format: date }
+                        remaining: { type: number, nullable: true }
+                        ideal: { type: number }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { description: Sprint has not started (SPRINT_NOT_STARTED), or the requested unit is not the project's active estimation unit (ESTIMATION_UNIT_INACTIVE), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/projects/{projectId}/reports/velocity:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Reports]
+      summary: Velocity of the last N completed sprints
+      description: >
+        The last N (default 6, cap 20) COMPLETED sprints as
+        committed/completed pairs, oldest first — a projection of the values
+        snapshotted at sprint completion. Every sprint reports task counts;
+        one completed while the project was estimating additionally reports
+        committedEstimate/completedEstimate and the estimateUnit they were
+        measured in. The unit is stored per sprint, so switching the project
+        from POINTS to HOURS never relabels or recomputes a historical
+        sprint — and a mixed-unit history must be rendered as such rather
+        than summed. Requires project membership.
+      operationId: projectVelocity
+      parameters: [ { name: n, in: query, schema: { type: integer, default: 6, maximum: 20 } } ]
+      responses:
+        '200':
+          description: Velocity entries, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    sprintId: { type: string, format: uuid }
+                    name: { type: string }
+                    endDate: { type: string, format: date, nullable: true }
+                    committed: { type: integer }
+                    completed: { type: integer }
+                    committedEstimate: { type: number, nullable: true }
+                    completedEstimate: { type: number, nullable: true }
+                    estimateUnit: { type: string, enum: [POINTS, HOURS], nullable: true }
+  /api/v1/projects/{projectId}/reports/statistics:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Reports]
+      summary: Project statistics overview for a project manager
+      description: >
+        Everything the statistics page draws, in one read-time projection —
+        no snapshot table and no scheduled job. Task totals and the
+        status/type/priority distributions (empty buckets included, in the
+        domain's own order, so a chart keeps its shape between reloads);
+        overdue, due-soon and unassigned counts over OPEN tasks only; the
+        30-day created/completed flow; weekly throughput for the last 8
+        weeks; average and median cycle time from creation to DONE over the
+        last 90 days; open work per assignee; the active sprint; and the
+        release plan. `effort` is null unless the project estimates, so zeros
+        can never be mistaken for "nothing left to do". Requires project
+        membership — the numbers aggregate exactly what a member can already
+        read task by task.
+      operationId: projectStatistics
+      responses:
+        '200':
+          description: Project statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projectId: { type: string, format: uuid }
+                  generatedAt: { type: string, format: date-time }
+                  estimationUnit: { type: string, enum: [NONE, POINTS, HOURS] }
+                  tasks:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      open: { type: integer }
+                      inProgress: { type: integer }
+                      done: { type: integer }
+                      archived: { type: integer }
+                      unassigned: { type: integer }
+                      overdue: { type: integer }
+                      dueSoon: { type: integer }
+                      createdLast30: { type: integer }
+                      completedLast30: { type: integer }
+                      byStatus: { $ref: '#/components/schemas/CountDistribution' }
+                      byType: { $ref: '#/components/schemas/CountDistribution' }
+                      byPriority: { $ref: '#/components/schemas/CountDistribution' }
+                  effort:
+                    type: object
+                    nullable: true
+                    properties:
+                      unit: { type: string, enum: [POINTS, HOURS] }
+                      total: { type: number }
+                      done: { type: number }
+                      remaining: { type: number }
+                      unestimated: { type: integer }
+                  throughput:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        weekStart: { type: string, format: date }
+                        completed: { type: integer }
+                        effort: { type: number, nullable: true }
+                  cycleTime:
+                    type: object
+                    properties:
+                      sampleSize: { type: integer }
+                      averageDays: { type: number, nullable: true }
+                      medianDays: { type: number, nullable: true }
+                  workload:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        userId: { type: string, format: uuid }
+                        name: { type: string }
+                        open: { type: integer }
+                        effort: { type: number, nullable: true }
+                  sprint:
+                    type: object
+                    nullable: true
+                    properties:
+                      sprintId: { type: string, format: uuid }
+                      name: { type: string }
+                      startDate: { type: string, format: date, nullable: true }
+                      endDate: { type: string, format: date, nullable: true }
+                      committed: { type: integer }
+                      completed: { type: integer }
+                      daysRemaining: { type: integer, nullable: true, description: End date inclusive — a sprint ending today has 1 day left }
+                      committedEstimate: { type: number, nullable: true }
+                      completedEstimate: { type: number, nullable: true }
+                  releases:
+                    type: object
+                    properties:
+                      open: { type: integer }
+                      closed: { type: integer }
+                      nextDue: { type: string, format: date, nullable: true }
+                      nextDueName: { type: string, nullable: true }
+                      overdueOpen: { type: integer }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─────────────── Task categories & templates ───────────────
+  /api/v1/projects/{projectId}/task-categories:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Categories], summary: List task categories, operationId: listTaskCategories, responses: { '200': { description: Categories, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TaskCategory' } } } } } } }
+    post:
+      tags: [Categories]
+      summary: Create a task category
+      operationId: createTaskCategory
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, description: { type: string }, color: { type: string } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskCategory' } } } } }
+  /api/v1/task-categories/{categoryId}:
+    parameters: [ { name: categoryId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [Categories]
+      summary: Update a task category
+      operationId: updateTaskCategory
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TaskCategory' } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/TaskCategory' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete: { tags: [Categories], summary: Delete a task category, operationId: deleteTaskCategory, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/projects/{projectId}/task-priorities:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Categories], summary: List the project's custom priorities (built-ins live in /meta/enums), operationId: listTaskPriorities, responses: { '200': { description: Custom priorities, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ProjectPriority' } } } } } } }
+    post:
+      tags: [Categories]
+      summary: Add a custom priority (project admins only)
+      operationId: createTaskPriority
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string, description: 'Normalized to UPPER_SNAKE; must not collide with a built-in priority' }, rank: { type: integer } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectPriority' } } } }, '409': { description: 'PRIORITY_EXISTS — duplicate name' }, '422': { description: 'INVALID_PRIORITY_NAME or PRIORITY_RESERVED' } }
+  /api/v1/task-priorities/{priorityId}:
+    parameters: [ { name: priorityId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    delete: { tags: [Categories], summary: Delete a custom priority (project admins only; 422 PRIORITY_IN_USE while tasks/templates use it), operationId: deleteTaskPriority, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' }, '422': { description: 'PRIORITY_IN_USE' } } }
+  /api/v1/projects/{projectId}/task-templates:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Categories], summary: List task templates, operationId: listTaskTemplates, responses: { '200': { description: Templates, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TaskTemplate' } } } } } } }
+    post:
+      tags: [Categories]
+      summary: Create a task template
+      operationId: createTaskTemplate
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TaskTemplate' } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskTemplate' } } } } }
+  /api/v1/task-templates/{templateId}:
+    parameters: [ { name: templateId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get: { tags: [Categories], summary: Get a task template, operationId: getTaskTemplate, responses: { '200': { description: Template, content: { application/json: { schema: { $ref: '#/components/schemas/TaskTemplate' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+    patch:
+      tags: [Categories]
+      summary: Update a task template
+      operationId: updateTaskTemplate
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/TaskTemplate' } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/TaskTemplate' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete: { tags: [Categories], summary: Delete a task template, operationId: deleteTaskTemplate, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/task-templates/{templateId}/instantiate:
+    parameters: [ { name: templateId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [Categories]
+      summary: Create a task from a template
+      operationId: instantiateTaskTemplate
+      responses: { '201': { description: Task created, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+
+  # ───────────────────────── Docs ─────────────────────────
+  /api/v1/projects/{projectId}/pages:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [Docs], summary: List wiki pages, operationId: listPages, responses: { '200': { description: Pages, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Page' } } } } } } }
+    post:
+      tags: [Docs]
+      summary: Create a wiki page
+      operationId: createPage
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [title], properties: { title: { type: string }, content: { type: string }, parentPageId: { type: string, format: uuid } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Page' } } } } }
+  /api/v1/projects/{projectId}/search/pages:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Search]
+      summary: Search wiki pages in a project
+      operationId: searchPages
+      # Shorter than minLength answers 200 with an empty result set rather than an
+      # error: pg_trgm extracts no trigram below 3 characters, so a 1- or 2-character
+      # pattern cannot use the GIN indexes and would sequentially scan.
+      parameters: [ { name: q, in: query, required: true, schema: { type: string, minLength: 3, maxLength: 500 } } ]
+      responses: { '200': { description: Matching pages, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Page' } } } } } }
+  /api/v1/pages/{pageId}:
+    parameters: [ { $ref: '#/components/parameters/pageId' } ]
+    get: { tags: [Docs], summary: Get a page, operationId: getPage, responses: { '200': { description: Page, content: { application/json: { schema: { $ref: '#/components/schemas/Page' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }
+    patch:
+      tags: [Docs]
+      summary: Update a page (creates a revision)
+      description: >-
+        Applies title/content/slug (with version for the optimistic lock).
+        Unknown keys are rejected with 400 UNSUPPORTED_FIELD — status in
+        particular changes only via POST /pages/{pageId}/publish or /archive.
+      operationId: updatePage
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Page' } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Page' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
+    delete: { tags: [Docs], summary: Delete a page, operationId: deletePage, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/pages/{pageId}/publish:
+    parameters: [ { $ref: '#/components/parameters/pageId' } ]
+    post: { tags: [Docs], summary: Publish a page, operationId: publishPage, responses: { '200': { description: Published, content: { application/json: { schema: { $ref: '#/components/schemas/Page' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } } }
+  /api/v1/pages/{pageId}/archive:
+    parameters: [ { $ref: '#/components/parameters/pageId' } ]
+    post: { tags: [Docs], summary: Archive a page, operationId: archivePage, responses: { '200': { description: Archived, content: { application/json: { schema: { $ref: '#/components/schemas/Page' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } } }
+  /api/v1/pages/{pageId}/render-preview:
+    parameters: [ { $ref: '#/components/parameters/pageId' } ]
+    post:
+      tags: [Docs]
+      summary: Render AsciiDoc to HTML without saving
+      operationId: renderPreview
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { content: { type: string } } } } } }
+      responses: { '200': { description: Rendered HTML } }
+  /api/v1/pages/{pageId}/revisions:
+    parameters: [ { $ref: '#/components/parameters/pageId' } ]
+    get: { tags: [Docs], summary: List page revisions, operationId: listPageRevisions, responses: { '200': { description: Revisions, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PageRevision' } } } } } } }
+  /api/v1/pages/{pageId}/references:
+    parameters: [ { $ref: '#/components/parameters/pageId' } ]
+    get: { tags: [Docs], summary: List task cross-references for a page, operationId: listPageReferences, responses: { '200': { description: References, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/PageReference' } } } } } } }
+  /api/v1/pages/{pageId}/references/rebuild:
+    parameters: [ { $ref: '#/components/parameters/pageId' } ]
+    post: { tags: [Docs], summary: Rebuild task cross-references from page content, operationId: rebuildPageReferences, responses: { '200': { description: Rebuilt }, '404': { $ref: '#/components/responses/NotFound' } } }
+
+  # ───────────────────────── SCM ─────────────────────────
+  /api/v1/projects/{projectId}/repository-connections:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get: { tags: [SCM], summary: List repository connections, operationId: listRepositoryConnections, responses: { '200': { description: Connections, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RepositoryConnection' } } } } } } }
+    post:
+      tags: [SCM]
+      summary: Create a repository connection
+      operationId: createRepositoryConnection
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [provider, repositoryUrl], properties: { provider: { $ref: '#/components/schemas/Provider' }, displayName: { type: string }, repositoryUrl: { type: string }, defaultBranch: { type: string } } } } } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/RepositoryConnection' } } } } }
+  /api/v1/repository-connections/{repositoryId}:
+    parameters: [ { name: repositoryId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    patch:
+      tags: [SCM]
+      summary: Update a repository connection
+      operationId: updateRepositoryConnection
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/RepositoryConnection' } } } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/RepositoryConnection' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete: { tags: [SCM], summary: Delete a repository connection, operationId: deleteRepositoryConnection, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /api/v1/repository-connections/{repositoryId}/oauth/authorize:
+    parameters: [ { name: repositoryId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    get:
+      tags: [SCM]
+      summary: Begin the OAuth authorization flow for a repository connection
+      operationId: oauthAuthorize
+      description: Returns the provider authorization URL for the client to redirect the user to. Requires project owner.
+      responses:
+        '200': { description: Authorization URL, content: { application/json: { schema: { type: object, properties: { authorizeUrl: { type: string } } } } } }
+        '400': { description: OAuth not configured for the provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/repository-connections/{repositoryId}/oauth/refresh:
+    parameters: [ { name: repositoryId, in: path, required: true, schema: { type: string, format: uuid } } ]
+    post:
+      tags: [SCM]
+      summary: Refresh the OAuth access token for a repository connection
+      operationId: oauthRefresh
+      responses:
+        '200': { description: Refreshed, content: { application/json: { schema: { $ref: '#/components/schemas/RepositoryConnection' } } } }
+        '400': { description: Connection has no OAuth refresh token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/oauth/{provider}/callback:
+    parameters: [ { name: provider, in: path, required: true, schema: { type: string } } ]
+    get:
+      tags: [SCM]
+      summary: OAuth provider redirect callback
+      operationId: oauthCallback
+      description: Exchanges the authorization code, stores the token, and redirects to OCTBASE_APP_URL when set (otherwise returns JSON).
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Connected, content: { application/json: { schema: { type: object, properties: { connected: { type: boolean } } } } } }
+        '302': { description: Redirect to the application after a successful connection }
+        '400': { description: Missing/invalid code or state, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────────────────── Search ─────────────────────────
+  /api/v1/search:
+    get:
+      tags: [Search]
+      summary: Global cross-project search (command palette)
+      operationId: globalSearch
+      # Shorter than minLength answers 200 with an empty result set rather than an
+      # error: pg_trgm extracts no trigram below 3 characters, so a 1- or 2-character
+      # pattern cannot use the GIN indexes and would sequentially scan.
+      parameters: [ { name: q, in: query, required: true, schema: { type: string, minLength: 3, maxLength: 500 } } ]
+      responses: { '200': { description: Mixed search results } }
+
+  # ───────────────── Import / export (project ZIP) ─────────────────
+  /api/v1/projects/import:
+    post:
+      tags: [Projects]
+      summary: Create a new project from a project export archive (ADMIN+, supports dryRun)
+      operationId: importProjectAsNew
+      parameters: [ { name: dryRun, in: query, schema: { type: boolean } } ]
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
+      responses: { '201': { description: Created project plus import result }, '200': { description: Dry-run preview (nothing persisted) }, '400': { description: Invalid archive (IMPORT_ARCHIVE_INVALID, IMPORT_FORMAT_UNSUPPORTED, IMPORT_TOO_LARGE) }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /api/v1/projects/{projectId}/export:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Projects]
+      summary: Export the whole project as a re-importable ZIP archive
+      description: >
+        The archive carries the project's tasks with their comments, links and
+        attachments (file bytes included), the task relations, the doc pages,
+        and the planning structure the tasks are placed in: releases, sprints,
+        boards with their lanes, task categories and task templates. Each task
+        keeps its releaseId, sprintId, boardColumnId and boardRank, so an import
+        restores the placement rather than a flat backlog.
+
+
+        Deliberately not exported: project memberships (an archive must not hand
+        out access), SCM repository connections (they hold credentials), board
+        columns mirrored from other projects, and the activity/audit log.
+      operationId: exportProject
+      responses: { '200': { description: ZIP archive, content: { application/zip: {} } }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /api/v1/projects/{projectId}/import:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    post:
+      tags: [Projects]
+      summary: Import a project export archive into this project (supports dryRun)
+      operationId: importProject
+      parameters: [ { name: dryRun, in: query, schema: { type: boolean } } ]
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
+      responses: { '200': { description: Import result (or dry-run preview) }, '400': { description: Invalid archive (IMPORT_ARCHIVE_INVALID, IMPORT_FORMAT_UNSUPPORTED, IMPORT_TOO_LARGE) }, '403': { $ref: '#/components/responses/Forbidden' } }
+
+  # ───────────────── Import / export (CSV) ─────────────────
+  /api/v1/projects/{projectId}/export/jira-csv:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Tasks]
+      summary: Export project tasks as Jira-compatible CSV
+      description: >
+        Emits the fixed Jira columns plus repeating Comment columns and, for
+        URL-backed attachments, repeating Attachment columns in Jira's
+        "date;author;filename;URL" format, so an Octbase→Octbase round-trip
+        preserves comments and external attachment links. Uploaded (binary)
+        attachments are not exported — they have no public URL.
+      operationId: exportJiraCsv
+      responses: { '200': { description: CSV file, content: { text/csv: {} } }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /api/v1/projects/{projectId}/import/jira-csv:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    post:
+      tags: [Tasks]
+      summary: Import tasks from a Jira CSV (supports dryRun)
+      description: >
+        Edition-gated (OCTBASE_EDITION): included in ENTERPRISE, activatable
+        in BUSINESS as an additional option (OCTBASE_OPTION_JIRA_IMPORT=true),
+        never available in TEAM. When not activated the endpoint answers 403
+        with the stable code FEATURE_DISABLED; the SPA hides its menu entry
+        via the features.jiraCsvImport flag from GET /api/v1/config.
+
+        Repeating Attachment columns ("date;author;filename;URL") become
+        URL-backed attachment records pointing at the original Jira URL; the
+        bytes are never fetched server-side (the URLs require Jira access, and
+        fetching them would be an SSRF surface). The response is an import
+        report: counts (imported, attachmentsImported, skipped) plus per-row
+        errors and warnings ({row, issueKey, message} — unknown status/
+        priority/type fallbacks, unmapped users, malformed attachment or
+        comment cells), capped at 200 warning details. A real (non-dry-run)
+        import also writes one project-level activity entry summarising the
+        run.
+      operationId: importJiraCsv
+      parameters: [ { name: dryRun, in: query, schema: { type: boolean } } ]
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
+      responses: { '200': { description: Import report (or dry-run preview) with counts, per-row errors, and warnings }, '403': { $ref: '#/components/responses/Forbidden' } }
+
+  # ───────────────────────── Realtime ─────────────────────────
+  /api/v1/projects/{projectId}/events:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Realtime]
+      summary: Server-Sent Events stream for a project
+      operationId: projectEvents
+      description: >-
+        Live event stream for project members. Accepts the access token via the
+        `Authorization` header or a `?token=` query parameter (for EventSource
+        clients). Each message `data` is a JSON object with a `type` field.
+        Emitted types: `notification.created` (an in-app notification for the
+        connected user) and `board.changed` (any co-worker mutation to the
+        project — carries `activityType`, `actorId`, and, when task-scoped,
+        `taskId`; clients use it to auto-refresh an open board/task panel).
+      security:
+        - bearerAuth: []
+        - {}
+      parameters: [ { name: token, in: query, schema: { type: string } } ]
+      responses: { '200': { description: SSE stream, content: { text/event-stream: {} } } }
+  /api/v1/projects/{projectId}/presence:
+    parameters: [ { $ref: '#/components/parameters/projectId' } ]
+    get:
+      tags: [Realtime]
+      summary: Currently-present users in a project
+      operationId: projectPresence
+      responses: { '200': { description: Presence list } }
+
+  # ───────────────────────── Webhooks ─────────────────────────
+  /api/v1/webhooks/bitbucket:
+    post:
+      tags: [Webhooks]
+      summary: Bitbucket webhook receiver (HMAC-SHA256)
+      operationId: bitbucketWebhook
+      security: []
+      description: Authenticated via the `X-Hub-Signature-256` HMAC header; rejects on mismatch.
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { '204': { description: Accepted }, '401': { $ref: '#/components/responses/Unauthorized' } }
+  /api/v1/webhooks/github:
+    post:
+      tags: [Webhooks]
+      summary: GitHub webhook receiver (HMAC-SHA256)
+      operationId: githubWebhook
+      security: []
+      description: Authenticated via the `X-Hub-Signature-256` HMAC header; rejects on mismatch.
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { '204': { description: Accepted }, '401': { $ref: '#/components/responses/Unauthorized' } }

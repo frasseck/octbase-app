@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Octbase API Docs</title>
+<link rel="stylesheet" href="/swagger-ui/swagger-ui.css">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #fafafa;
+  }
+
+  .topbar {
+    box-sizing: border-box;
+    padding: 12px 20px;
+    border-bottom: 1px solid #d0d7de;
+    background: #ffffff;
+    font-family: Arial, sans-serif;
+  }
+
+  .topbar a {
+    color: #0969da;
+    text-decoration: none;
+  }
+
+  .topbar p {
+    margin: 6px 0 0;
+    color: #57606a;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <strong>Octbase API Docs</strong>
+  <p>
+    OpenAPI spec: <a href="/openapi.yaml" target="_blank" rel="noreferrer">/openapi.yaml</a>.
+    Use the <strong>Authorize</strong> button to set <code>X-User-Id</code> for protected endpoints.
+    &nbsp;·&nbsp; <a href="/user-guide.html">User Guide</a>
+  </p>
+</div>
+<div id="swagger-ui"></div>
+<script src="/swagger-ui/swagger-ui-bundle.js"></script>
+<script>
+  window.addEventListener('load', function () {
+    window.ui = SwaggerUIBundle({
+      url: '/openapi.yaml',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      displayRequestDuration: true,
+      persistAuthorization: true,
+      defaultModelsExpandDepth: -1,
+    });
+  });
+</script>
+</body>
+</html>

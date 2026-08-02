@@ -1,0 +1,171 @@
+# Global options. Must be the first, unnamed block in the file.
+#
+# trusted_proxies decides whether an inbound X-Forwarded-For is PRESERVED (and
+# this server's peer appended to it) or REPLACED outright with the peer address.
+# Only a trusted peer's chain is preserved, so this is what lets the API recover
+# the real client IP for per-IP rate limiting and audit-log source addresses.
+#
+# Empty is the secure default and is what an unconfigured stack gets: Caddy
+# adapts `trusted_proxies static` with no ranges to "trust nobody", replacing any
+# client-supplied XFF. Verified against this image (Caddy v2.11.4) — it fails
+# CLOSED, so a stack that never sets the variable cannot be spoofed; it just
+# shares one rate-limit bucket across all clients.
+#
+# ⚠ Only set OCTBASE_FRONTEND_TRUSTED_PROXIES on a stack whose published port is
+# bound to loopback (FRONTEND_BIND_ADDR=127.0.0.1) behind an edge proxy. Rootless
+# podman NATs published-port traffic: this server sees its OWN container address
+# as the peer for every caller, so it cannot distinguish the edge proxy from a
+# stranger connecting directly. Trusting headers on a publicly reachable port
+# lets anyone forge their client IP — strictly worse than one shared bucket.
+# See podman-compose.yml and docs/technical_documentation.md.
+{
+	servers {
+		trusted_proxies static {$OCTBASE_FRONTEND_TRUSTED_PROXIES:}
+	}
+}
+
+:8080 {
+	root * /usr/share/caddy
+
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header X-Content-Type-Options "nosniff"
+	header X-Frame-Options "DENY"
+	header Referrer-Policy "strict-origin-when-cross-origin"
+	header Permissions-Policy "geolocation=(), camera=(), microphone=()"
+	# App CSP. script-src has no 'unsafe-inline': every first-party page loads
+	# only external scripts (see js/theme-init.js & friends). connect-src is
+	# 'self' only — the app talks to /api and SSE on its own origin and uses no
+	# WebSockets. /docs (proxied Swagger UI) is excluded: the API sets its own
+	# route-specific CSP there, and layering this stricter one on top would
+	# break Swagger's inline init (multiple CSP headers intersect).
+	@nonDocs not path /docs /docs/*
+	header @nonDocs Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none';"
+
+	# Cache policy. HTML is always revalidated, so a new build's asset URLs are
+	# picked up immediately.
+	#
+	# Everything the Vite build emits lands in /assets/ under a content-hashed
+	# filename — including the classic scripts outside the module graph, which
+	# scripts/vite-hash-classic-assets.mjs hashes the same way (37b stage 5,
+	# replacing the old `?v=` query stamped by scripts/stamp-assets.py). The
+	# name changes if and only if the bytes do, so a year of `immutable` is
+	# safe: a changed file is a different URL and is never served stale.
+	#
+	# That guarantee is what the matcher must express, so it keys on the
+	# directory, NOT on the extension. The image also serves files whose names
+	# are stable across changes — vendor/swagger-ui/*.js, the verbatim fonts/
+	# copy — and the old `path *.js *.css` rule promised those were immutable
+	# too, which was only ever true by accident of nothing having changed them.
+	# They get an hour instead: long enough to be free on a reload, short
+	# enough that an upgrade is picked up the same day.
+	# The `not path /assets/*` is load-bearing: a named matcher ANDs its
+	# conditions, and without it /assets/index-<hash>.js would match both rules
+	# and get two Cache-Control headers.
+	@hashed path /assets/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+	# Extensions, not just the two script types: /img/*, /locales/*.json and
+	# poweredby.png had NO Cache-Control at all, which does not mean "do not
+	# cache" — it hands the decision to each browser's heuristic (roughly a
+	# tenth of the age since Last-Modified), so the same favicon could be held
+	# for weeks by one client and refetched every navigation by another. An
+	# hour is a stated answer rather than an accident.
+	# The locales are in this bucket on purpose: they are unhashed and they
+	# change with a release, so an hour is the bound on how long a user reads
+	# yesterday's wording.
+	@unhashed {
+		path *.js *.css *.woff2 *.woff *.ttf *.otf *.png *.jpg *.jpeg *.gif *.webp *.avif *.svg *.ico *.json
+		not path /assets/*
+	}
+	header @unhashed Cache-Control "public, max-age=3600"
+	@html path / *.html
+	header @html Cache-Control "no-cache"
+
+	# Compression. The JS is already minified in the image (see the esbuild
+	# stage in ../Containerfile), but minification is the small half: the
+	# desktop SPA is ~372 KB minified and ~91 KB gzipped, so serving it
+	# uncompressed wastes ~280 KB on every cold load. demo.ocete.ch only
+	# avoided that because an edge proxy on the host compresses for it — a
+	# one-stack-per-client deployment with no such edge got the full payload.
+	# Compress here so it never depends on what sits in front.
+	#
+	# Deliberately scoped to the paths this container serves from disk. The
+	# proxied routes are excluded because SSE responses are text/event-stream,
+	# which matches Caddy's default text/* encode matcher; keeping the encoder
+	# off /api/* means it can never buffer or delay an event stream, and the
+	# API's own responses stay its own concern.
+	@compressible not path /api/* /docs /docs/* /health /openapi.yaml /mailpit /mailpit/*
+	encode @compressible zstd gzip
+
+	# ── Device routing ──────────────────────────────────────────────
+	# Phones are sent to the mobile app under /m/; every other device
+	# (desktops, laptops, and tablets incl. iPad) uses the desktop app at /.
+	# iPad and Android-tablet UAs omit the "Mobile" token, so they stay on
+	# the desktop app by design. To preview the mobile app on a desktop, use
+	# the browser's device emulation (it sends a phone User-Agent).
+	@phoneEntry {
+		header_regexp User-Agent "(?i)(iphone|ipod|android.+mobile|windows phone|blackberry|bb10|opera mini|iemobile|webos|mobile.+firefox)"
+		path / /index.html
+	}
+	@desktopOnMobile {
+		not header_regexp User-Agent "(?i)(iphone|ipod|android.+mobile|windows phone|blackberry|bb10|opera mini|iemobile|webos|mobile.+firefox)"
+		path /m /m/
+	}
+
+	# Optional installation password (front-door HTTP Basic Auth). Enabled by
+	# setting OCTBASE_SITE_PASSWORD_HASH to a bcrypt hash (`caddy hash-password`);
+	# leave it blank to keep the front door open. The base image is shell-less, so
+	# the toggle is pure Caddy: compose derives OCTBASE_SITE_AUTH="on" only when a
+	# hash is set, and the route below imports auth-{$OCTBASE_SITE_AUTH:}.caddy —
+	# `auth-on.caddy` (the basic_auth block) when on, `auth-.caddy` (a no-op) when
+	# empty. The indirection avoids feeding an empty password into basic_auth,
+	# which would crash the container (compose always passes the var set-but-empty
+	# and Caddy's {$VAR:default} only fills UNSET vars). @sitegate excludes /api/*
+	# (the SPA authenticates it with `Authorization: Bearer <JWT>` — the same
+	# header Basic Auth uses — plus the HMAC webhook receivers and SSE carry no
+	# Basic credentials) and /health (health probes carry none), so the gate
+	# covers only the browser-facing app.
+	@sitegate not path /api/* /health
+
+	route {
+		import /etc/caddy/auth-{$OCTBASE_SITE_AUTH:}.caddy
+
+		# API + SSE are proxied to the backend and never device-redirected.
+		@sse path_regexp ^/api/v1/projects/.*/events
+		reverse_proxy @sse octbase-api:8000 {
+			flush_interval -1
+		}
+
+		# /metrics is deliberately NOT proxied: Prometheus scrapes the API
+		# service directly (docs/operations.md §Prometheus Metrics), and the
+		# front door is the public entry point — runtime metrics must not be
+		# world-readable on a deployed stack.
+		@backend path /api/* /docs /docs/* /health /openapi.yaml
+		reverse_proxy @backend octbase-api:8000
+
+		# Mailpit dev email UI — only exists when podman-compose.dev.yml is
+		# layered (502 otherwise); the production Caddyfile.tls has no such
+		# route. MP_WEBROOT=mailpit means Mailpit expects the /mailpit prefix,
+		# so reverse_proxy (not handle_path) — don't strip it. Drop the strict
+		# app CSP for this path so Mailpit's own UI/WebSocket work.
+		@mailpit path /mailpit /mailpit/*
+		header @mailpit -Content-Security-Policy
+		reverse_proxy @mailpit mailpit:8025
+
+		# Document-level handoffs (asset/API requests are already handled above):
+		#   phone hitting the desktop entry   -> mobile app (/m/)
+		#   non-phone landing on the mobile   -> desktop app (/)
+		redir @phoneEntry /m/ 302
+		redir @desktopOnMobile / 302
+		redir /m /m/ 308
+
+		# Serve the mobile SPA (its own container) under /m/. handle_path strips
+		# the /m prefix so the mobile build's relative asset paths resolve.
+		handle_path /m/* {
+			reverse_proxy octbase-mobile:8080
+		}
+
+		# Desktop SPA.
+		try_files {path} /index.html
+		file_server
+	}
+}

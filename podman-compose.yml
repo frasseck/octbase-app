@@ -1,0 +1,232 @@
+services:
+  postgres:
+    # Pinned by digest (hi/postgresql:18) so a rebuilt upstream tag cannot change
+    # the database engine under a deployed stack. Refresh procedure:
+    # docs/operations.md ("Refreshing container base-image pins").
+    image: registry.access.redhat.com/hi/postgresql@sha256:940393b318261f00d8acff39ba5944e3b1c6d3db9194618d9f0f9cd604aeaeb7
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-octbase}
+      POSTGRES_USER: ${POSTGRES_USER:-octbase}
+      # No insecure default: the deployable stack must be given a real password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (e.g. openssl rand -base64 24)}
+    ports:
+      # Bind to loopback by default so Postgres is not published on the host's
+      # public interface; containers reach it as postgres:5432 on the compose
+      # network regardless. Set BIND_ADDR=0.0.0.0 only if host exposure is needed.
+      - "${BIND_ADDR:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ${PGDATA_DIR:-./pgdata}:/var/lib/postgresql/data:U
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-octbase}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # Resource limits keep one stack from starving its neighbours when several
+    # stacks share a host. See docs/hosting-concept.md §7 for the sizing rationale.
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  octbase-api:
+    image: localhost/${COMPOSE_PROJECT_NAME:-octbase}-api:latest
+    restart: always
+    build:
+      context: ./octbase-api
+      dockerfile: Containerfile
+    ports:
+      # Loopback by default; the frontend Caddy reverse-proxies the API over the
+      # compose network (octbase-api:8000). Set BIND_ADDR=0.0.0.0 to publish it,
+      # but note that bypasses the optional OCTBASE_SITE_AUTH front-door gate.
+      - "${BIND_ADDR:-127.0.0.1}:${API_PORT:-8000}:8000"
+    environment:
+      # sslmode=disable is only acceptable for the bundled Postgres on the
+      # private container network. When pointing at an external/managed
+      # database, set POSTGRES_SSLMODE=require (or verify-full) in the env.
+      OCTBASE_DATABASE_URL: "postgres://${POSTGRES_USER:-octbase}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-octbase}?sslmode=${POSTGRES_SSLMODE:-disable}"
+      # Optional owner-role connection for migrations (least-privilege split,
+      # scripts/db-least-privilege.sql). Blank keeps the legacy single-URL mode.
+      OCTBASE_MIGRATE_DATABASE_URL: "${OCTBASE_MIGRATE_DATABASE_URL:-}"
+      # Server-side statement_timeout for the request pool (blank = code default
+      # 30s; "0" disables). The backstop that keeps a stuck query from pinning
+      # its pooled connection until the whole API deadlocks.
+      OCTBASE_DB_STATEMENT_TIMEOUT: "${OCTBASE_DB_STATEMENT_TIMEOUT:-}"
+      # Demo mode is on for the local stack, which permits the dev JWT fallback.
+      # For a real deployment set OCTBASE_JWT_SECRET (>=32 bytes) in the env/.env
+      # and turn demo mode off — the API refuses to start without a strong secret.
+      OCTBASE_DEMO_MODE: "true"
+      OCTBASE_JWT_SECRET: "${OCTBASE_JWT_SECRET:-}"
+      # First SUPER_ADMIN for a non-demo stack, created only while the users
+      # table is empty (internal/bootstrap). Blank = no bootstrap. Inert here
+      # while OCTBASE_DEMO_MODE is "true" above, which seeds its own accounts.
+      OCTBASE_BOOTSTRAP_ADMIN_EMAIL: "${OCTBASE_BOOTSTRAP_ADMIN_EMAIL:-}"
+      OCTBASE_BOOTSTRAP_ADMIN_PASSWORD_HASH: "${OCTBASE_BOOTSTRAP_ADMIN_PASSWORD_HASH:-}"
+      # Set the Secure flag on auth/refresh cookies. Off by default so a plain
+      # HTTP dev stack still works; production/edge-HTTPS deployments set "true".
+      OCTBASE_SECURE_COOKIES: "${OCTBASE_SECURE_COOKIES:-false}"
+      # AES-256 key (base64- or hex-encoded, 32 bytes) used to encrypt SCM access
+      # tokens at rest. Required to add a repository connection with a token/OAuth.
+      OCTBASE_SCM_ENC_KEY: "${OCTBASE_SCM_ENC_KEY:-}"
+      # AES-256 key (base64- or hex-encoded, 32 bytes) used to encrypt users'
+      # TOTP secrets at rest. Separate from OCTBASE_SCM_ENC_KEY by design.
+      # Required before any user can enroll in MFA.
+      OCTBASE_MFA_ENC_KEY: "${OCTBASE_MFA_ENC_KEY:-}"
+      # OAuth apps for SCM "Connect with OAuth" (optional). Callback URL to
+      # register with each provider: <REDIRECT_BASE>/api/v1/oauth/<provider>/callback
+      OCTBASE_OAUTH_REDIRECT_BASE: "${OCTBASE_OAUTH_REDIRECT_BASE:-}"
+      # Where the OAuth callback redirects the browser after a successful connect.
+      OCTBASE_APP_URL: "${OCTBASE_APP_URL:-}"
+      OCTBASE_OAUTH_GITHUB_CLIENT_ID: "${OCTBASE_OAUTH_GITHUB_CLIENT_ID:-}"
+      OCTBASE_OAUTH_GITHUB_CLIENT_SECRET: "${OCTBASE_OAUTH_GITHUB_CLIENT_SECRET:-}"
+      OCTBASE_OAUTH_GITLAB_CLIENT_ID: "${OCTBASE_OAUTH_GITLAB_CLIENT_ID:-}"
+      OCTBASE_OAUTH_GITLAB_CLIENT_SECRET: "${OCTBASE_OAUTH_GITLAB_CLIENT_SECRET:-}"
+      OCTBASE_OAUTH_BITBUCKET_CLIENT_ID: "${OCTBASE_OAUTH_BITBUCKET_CLIENT_ID:-}"
+      OCTBASE_OAUTH_BITBUCKET_CLIENT_SECRET: "${OCTBASE_OAUTH_BITBUCKET_CLIENT_SECRET:-}"
+      # Deployment-stamped app version (blank falls back to the build default);
+      # surfaced at /health, /api/v1/version and /api/v1/config.
+      OCTBASE_APP_VERSION: "${OCTBASE_APP_VERSION:-}"
+      # Allowed CORS origin. Set OCTBASE_CORS_ORIGIN in .env for any stack that
+      # is served under a real origin (e.g. https://demo.example.com); the
+      # default only fits a plain local stack on the default frontend port.
+      OCTBASE_CORS_ORIGIN: "${OCTBASE_CORS_ORIGIN:-http://localhost:8080}"
+      # Proxy IPs/CIDRs whose X-Forwarded-For the API honors for rate limiting
+      # and audit-log client IPs. Empty (the secure default) ignores forwarding
+      # headers, which means all traffic arriving through the bundled Caddy
+      # front door shares the Caddy container's IP for per-IP rate limits. Set
+      # this to the stack's container network subnet (podman network inspect
+      # <project>_default) or to your edge proxy's address in production.
+      OCTBASE_TRUSTED_PROXIES: "${OCTBASE_TRUSTED_PROXIES:-}"
+      # Installation limits. Blank falls back to the in-code defaults
+      # (5 users incl. admin, 10 MB per file, 512 MB storage per user);
+      # 0 disables a limit. See .env.example.
+      OCTBASE_MAX_USERS: "${OCTBASE_MAX_USERS:-}"
+      OCTBASE_MAX_UPLOAD_MB: "${OCTBASE_MAX_UPLOAD_MB:-}"
+      OCTBASE_MAX_USER_STORAGE_MB: "${OCTBASE_MAX_USER_STORAGE_MB:-}"
+      OCTBASE_LOG_LEVEL: "info"
+      # DB pool size. Lower this (or front Postgres with pgBouncer) when many API
+      # instances share one database — see docs/hosting-concept.md §4.
+      OCTBASE_DB_MAX_OPEN_CONNS: "${OCTBASE_DB_MAX_OPEN_CONNS:-25}"
+      OCTBASE_DB_MAX_IDLE_CONNS: "${OCTBASE_DB_MAX_IDLE_CONNS:-5}"
+      # Outgoing mail (invitations, task-change notifications). Blank (the
+      # default) falls back to stdout dev-mode logging; set a real relay in
+      # production. For local development, layer podman-compose.dev.yml on top
+      # to add a Mailpit capture container (never deploy that override: its
+      # mailbox holds password-reset and invitation links).
+      OCTBASE_SMTP_HOST: "${OCTBASE_SMTP_HOST:-}"
+      OCTBASE_SMTP_PORT: "${OCTBASE_SMTP_PORT:-587}"
+      OCTBASE_SMTP_FROM: "${OCTBASE_SMTP_FROM:-noreply@beyags.com}"
+      OCTBASE_SMTP_USER: "${OCTBASE_SMTP_USER:-}"
+      OCTBASE_SMTP_PASS: "${OCTBASE_SMTP_PASS:-}"
+      # Uploaded task attachments live on the volume mounted below. Kept explicit
+      # (rather than relying on the in-code default) so the env and the mount can
+      # never drift apart.
+      OCTBASE_ATTACHMENTS_DIR: "/data/attachments"
+    volumes:
+      # Attachment files are the API's only durable state besides Postgres, and
+      # they previously had NO volume at all: uploads landed in the container's
+      # writable layer and were silently lost on every `up --build` / recreate.
+      #
+      # `:U` makes podman chown the host directory to the container's user, which
+      # the API image now runs as (non-root UID 10001) — without it the mount
+      # would arrive root-owned and uploads would fail. Same pattern as pgdata.
+      - ${ATTACHMENTS_DIR:-./attachments}:/data/attachments:U
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+
+  octbase-frontend:
+    image: localhost/${COMPOSE_PROJECT_NAME:-octbase}-frontend:latest
+    restart: always
+    build:
+      # Root context, not ./octbase-frontend: the SPA is built from the
+      # @octbase/shared workspace package, which lives outside that directory
+      # (37b stage 3). .containerignore keeps the context small.
+      context: .
+      dockerfile: octbase-frontend/Containerfile
+    ports:
+      # The front door. Deliberately NOT ${BIND_ADDR}: that variable also governs
+      # Postgres and the API, so reusing it would mean publishing this port could
+      # only be done by publishing the database too. Defaults to 0.0.0.0 because a
+      # standalone stack IS its own public entry (see caddy/Caddyfile.tls).
+      #
+      # Set FRONTEND_BIND_ADDR=127.0.0.1 when an edge proxy on the host fronts
+      # this stack. That is REQUIRED before setting
+      # OCTBASE_FRONTEND_TRUSTED_PROXIES below: rootless podman NATs
+      # published-port traffic, so this Caddy sees its own container address as
+      # the peer for every caller and cannot tell the edge proxy from a stranger.
+      # Trusting forwarded headers on a publicly reachable port therefore lets
+      # anyone forge their client IP. Unreachability is the trust boundary.
+      - "${FRONTEND_BIND_ADDR:-0.0.0.0}:${FRONTEND_PORT:-8080}:8080"
+    environment:
+      # Proxy addresses whose X-Forwarded-For this Caddy preserves instead of
+      # replacing. Empty (the default) trusts nobody: Caddy overwrites any
+      # inbound XFF with the real peer, which is unspoofable but collapses every
+      # client into one per-IP rate-limit bucket at the API.
+      #
+      # Set this ONLY together with FRONTEND_BIND_ADDR=127.0.0.1 (see above).
+      # Because of the NAT described there, the peer is always an address on the
+      # compose network, so `private_ranges` is the value that fits the bundled
+      # topology. The API then applies its own OCTBASE_TRUSTED_PROXIES check.
+      OCTBASE_FRONTEND_TRUSTED_PROXIES: "${OCTBASE_FRONTEND_TRUSTED_PROXIES:-}"
+      # Optional installation password: gate the whole browser-facing app behind
+      # an HTTP Basic Auth prompt. Set OCTBASE_SITE_PASSWORD_HASH to a bcrypt
+      # hash (`caddy hash-password`); empty (the default) leaves the front door
+      # open. The /api reverse proxy and /health are never gated — the API keeps
+      # its own JWT auth. See .env.example and caddy/auth-on.caddy.
+      #
+      # Enabling takes TWO entries in .env — set OCTBASE_SITE_AUTH=on AND
+      # OCTBASE_SITE_PASSWORD_HASH=<hash>. The Caddyfile imports
+      # auth-<value>.caddy: auth-on.caddy (basic_auth) when the selector is "on",
+      # auth-.caddy (no-op) when it is empty. Two vars because podman-compose
+      # cannot derive the selector from the hash (it supports only ${VAR:-def},
+      # not ${VAR:+on}); this keeps an empty password out of basic_auth, which
+      # Caddy rejects at parse time and would otherwise crash-loop the container.
+      OCTBASE_SITE_AUTH: "${OCTBASE_SITE_AUTH:-}"
+      OCTBASE_SITE_PASSWORD_HASH: "${OCTBASE_SITE_PASSWORD_HASH:-}"
+      OCTBASE_SITE_USER: "${OCTBASE_SITE_USER:-octbase}"
+    depends_on:
+      - octbase-api
+      - octbase-mobile
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 64M
+
+  # Phone-first SPA. Not published directly: the frontend (the front door)
+  # detects mobile devices by User-Agent and serves this app under /m/ on the
+  # same origin, so it shares cookies/JWT with the desktop app and the /api
+  # reverse-proxy. See octbase-frontend/caddy/Caddyfile.
+  octbase-mobile:
+    image: localhost/${COMPOSE_PROJECT_NAME:-octbase}-mobile:latest
+    restart: always
+    build:
+      # Root context, for the same reason as octbase-frontend above.
+      context: .
+      dockerfile: octbase-mobile/Containerfile
+    depends_on:
+      - octbase-api
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 64M
+
+# Mail capture (Mailpit) is deliberately NOT part of this file: it belongs to
+# development only and must never ship in a client deployment (its mailbox
+# holds every password-reset and invitation link the API sends). For a dev
+# stack with captured mail, layer the override on top:
+#   podman-compose -f podman-compose.yml -f podman-compose.dev.yml up -d

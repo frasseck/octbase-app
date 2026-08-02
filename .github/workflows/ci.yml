@@ -1,0 +1,427 @@
+name: CI
+
+# release_v* is in the push triggers deliberately: releases merge to main
+# directly (scripts/release.sh, no PR), so without it no CI run ever gated a
+# release — the first build of released code happened after it was on main.
+on:
+  push:
+    branches: [main, 'release_v*']
+  pull_request:
+    branches: [main]
+
+# Least privilege by default; jobs that need more (build → packages: write)
+# opt in explicitly.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache-dependency-path: octbase-api/go.sum
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: octbase-api
+          # Pinned to the version octbase-api/.golangci.yml was validated
+          # against locally — "latest" made linter drift able to redden main.
+          version: v2.12.2
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: octbase_test
+          POSTGRES_USER: octbase
+          POSTGRES_PASSWORD: octbase
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache-dependency-path: octbase-api/go.sum
+      - name: Run tests with coverage
+        working-directory: octbase-api
+        env:
+          TEST_DATABASE_URL: postgres://octbase:octbase@localhost:5432/octbase_test?sslmode=disable
+        run: go test ./... -count=1 -coverprofile=cover.out
+
+      - name: Enforce coverage floor
+        working-directory: octbase-api
+        # Regression floor for meaningful statement coverage. Raise MIN as
+        # coverage improves; it must never be lowered to make a red build pass.
+        # The intentionally-untestable packages (cmd/main wiring, seed demo data,
+        # testutil) are excluded from the measured total below.
+        env:
+          MIN: "73.0"
+        run: |
+          go tool cover -func=cover.out | tee coverage.txt
+          total=$(grep -E '^total:' coverage.txt | awk '{print $3}' | tr -d '%')
+          echo "Total coverage: ${total}% (floor: ${MIN}%)"
+          awk -v t="$total" -v m="$MIN" 'BEGIN { if (t+0 < m+0) { printf "FAIL: coverage %.1f%% is below floor %.1f%%\n", t, m; exit 1 } }'
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Install workspace
+        run: npm ci
+      # Runtime dependencies only — the two libraries that reach a browser
+      # (dompurify, qrcode-generator, 37b stage 4). They were vendored files
+      # pinned by SHA-256 until then, which proved a copy had not been tampered
+      # with but could never tell us an advisory had been published against it.
+      # --omit=dev deliberately excludes the build toolchain: a vite or eslint
+      # advisory is a real finding, but it is not shipped code and must not gate
+      # a frontend change. Nothing audits the dev tree yet — that is a gap, not
+      # a decision, and Dependabot is the natural place for it.
+      - name: Dependency audit (runtime deps)
+        run: npm audit --omit=dev
+      # Replaced the `node --check` loop at 37b stage 6. That loop asked one
+      # question — "does this file parse" — of a hand-maintained path list; the
+      # build already answers it for everything in the module graph, and ESLint
+      # answers it for everything outside the graph (the classic scripts, the
+      # unit-test layer, the .mjs guards) while also catching what a parser
+      # cannot see: a name used with no import behind it (`no-undef`) and an
+      # import that outlived its caller (`no-unused-vars`). Both found real bugs
+      # the first time they ran — see eslint.config.mjs.
+      - name: ESLint
+        run: npx eslint .
+      # The API contract, checked on the client for the first time (37b stage 7).
+      # types/openapi.d.ts is generated from the spec and committed, so this step
+      # is the freshness half: regenerate and diff. It mirrors what the backend's
+      # internal/apicontract test does for route↔spec parity — together they mean
+      # a Go handler change that reaches the spec also reaches the SPA's types,
+      # and a field the SPA reads that the spec no longer has fails to compile.
+      - name: API types match the spec
+        run: |
+          npm run types:generate
+          git diff --exit-code -- octbase-frontend/types/openapi.d.ts \
+            || { echo "::error::octbase-frontend/types/openapi.d.ts is stale — run npm run types:generate and commit it"; exit 1; }
+      # tsc over a JSDoc-annotated allowlist, not a TypeScript build: there are no
+      # .ts files and nothing is emitted. A file joins the allowlist by gaining a
+      # `// @ts-check` line — grep for it to see the current membership.
+      - name: Type-check annotated files
+        run: npm run typecheck
+      # An import of a name nothing exports is a build error, so this is also
+      # the export-completeness check the retired guard used to approximate.
+      - name: Build both SPAs
+        run: npm run build
+      # Vitest since 37b stage 7 — one runner for the whole layer. It resolves
+      # real ES modules (and '@octbase/shared/…' the same way the app does), so
+      # the tests that need no fake globals import the module under test
+      # directly instead of going through js/testutil.js's vm shim.
+      - name: JS unit tests (vitest)
+        run: npm run test:unit
+      # Kept alongside ESLint's no-unsanitized rules, not replaced by them: this
+      # guard understands the repo's escaping convention (the html`` ratchet in
+      # its STRICT_FILES set), which the plugin cannot see. eslint.config.mjs
+      # carries the measurement behind that split.
+      - name: HTML-injection guard
+        run: node scripts/check-innerhtml.mjs
+      # The one failure a valid module graph still allows: a top-level read of a
+      # not-yet-evaluated const/let/class across an import cycle, which throws
+      # ReferenceError at boot and which the build cannot see.
+      - name: TDZ guard
+        run: node scripts/check-tdz.mjs
+      - name: Metrics-not-proxied guard
+        run: bash scripts/check-metrics-not-proxied.sh
+      # A missing error translation is invisible in testing: apiErrorMessage()
+      # falls back to the API's English message, so the UI still shows a
+      # sentence — just the wrong language, and only for the codes someone
+      # happened to trigger. This compares the codes in the Go handlers against
+      # the errors.* block of every locale file in both SPAs.
+      - name: Error-translation guard
+        run: node scripts/check-error-translations.mjs
+      # Same class: the audit-log view's ACTION_KEYS is both the filter dropdown
+      # and the label lookup, so an action the backend writes but the list omits
+      # is unfilterable and renders as a raw enum.
+      - name: Audit-action guard
+        run: node scripts/check-audit-actions.mjs
+      # The general case of both of the above, for keys written as literals at
+      # the call site: t() answers a key it cannot find with the key itself and
+      # warns to a console nobody watches, and callers paper over that with
+      # `t('x') !== 'x' ? t('x') : 'English'` — so a wrong key namespace ships a
+      # German reader an English label and looks right in every screenshot. The
+      # same step checks that the locale files of a SPA carry the same key set,
+      # which is the quieter half: a key missing from de.json alone falls back
+      # to English without even warning.
+      - name: i18n-key guard
+        run: node scripts/check-i18n-keys.mjs
+      # Two audits, deliberately split by what they can actually break.
+      #
+      # This one gates: it covers the dependencies that reach a browser, which
+      # is the surface a user is exposed to. It is trivially clean while the
+      # SPAs have no runtime dependencies at all — that is the point, it is the
+      # tripwire armed for 37b stage 4, which adds dompurify and
+      # qrcode-generator as the first two.
+      - name: npm audit (shipped dependencies)
+        run: npm audit --omit=dev --audit-level=low
+      # This one reports: the build toolchain (vite, eslint, openapi-typescript
+      # and their transitive deps) never reaches a user, and its advisories are
+      # mostly dev-server issues on a loopback port. Failing the build on those
+      # trains people to ignore audit output. Visible, not blocking — read it
+      # when it changes.
+      #
+      # Expect 4 highs here, all one cluster: openapi-typescript@7.13.0 (the
+      # newest) pins @redocly/openapi-core@1.34.18, which is inside the
+      # vulnerable range, and pulls brace-expansion and minimatch with it. There
+      # is no forward fix — npm's suggested "fix" is a DOWNGRADE to
+      # openapi-typescript 6.7.6, and forcing @redocly/openapi-core@2.x through
+      # an npm override breaks `types:generate` outright
+      # (ERR_PACKAGE_PATH_NOT_EXPORTED, measured). It is dev-only: the package
+      # runs in `npm run types:generate` and nothing it touches ships. Revisit
+      # when openapi-typescript adopts @redocly/openapi-core 2.x.
+      - name: npm audit (build toolchain, informational)
+        continue-on-error: true
+        run: npm audit
+      # The "Asset cache-busting guard" that stood here retired at 37b stage 5.
+      # It checked that a Python script's `?v=<content-hash>` stamps in the two
+      # index.html files were current; the Vite build now content-hashes every
+      # asset filename, including the classic scripts outside the module graph
+      # (scripts/vite-hash-classic-assets.mjs), so "Build both SPAs" above is
+      # the check — a stale hash is not expressible any more.
+
+  e2e:
+    name: Frontend E2E (Playwright)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: octbase_test
+          POSTGRES_USER: octbase
+          POSTGRES_PASSWORD: octbase
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache-dependency-path: octbase-api/go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Install Python deps + Playwright Chrome
+        working-directory: octbase-frontend/tests
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chrome
+      # The suite drives the BUILT app from 37b stage 6 on, not the source tree.
+      # Both SPAs, and both of each SPA's targets: the desktop tests load dist/
+      # over HTTP, test_mobile.py loads the mobile dist-standalone/ from file://
+      # for most cases and serves the mobile dist/ for the three login tests.
+      # `npm run build` at the root produces all four.
+      - name: Install workspace and build both SPAs
+        run: |
+          npm ci
+          npm run build
+      # Build synchronously so a compile error fails THIS step with a readable
+      # log, and the health wait below only covers startup (migrations + seed),
+      # not an uncached `go run` compile that used to blow the 30s window.
+      - name: Build API
+        working-directory: octbase-api
+        run: go build -o /tmp/octbase-api ./cmd/octbase-api
+      - name: Start API (demo-seeded)
+        # The binary resolves the migrations dir relative to the working
+        # directory, so it must run from octbase-api like the old `go run` did.
+        working-directory: octbase-api
+        env:
+          OCTBASE_DEMO_MODE: "true"
+          OCTBASE_DATABASE_URL: postgres://octbase:octbase@localhost:5432/octbase_test?sslmode=disable
+          PORT: "8000"
+          # Default /data/attachments is not creatable on a hosted runner, which
+          # silently disables uploads and fails the attachment e2e tests.
+          OCTBASE_ATTACHMENTS_DIR: ${{ runner.temp }}/attachments
+          # MFA enrollment 500s without an encryption key. Throwaway CI-only
+          # key (base64 of 32 zero bytes, same as the Go unit tests) — the DB
+          # is disposable, nothing real is protected by it.
+          OCTBASE_MFA_ENC_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        run: |
+          /tmp/octbase-api &
+          echo $! > /tmp/api.pid
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/api/v1/health >/dev/null; then
+              echo "API is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start" >&2
+          exit 1
+      # Serve the built desktop app with /api proxied to the API started above,
+      # so the page is SAME-ORIGIN with its API exactly as the deployed stack is
+      # (Caddy reverse-proxies /api there). That is not a convenience: the
+      # session lives in an HttpOnly refresh cookie, and a cross-origin preview
+      # never gets it back, so every test that reloads would land on the login
+      # screen. `vite preview` binds localhost (::1) only — use that hostname,
+      # not 127.0.0.1.
+      - name: Serve built desktop app
+        working-directory: octbase-frontend
+        env:
+          OCTBASE_API_ORIGIN: http://127.0.0.1:8000
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          pid=$!
+          echo "$pid" > /tmp/preview.pid
+          for i in $(seq 1 30); do
+            # Check OUR process first. With --strictPort a preview that loses the
+            # port exits, and a curl to 4173 can still answer 200 from whatever
+            # already holds it — success against somebody else's server. Only a
+            # live pid distinguishes "my server is up" from "a server is up".
+            if ! kill -0 "$pid" 2>/dev/null; then
+              echo "vite preview exited (port 4173 already in use?)" >&2
+              exit 1
+            fi
+            if curl -sf http://localhost:4173/index.html >/dev/null; then
+              echo "preview is up"; exit 0
+            fi
+            sleep 1
+          done
+          echo "vite preview failed to start" >&2
+          exit 1
+      - name: Run Playwright tests
+        working-directory: octbase-frontend/tests
+        env:
+          OCTBASE_BROWSER: chrome
+          OCTBASE_API_BASE: http://127.0.0.1:8000
+          # The query string is load-bearing: test_taskview.py appends
+          # `&taskView=off`, so a URL without one becomes `index.html&taskView=off`
+          # and the app never sees the parameter.
+          OCTBASE_UI_URL: http://localhost:4173/index.html?e2e=1
+        run: python -m pytest -q
+      - name: Stop preview
+        if: always()
+        run: kill "$(cat /tmp/preview.pid)" 2>/dev/null || true
+      - name: Stop API
+        if: always()
+        run: kill "$(cat /tmp/api.pid)" 2>/dev/null || true
+
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history so the secret scan covers past commits
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache-dependency-path: octbase-api/go.sum
+      - name: Vendored-dependency integrity
+        # Fails if any vendored third-party JS drifts from its SHA-256 pin in
+        # scripts/vendor-manifest.txt, or if a new vendored file is unpinned.
+        run: bash scripts/check-vendor-integrity.sh
+      - name: govulncheck (reachable CVEs)
+        working-directory: octbase-api
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)"/bin/govulncheck ./...
+      - name: Container Go toolchain pin matches go.mod
+        working-directory: octbase-api
+        # Guards against the class of bug where an exact GOTOOLCHAIN pin in the
+        # Containerfile silently overrides (and lags) the go.mod toolchain
+        # directive, shipping a vulnerable stdlib in the image.
+        run: |
+          mod=$(grep -E '^toolchain ' go.mod | awk '{print $2}')
+          img=$(grep -E 'GOTOOLCHAIN=' Containerfile | sed -E 's/.*GOTOOLCHAIN=([a-z0-9.]+).*/\1/')
+          echo "go.mod toolchain=$mod  Containerfile GOTOOLCHAIN=$img"
+          test "$img" = "$mod" || { echo "::error::Containerfile GOTOOLCHAIN ($img) must equal go.mod toolchain ($mod)"; exit 1; }
+      - name: Secret scan (gitleaks)
+        run: |
+          ver=8.18.4
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${ver}/gitleaks_${ver}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks detect --source . --no-banner --redact --exit-code 1
+
+  build:
+    name: Build image
+    runs-on: ubuntu-latest
+    needs: [lint, test, frontend, e2e, security]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build API container image
+        working-directory: octbase-api
+        run: docker build -f Containerfile -t octbase-api:${{ github.sha }} .
+      # Both frontend images build from the repository root (37b stage 3): they
+      # need the @octbase/shared workspace package, which sits outside either
+      # app directory. .containerignore keeps the context to the four things
+      # they COPY.
+      - name: Build frontend container image
+        run: podman build -f octbase-frontend/Containerfile -t octbase-frontend:${{ github.sha }} .
+      - name: Build mobile container image
+        run: podman build -f octbase-mobile/Containerfile -t octbase-mobile:${{ github.sha }} .
+      - name: Install Trivy
+        # Pinned by tag (not a floating installer) so the scanner itself cannot
+        # be swapped under us — the same reasoning as the digest-pinned base
+        # images. Bump the version deliberately.
+        run: |
+          ver=0.72.0
+          curl -sSfL "https://raw.githubusercontent.com/aquasecurity/trivy/v${ver}/contrib/install.sh" \
+            | sh -s -- -b /usr/local/bin "v${ver}"
+      - name: Scan built images (Trivy)
+        # Scans each just-built image (before push) for fixable HIGH/CRITICAL OS
+        # and library vulnerabilities. --ignore-unfixed keeps the gate actionable
+        # (an un-upgradable base-image CVE does not block every build); drop it,
+        # or add a .trivyignore with a justification, to triage a specific
+        # finding — see the gate in prompts/37a §2. Images are piped in as a tar
+        # so the scan is agnostic to whether docker or podman built them.
+        run: |
+          set -euo pipefail
+          scan() {
+            echo "::group::trivy $1"
+            $2 save "$1" -o /tmp/trivy-img.tar
+            trivy image --input /tmp/trivy-img.tar --scanners vuln \
+              --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress
+            rm -f /tmp/trivy-img.tar
+            echo "::endgroup::"
+          }
+          scan "octbase-api:${{ github.sha }}" docker
+          scan "octbase-frontend:${{ github.sha }}" podman
+          scan "octbase-mobile:${{ github.sha }}" podman
+      - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main'
+        run: |
+          # podman falls back to the docker credential store (~/.docker/config.json)
+          # when it has no authfile of its own, so one login covers both CLIs.
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Push images to GHCR
+        if: github.ref == 'refs/heads/main'
+        run: |
+          repo_lc=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker tag octbase-api:${{ github.sha }} "ghcr.io/${repo_lc}/octbase-api:${{ github.sha }}"
+          docker push "ghcr.io/${repo_lc}/octbase-api:${{ github.sha }}"
+          podman tag octbase-frontend:${{ github.sha }} "ghcr.io/${repo_lc}/octbase-frontend:${{ github.sha }}"
+          podman push "ghcr.io/${repo_lc}/octbase-frontend:${{ github.sha }}"
+          podman tag octbase-mobile:${{ github.sha }} "ghcr.io/${repo_lc}/octbase-mobile:${{ github.sha }}"
+          podman push "ghcr.io/${repo_lc}/octbase-mobile:${{ github.sha }}"

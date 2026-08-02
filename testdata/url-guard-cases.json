@@ -1,0 +1,217 @@
+{
+  "_comment": [
+    "Shared case table for the two URL guards that exist twice: once in Go",
+    "(octbase-api/internal/workmanagement/sanitize.go — safeHref, safeImageSrc)",
+    "and once in JS (octbase-shared/richtext.js — rtSafeHref, rtSafeImageSrc).",
+    "The JS copy exists because DOMPurify runs in the browser and has to make",
+    "the same decision the server already made; the comment on it claimed",
+    "parity with the server, and nothing enforced that.",
+    "",
+    "Both suites read THIS file: octbase-api's sanitize_parity_test.go and",
+    "octbase-frontend/js/richtext.test.js. A change to one implementation that",
+    "the other does not follow now fails a test on both sides instead of",
+    "becoming a silent difference between what the server stores and what the",
+    "browser is willing to render.",
+    "",
+    "Add a case here, never to only one suite. `want` is what BOTH must answer."
+  ],
+  "safeHref": [
+    {
+      "input": "http://example.com/x",
+      "want": true,
+      "why": "plain http"
+    },
+    {
+      "input": "https://example.com/x",
+      "want": true,
+      "why": "plain https"
+    },
+    {
+      "input": "HTTPS://EXAMPLE.COM",
+      "want": true,
+      "why": "scheme match is case-insensitive"
+    },
+    {
+      "input": "mailto:a@b.com",
+      "want": true,
+      "why": "mailto is allowed"
+    },
+    {
+      "input": "  https://example.com  ",
+      "want": true,
+      "why": "trimmed before checking"
+    },
+    {
+      "input": "/relative/path",
+      "want": true,
+      "why": "relative, no scheme"
+    },
+    {
+      "input": "relative/path",
+      "want": true,
+      "why": "relative without a leading slash"
+    },
+    {
+      "input": "#anchor",
+      "want": true,
+      "why": "fragment only"
+    },
+    {
+      "input": "?q=1",
+      "want": true,
+      "why": "query only"
+    },
+    {
+      "input": "//example.com/x",
+      "want": true,
+      "why": "protocol-relative is allowed for a LINK (unlike an image src): it inherits the page scheme and cannot smuggle javascript:"
+    },
+    {
+      "input": "",
+      "want": false,
+      "why": "empty"
+    },
+    {
+      "input": "   ",
+      "want": false,
+      "why": "whitespace only"
+    },
+    {
+      "input": "javascript:alert(1)",
+      "want": false,
+      "why": "the whole point of the guard"
+    },
+    {
+      "input": "JavaScript:alert(1)",
+      "want": false,
+      "why": "case does not help"
+    },
+    {
+      "input": "java\nscript:alert(1)",
+      "want": false,
+      "why": "newline used to obscure the scheme"
+    },
+    {
+      "input": "java\tscript:alert(1)",
+      "want": false,
+      "why": "tab, same trick"
+    },
+    {
+      "input": "java\u0000script:alert(1)",
+      "want": false,
+      "why": "NUL, same trick"
+    },
+    {
+      "input": "data:text/html,<script>x</script>",
+      "want": false,
+      "why": "data: is a scheme and not on the allowlist"
+    },
+    {
+      "input": "vbscript:msgbox(1)",
+      "want": false,
+      "why": "any unlisted scheme"
+    },
+    {
+      "input": "file:///etc/passwd",
+      "want": false,
+      "why": "any unlisted scheme"
+    },
+    {
+      "input": "ftp://example.com",
+      "want": false,
+      "why": "any unlisted scheme"
+    },
+    {
+      "input": "x+y-z.1:payload",
+      "want": false,
+      "why": "scheme characters include + - . and digits"
+    }
+  ],
+  "safeImageSrc": [
+    {
+      "input": "/api/v1/tasks/abc/attachments/def/content",
+      "want": true,
+      "why": "our own attachment content endpoint"
+    },
+    {
+      "input": "  /api/v1/tasks/abc/attachments/def/content  ",
+      "want": true,
+      "why": "trimmed before checking"
+    },
+    {
+      "input": "",
+      "want": false,
+      "why": "empty"
+    },
+    {
+      "input": "   ",
+      "want": false,
+      "why": "whitespace only"
+    },
+    {
+      "input": "//evil.example/api/v1/tasks/a/attachments/b/content",
+      "want": false,
+      "why": "protocol-relative: an image src must never leave this origin"
+    },
+    {
+      "input": "https://example.com/api/v1/tasks/a/attachments/b/content",
+      "want": false,
+      "why": "absolute, even to a path that looks right"
+    },
+    {
+      "input": "http://example.com/x.png",
+      "want": false,
+      "why": "external image (tracking pixel)"
+    },
+    {
+      "input": "data:image/png;base64,iVBORw0KGgo=",
+      "want": false,
+      "why": "data: URLs are rejected outright"
+    },
+    {
+      "input": "javascript:alert(1)",
+      "want": false,
+      "why": "scheme"
+    },
+    {
+      "input": "/api/v1/tasks/a/attachments/b/content?x=1",
+      "want": false,
+      "why": "must END with /content — a query string is not it"
+    },
+    {
+      "input": "/api/v1/tasks/a/attachments/b/content/extra",
+      "want": false,
+      "why": "must end with /content"
+    },
+    {
+      "input": "/api/v1/tasks/a/content",
+      "want": false,
+      "why": "missing the /attachments/ segment"
+    },
+    {
+      "input": "/other/api/v1/tasks/a/attachments/b/content",
+      "want": false,
+      "why": "the prefix is anchored at the start"
+    },
+    {
+      "input": "/API/V1/tasks/a/attachments/b/content",
+      "want": false,
+      "why": "the path prefix is matched case-SENSITIVELY, unlike the scheme"
+    },
+    {
+      "input": "/api/v1/tasks/a/attach\nments/b/content",
+      "want": false,
+      "why": "control character inside the path"
+    },
+    {
+      "input": "/api/v1/tasks/a/attachments/b/content\u0000",
+      "want": false,
+      "why": "trailing NUL"
+    },
+    {
+      "input": "/api/v1/tasks//attachments//content",
+      "want": true,
+      "why": "shared quirk, recorded rather than hidden: the guard is a shape check, not a route match, so empty id segments pass it. Harmless (the request 404s) but both sides must agree"
+    }
+  ]
+}

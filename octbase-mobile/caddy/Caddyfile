@@ -1,0 +1,75 @@
+:8080 {
+    root * /usr/share/caddy
+
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    header X-Content-Type-Options "nosniff"
+    header X-Frame-Options "DENY"
+    header Referrer-Policy "strict-origin-when-cross-origin"
+    header Permissions-Policy "geolocation=(), camera=(), microphone=()"
+    # App CSP. script-src has no 'unsafe-inline' (the mobile SPA loads only
+    # external scripts) and connect-src is 'self' only (API + SSE on the own
+    # origin, no WebSockets). /docs (proxied Swagger UI) is excluded: the API
+    # sets its own route-specific CSP there.
+    @nonDocs not path /docs /docs/*
+    header @nonDocs Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none';"
+
+    # Cache policy — same rule as the front door
+    # (octbase-frontend/caddy/Caddyfile), where the rationale lives: /assets/*
+    # is content-hashed by the Vite build (37b stage 5) and immutable for a
+    # year; anything served under a stable name gets an hour; HTML is always
+    # revalidated. The mobile SPA is reached as /m/<path>, but the front door
+    # strips that prefix before proxying, so these paths are matched exactly as
+    # written. `not path /assets/*` keeps a hashed asset from matching both
+    # rules and receiving two Cache-Control headers.
+    @hashed path /assets/*
+    header @hashed Cache-Control "public, max-age=31536000, immutable"
+    # Extensions, not just the two script types: /img/*, /locales/*.json and
+    # poweredby.png had NO Cache-Control at all, which does not mean "do not
+    # cache" — it hands the decision to each browser's heuristic (roughly a
+    # tenth of the age since Last-Modified), so the same favicon could be held
+    # for weeks by one client and refetched every navigation by another. An
+    # hour is a stated answer rather than an accident.
+    # The locales are in this bucket on purpose: they are unhashed and they
+    # change with a release, so an hour is the bound on how long a user reads
+    # yesterday's wording.
+    @unhashed {
+        path *.js *.css *.woff2 *.woff *.ttf *.otf *.png *.jpg *.jpeg *.gif *.webp *.avif *.svg *.ico *.json
+        not path /assets/*
+    }
+    header @unhashed Cache-Control "public, max-age=3600"
+    @html path / *.html
+    header @html Cache-Control "no-cache"
+
+    # Compression — same rule as the front door
+    # (octbase-frontend/caddy/Caddyfile), where the full rationale lives.
+    # Scoped to the paths served from disk so the encoder never touches the SSE
+    # stream. This SPA is served through the front door's `handle_path /m/*`,
+    # which proxies to here; Caddy negotiates Accept-Encoding hop by hop, so
+    # the front door forwards the client's header and passes this response
+    # back, leaving /m/ compressed exactly like /.
+    @compressible not path /api/* /docs /docs/* /health /openapi.yaml
+    encode @compressible zstd gzip
+
+    route {
+        @sse path_regexp ^/api/v1/projects/.*/events
+        reverse_proxy @sse octbase-api:8000 {
+            flush_interval -1
+        }
+
+        # /metrics is deliberately NOT proxied — same rule as the front door
+        # (octbase-frontend/caddy/Caddyfile). Prometheus scrapes the API service
+        # directly (docs/operations.md §Prometheus Metrics), and the API puts no
+        # auth on /metrics, so anything that proxies it publishes it.
+        #
+        # This container is not published to the host, which makes the omission
+        # look academic — it is not. The front door serves this SPA under /m/ via
+        # `handle_path /m/*`, which STRIPS the prefix: a request for /m/metrics
+        # arrives here as /metrics. Listing it here therefore re-exposed, through
+        # /m/metrics, exactly what the front door refuses to proxy at /metrics.
+        @backend path /api/* /docs /docs/* /health /openapi.yaml
+        reverse_proxy @backend octbase-api:8000
+
+        try_files {path} /index.html
+        file_server
+    }
+}

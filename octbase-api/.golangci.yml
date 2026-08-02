@@ -1,0 +1,48 @@
+# golangci-lint v2 config. CI pins the same version this was validated with
+# (see .github/workflows/ci.yml); bump both together. The point of this file:
+# without it golangci-lint runs only its small default set and the pre-push
+# hook's "incl. gosec-class rules" claim was false.
+version: "2"
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - gosec # the security linter this repo's hooks promise
+    - bodyclose # forgotten resp.Body.Close() leaks connections
+    - sqlclosecheck # forgotten rows.Close() leaks pool slots
+    - rowserrcheck # rows.Err() must be checked after iteration
+    - copyloopvar # pre-Go1.22 loop-var capture habits
+    - misspell
+    - unconvert
+  exclusions:
+    rules:
+      # Tests may ignore errors and use weak randomness/fixed creds freely.
+      - path: _test\.go
+        linters: [gosec, errcheck, bodyclose, rowserrcheck, misspell]
+      # Test infrastructure: testutil's Must*/DecodeJSON helpers close response
+      # bodies inside DecodeJSON, which bodyclose cannot see through.
+      - path: internal/testutil/
+        linters: [bodyclose]
+      # G104 duplicates errcheck; keep one source of truth for unhandled errors.
+      - linters: [gosec]
+        text: "G104"
+      # Refresh cookies set HttpOnly/SameSite=Strict explicitly; Secure is
+      # env-conditional (OCTBASE_SECURE_COOKIES) because local dev runs plain
+      # HTTP, and the presence-marker cookie is deliberately JS-readable —
+      # both documented at the call sites in internal/auth/handler.go.
+      - path: internal/auth/handler\.go
+        linters: [gosec]
+        text: "G124"
+      # internal/seed exists to insert deterministic DEMO data, and the two
+      # bcrypt hashes it seeds are public surface on purpose — both READMEs, the
+      # Playwright conftest, both SPAs' demo-login helpers and four skills print
+      # the matching passwords. G101 fires on the constant NAMES
+      # (superAdminPasswordHash / demoUserPasswordHash), not on anything new:
+      # the same hashes sat inline in the SQL literals before they were named,
+      # and naming them is what made seed_password_test.go able to assert they
+      # match the documented passwords and satisfy shared.ValidatePassword.
+      # Scoped to this one file so a hardcoded credential anywhere else still
+      # fails the build.
+      - path: internal/seed/seed\.go
+        linters: [gosec]
+        text: "G101"

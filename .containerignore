@@ -1,0 +1,37 @@
+# Build-context filter for the two frontend images, which build from the
+# REPOSITORY ROOT (see octbase-frontend/Containerfile) because the SPAs import
+# the @octbase/shared workspace package from outside their own directories.
+#
+# A root context would otherwise stream the whole working tree — including the
+# local Postgres data directory, which is owned by the container's UID and is
+# not even readable here. Deny everything, then re-admit exactly what the two
+# Containerfiles COPY.
+*
+!package.json
+!package-lock.json
+!octbase-shared
+!octbase-frontend
+!octbase-mobile
+# Both vite.config.js files import their build plugins from outside their own
+# directory, so the build stage cannot run without them — the Vite config fails
+# to LOAD, before it compiles anything. Admitted by pattern rather than by name:
+# this is a deny-all list, so a plugin added later is invisible to the image
+# while every host build stays green, and the error it produces
+# ("Could not resolve '../scripts/…' in vite.config.js") points at the config,
+# not at this file. That is exactly how adding vite-strip-html-comments.mjs
+# broke both image builds on 2026-08-01.
+#   vite-hash-classic-assets  hashes the classic scripts the bundler leaves
+#                             alone (37b stage 5)
+#   vite-strip-html-comments  drops HTML comments from the built pages
+# Still nothing else from scripts/: the rest is repo tooling, not part of an image.
+!scripts/vite-*.mjs
+
+# ...minus the parts of those trees an image must never carry: build output
+# (the image builds its own), dependencies (installed by `npm ci` inside), and
+# the dev-only test layer.
+octbase-*/dist
+octbase-*/dist-standalone
+octbase-*/tests
+**/node_modules
+**/*.test.js
+octbase-frontend/js/testutil.js

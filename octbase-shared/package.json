@@ -1,0 +1,16 @@
+{
+  "name": "@octbase/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "JavaScript shared by the desktop and mobile SPAs — the i18n engine, task enum metadata, and the rich-text sanitizer.",
+  "license": "UNLICENSED",
+  "exports": {
+    "./i18n.js": "./i18n.js",
+    "./meta.js": "./meta.js",
+    "./richtext.js": "./richtext.js"
+  },
+  "dependencies": {
+    "dompurify": "3.4.12"
+  }
+}

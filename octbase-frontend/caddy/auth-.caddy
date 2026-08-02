@@ -1,0 +1,8 @@
+# Installation password gate DISABLED (no-op).
+#
+# This file is imported when OCTBASE_SITE_PASSWORD_HASH is empty/unset — the
+# Caddyfiles import `auth-{$OCTBASE_SITE_AUTH:}.caddy`, and compose derives
+# OCTBASE_SITE_AUTH="on" only when a hash is set, otherwise empty (which selects
+# this file). It intentionally contains no directives so the front door serves
+# openly. See auth-on.caddy for the enabled counterpart and docs/operations.md
+# → "Installation password".

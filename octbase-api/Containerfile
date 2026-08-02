@@ -1,0 +1,53 @@
+# Base images are pinned by digest, not tag: a floating tag lets a regressed or
+# compromised upstream rebuild flow into a build silently, and makes builds
+# non-reproducible. The trailing comment records which human tag the digest stood
+# for when it was pinned (an inline comment on a FROM line is a parse error, so
+# the tag lives here). To refresh deliberately, see docs/operations.md
+# ("Refreshing container base-image pins").
+#
+# hi/go:latest
+FROM registry.access.redhat.com/hi/go@sha256:19425721abfeaa80582caf96030654e78e4a0eddc7fee0233d49916b174303cb AS builder
+# Pin the Go toolchain deterministically regardless of what `hi/go:latest`
+# resolves to. Must be >= the `toolchain` directive in go.mod (go1.26.5, which
+# carries the crypto/tls fix for GO-2026-5856) — an older exact pin here silently
+# overrides go.mod and ships the vulnerable stdlib. Keep this in lockstep with
+# go.mod's toolchain line.
+ENV GOTOOLCHAIN=go1.26.5
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /octbase-api ./cmd/octbase-api
+
+# Build the attachments directory skeleton here, in the stage that still has a
+# shell. The runtime image (ubi-micro) has no shell and no useradd, so it cannot
+# mkdir/chown anything itself — the only way to give the non-root runtime user a
+# writable /data/attachments is to COPY --chown a ready-made tree in.
+RUN mkdir -p /data/attachments
+
+# ubi9/ubi-micro:latest
+FROM registry.access.redhat.com/ubi9/ubi-micro@sha256:98ab4c56274cf6d9f5574884543c5f6f599ac32732f428e3c9904c65853c1f26
+# ubi-micro ships without a CA trust store; the statically-linked (CGO_ENABLED=0)
+# binary needs one to verify TLS for outbound SCM calls (GitHub/GitLab/Bitbucket).
+COPY --from=builder /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+COPY --from=builder /octbase-api /octbase-api
+COPY --from=builder /src/migrations /migrations
+COPY --from=builder /src/api /api
+COPY --from=builder /src/web /web
+
+# Writable state for the non-root user. Group 0 (root) with group-write mirrors
+# the OpenShift/UBI convention, so the image also works under runtimes that
+# assign an arbitrary UID but always GID 0.
+COPY --from=builder --chown=10001:0 --chmod=770 /data /data
+
+EXPOSE 8000
+
+# Run as a non-root numeric UID. Numeric (not a name) because ubi-micro has no
+# useradd and no matching /etc/passwd entry — the kernel only needs the number,
+# and `podman inspect` / Kubernetes runAsNonRoot can both verify it.
+#
+# /data/attachments must be a mounted volume in any real deployment (see
+# podman-compose.yml): without one, uploads land in the container's writable
+# layer and are lost on recreate.
+USER 10001
+ENTRYPOINT ["/octbase-api"]

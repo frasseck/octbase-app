@@ -1,0 +1,11 @@
+# Triaged findings — each entry needs a justification and an expiry so it is
+# re-examined instead of forgotten (the scan step in .github/workflows/ci.yml
+# documents this mechanism).
+
+# google.golang.org/grpc v1.81.0 inside the upstream-built caddy binary of the
+# hi/caddy base image (frontend + mobile). The advisory covers gRPC xDS RBAC
+# and the gRPC HTTP/2 server; our Caddy configs are static-file serving +
+# reverse proxy only — no gRPC listener, no xDS — so the vulnerable code is
+# unreachable. No rebuilt hi/caddy exists yet (2026-07-27's build still bundles
+# v1.81.0). Re-check for a rebuilt base at expiry and drop this entry.
+GHSA-hrxh-6v49-42gf exp:2026-08-31

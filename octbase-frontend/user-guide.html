@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Guide | Octbase</title>
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/img/favicon.ico" sizes="any">
+<style>
+/* ── MD3 tokens (green primary) ── */
+:root {
+  --md-primary:              #006C4F;
+  --md-on-primary:           #FFFFFF;
+  --md-primary-container:    #B0EDD0;
+  --md-on-primary-container: #002115;
+  --md-surface:              #F6FAF6;
+  --md-on-surface:           #191D19;
+  --md-surface-variant:      #D6E4D9;
+  --md-on-surface-variant:   #3E4940;
+  --md-surface-c-low:        #F0F5F0;
+  --md-surface-c:            #EAF0EA;
+  --md-surface-c-high:       #E4EBE4;
+  --md-outline:              #6D7870;
+  --md-outline-variant:      #BBCABD;
+  --md-e1: 0 1px 2px rgba(0,0,0,.15), 0 1px 3px 1px rgba(0,0,0,.08);
+}
+/* Dark theme — follows the OS preference (this guide opens standalone in a new
+   tab, so it has no in-app toggle). Mirrors the app's dark palette; the page is
+   token-based, so flipping these values is enough. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-primary:              #7ADCAD;
+    --md-on-primary:           #003825;
+    --md-primary-container:    #005138;
+    --md-on-primary-container: #97F9C9;
+    --md-surface:              #191C1A;
+    --md-on-surface:           #FFFFFF;
+    --md-surface-variant:      #404943;
+    --md-on-surface-variant:   #BFC9C1;
+    --md-surface-c-low:        #1B211D;
+    --md-surface-c:            #1D211E;
+    --md-surface-c-high:       #272B27;
+    --md-outline:              #899389;
+    --md-outline-variant:      #404943;
+    --md-e1: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px 1px rgba(0,0,0,.15);
+  }
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  line-height: 1.65;
+  font-size: 15px;
+}
+
+/* ── Layout ── */
+.layout { display: flex; min-height: 100vh; }
+nav.sidebar {
+  width: 260px; flex-shrink: 0;
+  background: var(--md-surface-c-low);
+  border-right: 1px solid var(--md-outline-variant);
+  padding: 0 0 40px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.sidebar-header {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  margin-bottom: 8px;
+}
+.sidebar-header img { max-width: 140px; height: auto; display: block; }
+.brand { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--md-outline); }
+.brand span { display: none; }
+.back-link {
+  font-size: 12px; font-weight: 600; color: var(--md-primary);
+  text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+}
+.back-link:hover { text-decoration: underline; }
+nav.sidebar a {
+  display: block; padding: 8px 20px;
+  color: var(--md-on-surface-variant); text-decoration: none;
+  font-size: 13.5px;
+  border-radius: 0 20px 20px 0;
+  margin: 1px 8px 1px 0;
+  transition: background .15s, color .15s;
+}
+nav.sidebar a:hover { background: var(--md-surface-variant); color: var(--md-primary); }
+nav.sidebar a.active { background: var(--md-primary-container); color: var(--md-on-primary-container); font-weight: 600; }
+.nav-section {
+  font-size: 11px; font-weight: 600; letter-spacing: .8px;
+  text-transform: uppercase; color: var(--md-outline);
+  padding: 16px 20px 4px;
+}
+main { flex: 1; max-width: 860px; padding: 40px 48px 80px; min-width: 0; }
+
+/* ── Typography ── */
+h1 { font-size: 28px; font-weight: 700; color: var(--md-primary); margin-bottom: 8px; letter-spacing: -.4px; }
+h2 {
+  font-size: 21px; font-weight: 700; color: var(--md-on-surface);
+  margin: 48px 0 14px; padding-top: 16px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+h2:first-of-type { border-top: none; margin-top: 32px; }
+h3 { font-size: 16px; font-weight: 600; color: var(--md-primary); margin: 24px 0 8px; }
+p  { margin-bottom: 12px; }
+p:last-child { margin-bottom: 0; }
+ul, ol { margin: 8px 0 12px 20px; }
+li { margin-bottom: 5px; }
+a  { color: var(--md-primary); }
+code {
+  font-family: 'Courier New', monospace; font-size: 13px;
+  background: var(--md-surface-c-high); padding: 1px 5px;
+  border-radius: 4px; border: 1px solid var(--md-outline-variant);
+}
+.lead { font-size: 16px; color: var(--md-on-surface-variant); margin-bottom: 32px; line-height: 1.7; }
+
+/* ── Cards / callouts ── */
+.card {
+  background: var(--md-surface-c-low);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 12px; padding: 20px 24px; margin: 16px 0;
+  box-shadow: var(--md-e1);
+}
+.card h3 { margin-top: 0; }
+.tip {
+  background: var(--md-primary-container);
+  border-left: 4px solid var(--md-primary);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px; margin: 16px 0; font-size: 14px;
+  color: var(--md-on-primary-container);
+}
+.tip strong { color: var(--md-primary); }
+.warning {
+  background: #FFF8E7; border-left: 4px solid #F9A825;
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px; margin: 16px 0; font-size: 14px;
+}
+
+/* ── Kbd ── */
+kbd {
+  display: inline-block; padding: 2px 7px;
+  font-family: 'Courier New', monospace; font-size: 12px; font-weight: 600;
+  background: var(--md-surface-c-high);
+  border: 1px solid var(--md-outline); border-bottom-width: 2px;
+  border-radius: 5px; color: var(--md-on-surface); white-space: nowrap;
+}
+
+/* ── Shortcut grid ── */
+.shortcut-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px; margin: 12px 0;
+}
+.shortcut-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--md-surface-c);
+  border-radius: 8px; font-size: 13.5px;
+}
+.shortcut-row kbd { flex-shrink: 0; min-width: 36px; text-align: center; }
+
+/* ── Role table ── */
+.role-table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14px; }
+.role-table th {
+  background: var(--md-surface-c-high); padding: 10px 14px;
+  text-align: left; font-weight: 600;
+  border-bottom: 2px solid var(--md-outline-variant);
+}
+.role-table td { padding: 9px 14px; border-bottom: 1px solid var(--md-outline-variant); vertical-align: top; }
+.role-table tr:last-child td { border-bottom: none; }
+
+/* ── Badges ── */
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600; letter-spacing: .3px;
+}
+.badge-green { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+.badge-blue  { background: #D3E4FF; color: #00315C; }
+.badge-gray  { background: var(--md-surface-c-high); color: var(--md-on-surface-variant); }
+.badge-red   { background: #FFDAD6; color: #410002; }
+
+/* ── Numbered steps ── */
+.steps { counter-reset: step; list-style: none; margin: 12px 0; padding: 0; }
+.steps li { counter-increment: step; display: flex; gap: 14px; margin-bottom: 12px; align-items: flex-start; }
+.steps li::before {
+  content: counter(step);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; width: 26px; height: 26px;
+  background: var(--md-primary); color: #fff; border-radius: 50%;
+  font-size: 12px; font-weight: 700; margin-top: 1px;
+}
+
+/* ── Responsive / print ── */
+@media (max-width: 720px) { nav.sidebar { display: none; } main { padding: 24px 20px 60px; } }
+@media print { nav.sidebar { display: none; } main { padding: 0; max-width: 100%; } }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ── Sidebar ── -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <img src="img/octbase_logo.svg" alt="Octbase">
+    <div class="brand">User Guide</div>
+    <a class="back-link" href="https://www.ocete.ch" target="_blank" rel="noopener">&larr; www.ocete.ch</a>
+  </div>
+
+  <div class="nav-section">Getting started</div>
+  <a href="#overview">What is Octbase?</a>
+  <a href="#login">Signing in</a>
+  <a href="#dashboard">Dashboard</a>
+
+  <div class="nav-section">Working with tasks</div>
+  <a href="#projects">Projects</a>
+  <a href="#board">Kanban board</a>
+  <a href="#backlog">Backlog</a>
+  <a href="#task-panel">Task panel</a>
+  <a href="#bulk-actions">Bulk actions</a>
+  <a href="#tasklist">Task list view</a>
+  <a href="#mindmap">Mindmap</a>
+  <a href="#archive">Archive</a>
+  <a href="#activity">Project activity</a>
+
+  <div class="nav-section">Planning</div>
+  <a href="#releases">Releases</a>
+  <a href="#sprints">Sprints</a>
+  <a href="#statistics">Project statistics</a>
+
+  <div class="nav-section">Collaboration</div>
+  <a href="#comments">Comments &amp; mentions</a>
+  <a href="#notifications">Notifications</a>
+  <a href="#notif-prefs">Notification preferences</a>
+  <a href="#realtime">Real-time updates</a>
+
+  <div class="nav-section">Documentation</div>
+  <a href="#pages">Wiki pages</a>
+
+  <div class="nav-section">SCM &amp; Integrations</div>
+  <a href="#scm">Repository connections</a>
+  <a href="#webhooks">Webhooks</a>
+  <a href="#import">Import &amp; export</a>
+
+  <div class="nav-section">Administration</div>
+  <a href="#roles">Roles &amp; permissions</a>
+  <a href="#admin">Admin panel</a>
+  <a href="#invitations">Inviting users</a>
+
+  <div class="nav-section">Your account</div>
+  <a href="#settings">Personal settings</a>
+  <a href="#mfa">Two-factor authentication</a>
+
+  <div class="nav-section">Productivity</div>
+  <a href="#shortcuts">Keyboard shortcuts</a>
+  <a href="#command-palette">Command palette</a>
+  <a href="#search">Search</a>
+  <a href="#language">Language</a>
+  <a href="#vocabulary">Vocabulary: agile or classic</a>
+  <a href="#appearance">Appearance &amp; themes</a>
+  <a href="#urls">Bookmarkable URLs</a>
+</nav>
+
+<!-- ── Content ── -->
+<main>
+
+<h1>Octbase User Guide</h1>
+<p class="lead">Octbase is a focused project management tool covering tasks, sprints, releases, documentation, and source-code integration — with fewer moving parts than Jira and a keyboard-first interface.</p>
+
+<section id="overview">
+<h2>What is Octbase?</h2>
+<p>Octbase replaces Jira for task, sprint, and board work, includes its own wiki pages, and integrates with GitHub, GitLab, and Bitbucket (it does not host git) — one tool that does the core workflow really well. It is designed for a single team where every user is known and invited by an administrator.</p>
+<div class="card">
+  <h3>Key capabilities</h3>
+  <ul>
+    <li><strong>Task management</strong> — Kanban board, backlog, list view, bulk actions</li>
+    <li><strong>Planning</strong> — Releases (long-horizon targets) and Sprints (time-boxed iterations), with optional <a href="#estimation">effort estimation</a> in story points or hours</li>
+    <li><strong>Documentation</strong> — AsciiDoc wiki pages with live preview and revision history</li>
+    <li><strong>SCM integration</strong> — connect GitHub, GitLab, or Bitbucket repositories; create branches and pull requests from a task, with PR status shown on tasks</li>
+    <li><strong>Real-time</strong> — Server-Sent Events tell you the moment a teammate changes something you are looking at</li>
+    <li><strong>Import &amp; export</strong> — portable whole-project ZIP archives (backup / move between instances), plus Jira CSV import and export</li>
+  </ul>
+</div>
+</section>
+
+<section id="login">
+<h2>Signing in</h2>
+<p>Octbase uses invitation-only registration — there is no public sign-up. An ADMIN or SUPER_ADMIN invites you by email and you set your own password when accepting the invitation link.</p>
+<ol class="steps">
+  <li>Open the app and you will see the login page.</li>
+  <li>Enter your email address and password, then click <strong>Sign in</strong>.</li>
+  <li>If your account has <a href="#mfa">two-factor authentication</a> enabled, a <strong>Two-factor verification</strong> step appears — enter the 6-digit code from your authenticator app (or one of your recovery codes) and click <strong>Verify</strong>.</li>
+  <li>After a successful login you land on the <strong>Dashboard</strong>.</li>
+</ol>
+<div class="tip"><strong>Forgot your password?</strong> Click <strong>Forgot password?</strong> on the login page and enter your email address. If an account exists, you receive an email with a reset link that is valid for 60 minutes and can be used once. Setting a new password signs out all existing sessions.</div>
+<h3>Password requirements</h3>
+<p>Whenever you set a new password — accepting an <a href="#invitations">invitation</a>, using a reset link, or when an administrator creates your account — it must be at least <strong>12 characters</strong> long, and trivially common passwords (e.g. <code>password1234</code>) are rejected. Existing passwords are not affected until you change them.</p>
+</section>
+
+<section id="dashboard">
+<h2>Dashboard</h2>
+<p>The Dashboard (<em>My Work</em>) is the first screen after login. It gives you a personal overview across all projects you are a member of.</p>
+<div class="card">
+  <h3>Dashboard sections</h3>
+  <ul>
+    <li><strong>Assigned to me</strong> — all open tasks where you are the assignee</li>
+    <li><strong>In review</strong> — tasks where you are the reviewer</li>
+    <li><strong>Recent pages</strong> — wiki pages you have edited lately</li>
+    <li><strong>Upcoming releases</strong> — releases with a due date within the next 14 days</li>
+    <li><strong>My projects</strong> — every project you can access; click one to open its board</li>
+    <li><strong>My boards</strong> — the boards across those projects, for one-click access to the work you care about</li>
+  </ul>
+</div>
+<p>Click any task or page title to open it directly. Use <kbd>Ctrl</kbd>+<kbd>K</kbd> to search across everything from any view.</p>
+</section>
+
+<section id="projects">
+<h2>Projects</h2>
+<p>A project is the top-level container for tasks, a board, releases, sprints, pages, and repository connections.</p>
+
+<h3>Creating a project</h3>
+<p>ADMIN and SUPER_ADMIN users can create projects. Click <strong>+ New Project</strong> on the project list screen. Provide a name, an optional <strong>abbreviation</strong>, an optional description, and choose <strong>Public</strong> or <strong>Private</strong> visibility.</p>
+
+<div class="tip"><strong>Who can see a project</strong> — you only see a project, its boards, and its tasks if you are a member of it (any role). Visibility no longer grants access on its own: a non-member cannot see a project even when it is <strong>Public</strong>. SUPER_ADMIN users can see every project.</div>
+
+<h3>Editing and deleting</h3>
+<p>Every project card shows <strong>Edit</strong> and <strong>Delete</strong> buttons. Inside a project the same actions appear in the top bar. Deleting a project permanently removes all of its tasks, boards, pages, releases, and activity — a confirmation dialog warns you before proceeding.</p>
+
+<h3>Archiving</h3>
+<p>Archiving freezes a project without deleting anything: it stays fully readable, but nothing in it can be created, edited or moved until it is unarchived. Only a <strong>PROJECT_OWNER</strong> can archive or unarchive.</p>
+<p>Open the <strong>settings gear</strong> menu in the project top bar and choose <strong>Archive project</strong> (German UI: <em>Projekt archivieren</em>); the dialog says exactly what changes before you confirm. The same menu then offers <strong>Unarchive project</strong> — archiving is reversible, and it is the only way back, because the ordinary "edit project" route is frozen along with everything else while the project is archived.</p>
+
+<h3>Exporting a project</h3>
+<p>Any project member can export the whole project as a single ZIP archive. Click the <strong>settings gear</strong> icon in the project top bar and choose <strong>Export project</strong> (German UI: <em>Projekt exportieren</em>). The archive contains everything that makes up the project:</p>
+<ul>
+  <li>All <strong>tasks</strong> with their comments (including reply threads), web links, and task relations</li>
+  <li>All <strong>attachments</strong> — uploaded files are included with their original bytes, external links are preserved</li>
+  <li>All <strong>wiki pages</strong> with their hierarchy and <code>TASK-…</code> cross-references</li>
+  <li>The <strong>planning structure</strong> — releases, sprints (with their velocity figures), boards and their lanes, task categories and task templates — and, for every task, the release, sprint and board lane it is placed in</li>
+  <li>A <code>project.json</code> manifest with the project metadata</li>
+</ul>
+<p>The archive is <strong>re-importable</strong>: use it as a backup, or to move a project to another Octbase instance.</p>
+<p>Three things are deliberately <em>not</em> in the archive: the project's <strong>member list</strong> (an export file must not be able to grant access — people are matched by email on import instead), the <strong>repository connections</strong> (they hold credentials for your Git provider), and the <strong>activity and audit log</strong>, which belongs to the instance rather than to the project.</p>
+
+<h3>Importing a project</h3>
+<p>Members with a writer role (any project role except <code>PROJECT_VIEWER</code>) can import a previously exported archive. Open the <strong>settings gear</strong> menu and choose <strong>Import project</strong> (German UI: <em>Projekt importieren</em>), then select the ZIP file. The imported content is <em>added</em> to the current project — existing content is never modified or deleted.</p>
+<ul>
+  <li>Everything is recreated with fresh IDs; task numbers are re-assigned using the target project's abbreviation, and comment threads, page hierarchy, task relations, and <code>TASK-…</code> references inside pages are re-linked automatically.</li>
+  <li>People are matched <strong>by email address</strong>. If an assignee, reporter, or comment author doesn't exist on the target instance, the field is left empty (comments fall back to the importing user) and a warning is reported.</li>
+  <li>Page slugs that already exist in the target project are de-conflicted with a numeric suffix.</li>
+  <li>Imported files pass the same file-type and size checks as regular uploads; anything disallowed is skipped and reported.</li>
+  <li>The archive's boards and sprints are added alongside the ones the target project already has. A project can only have one default board and one active sprint, so an imported default board becomes an additional board and an imported active sprint arrives as <em>planned</em>; sprint dates that would overlap an existing sprint are dropped. Each of these is reported as an import warning.</li>
+</ul>
+
+<h3>Creating a new project from an export</h3>
+<p>Instead of importing into an existing project, you can create a <strong>brand-new project</strong> straight from an export archive: on the project list screen, click <strong>New project from export</strong> and select the ZIP file. The project's name, abbreviation, description, and visibility are taken from the archive, you become its <strong>PROJECT_OWNER</strong>, and all content is imported in one step. Like regular project creation, this requires the ADMIN or SUPER_ADMIN global role.</p>
+
+<div class="tip"><strong>Jira handover</strong> — the previous Jira-compatible CSV export/import is still available via the API (<code>/export/jira-csv</code>, <code>/import/jira-csv</code>) for teams migrating to or from Jira; see the API docs.</div>
+
+<div class="tip"><strong>Project abbreviation</strong> — each project has a short uppercase abbreviation (e.g. <code>DP</code> for <em>Demo Project</em>) used as the prefix in task sequence numbers like <code>DP-42</code>. It is auto-generated from the project name when you leave the field blank, and you can edit it (up to 4 characters) when creating or editing the project.</div>
+</section>
+
+<section id="board">
+<h2>Kanban board</h2>
+<p>The board is the primary task view. Tasks are organised into columns (lanes) that map to a workflow status. Press <kbd>B</kbd> from inside any project to jump here.</p>
+<p>A card's lane and its status are two views of the same thing and stay aligned both ways: dragging a card to another lane sets the task's status to that lane's status, and changing a task's status elsewhere (for example from the task panel) moves the card into the matching lane. A task not on the board, or one whose board has no lane for the new status, keeps its place.</p>
+
+<h3>Creating a board</h3>
+<p>A <strong>PROJECT_OWNER</strong> or <strong>PROJECT_ADMIN</strong> can create a board pre-filled with a default set of lanes. Choose a template:</p>
+<ul>
+  <li><strong>Kanban</strong> — <em>To&nbsp;Do · In&nbsp;Progress · Done</em></li>
+  <li><strong>Scrum</strong> — <em>To&nbsp;Do · In&nbsp;Progress · In&nbsp;Review · Done</em></li>
+</ul>
+<p>The lane names are created in your current language (English or German), and you can rename them afterwards at any time. The first time a project's board is opened, Octbase auto-creates a default Scrum board for you.</p>
+
+<h3>Configuring the board</h3>
+<p>Click the <strong>⚙ Board settings</strong> button above the board to customise it. You can rename the board, add lanes, rename existing lanes, reorder them, and remove lanes you no longer need (between 1 and 10 lanes). A custom lane name becomes a usable task status, so the board's columns and the available task statuses always stay in sync: renaming a custom lane renames the status its tasks carry, while renaming a built-in lane (for example calling "Done" "Shipped") changes only the label — the built-in behaviour stays. Removing a lane sends the tasks in it back to the <a href="#backlog">backlog</a>, where they return to <strong>Planned</strong> — the backlog holds work that has not started, so a card cannot sit there still marked <em>In Progress</em>. Tasks already <strong>Done</strong> keep that status.</p>
+
+<h3>Linked columns</h3>
+<p>You can mirror a single column from another board so its content is visible alongside your own work — including boards in <strong>other projects you have read access to</strong>, which is handy when each project has just one board. Click the <strong>linked column</strong> button above the board and pick a source column; the picker groups columns by <em>project · board</em>. The linked column appears on the <strong>right</strong> of your board, labelled with its source (and source project when it differs from yours), and is <strong>read-only</strong> — its tasks cannot be moved or edited from here, since the source board stays authoritative. Use the <strong>×</strong> on a linked column to remove it (this never affects the source).</p>
+<div class="tip"><strong>Access is always checked</strong> — you can only link a column from a project you can read, and the linked tasks are shown only to board viewers who themselves have read access to that source project. A viewer without access still sees the column, but not its task content.</div>
+
+<h3>Backlog column</h3>
+<p>Toggle the <strong>backlog</strong> button above the board to show or hide the backlog as a separate column on the <strong>left</strong> of your board. This keeps unstarted work in view while you plan — drag an item from the backlog column straight into a lane to put it on the board, and drag a card out of a lane onto the backlog column to take it back off the board again (the same thing the task panel's <strong>Move to Backlog</strong> does), which returns it to <strong>Planned</strong>. The toggle is remembered per board on your device, so the backlog stays shown or hidden the way you left it.</p>
+
+<h3>Creating a task inline</h3>
+<p>Press <kbd>N</kbd> while the board is visible. An inline creation row appears in the first column — type a title and press <kbd>Enter</kbd>. Press <kbd>Esc</kbd> to cancel without creating.</p>
+
+<h3>Moving tasks</h3>
+<p>Drag a card to a different column to update its status. Or open the task panel and change the <strong>Status</strong> field.</p>
+
+<h3>Filtering</h3>
+<p>Use the filter bar above the board to narrow by status, priority, assignee, or label. Active filters are encoded in the URL — a filtered board view is bookmarkable and shareable.</p>
+<p>The search box on the board narrows the lanes as you type. It matches the card title and — see <a href="#find-by-id">Finding a task by its ID</a> — the task ID printed on the card.</p>
+
+<h3>Task cards</h3>
+<p>Each card shows its <strong>type badge</strong> and <strong>sequence number</strong> along the top, with the <strong>assignee avatar</strong> (and the pin button) at the top right, then the <strong>title</strong>. Below it sits a row of tags, each shown only when it applies: the <strong>priority</strong> dot, the <a href="#estimation">effort estimate</a>, the <strong>due date</strong> (red when past due), the <strong>release</strong>, and — if the task is assigned to a sprint — a green <strong>sprint</strong> tag.</p>
+<p>A card always shows the current state of its task: anything you change in the task panel — assignee, priority, type, due date, release, sprint, or the title — appears on the card straight away, with no need to reload the page.</p>
+<h3>Pinning a card</h3>
+<p>Hover a card and click the <strong>pin</strong> button to pin it. Pinned cards float to the top of their lane (and show a coloured left border) so important work stays in view. Click the pin again to unpin. Pinning needs write access and works on a task in any status — including DONE or ARCHIVED.</p>
+</section>
+
+<section id="backlog">
+<h2>Backlog</h2>
+<p>The backlog lists all tasks that are not yet placed on the board (unstarted work), grouped by release. Use it for grooming and sprint planning. Press <kbd>L</kbd> to navigate here from inside a project. You can also show the same backlog as a column directly on the board — see <a href="#board">Backlog column</a>.</p>
+<p>Setting a task's <a href="#task-panel">status</a> moves it out of the backlog and into the matching board column, so the backlog keeps meaning what its name says rather than quietly accumulating work that is already underway. The <strong>Move to backlog</strong> button on the task panel sends a task back, and taking a task off the board returns it to <strong>Planned</strong> — the rule holds in both directions, so everything in the backlog is genuinely unstarted. Work that is already <strong>Done</strong> keeps that status wherever it sits.</p>
+<p><strong>Sorting.</strong> Click any column header to sort the whole backlog by that column — the release grouping collapses into one flat, sorted list. Click the same header again to reverse the direction (an ▲/▼ arrow marks the active column), and a third click clears the sort and returns to the release grouping. The Backlog and the Task list view remember their sort independently.</p>
+<p><strong>Searching.</strong> The search box above the list narrows it as you type, matching both the task title and its description.</p>
+
+<h3 id="find-by-id">Finding a task by its ID</h3>
+<p>Every task carries an ID made of the project abbreviation and a number — <code>OCT-202</code> — shown on its board card, its backlog row, and at the top of its task panel. Typing that ID into the search box on the <strong>Backlog</strong>, the <strong>Task list</strong>, or the <strong>Board</strong> jumps straight to that one task, so an ID quoted in a chat message or a commit can be pasted back in to find the work it refers to.</p>
+<ul>
+  <li>Both spellings work: the full ID (<code>OCT-202</code>, in any capitalisation, with an optional leading <code>#</code>) and the bare number (<code>202</code>).</li>
+  <li>The ID has to be complete — <code>OCT-20</code> finds task 20, not 202.</li>
+  <li>An ID from a different project is not matched: searching <code>ABC-202</code> inside project OCT returns nothing rather than the wrong task.</li>
+  <li>The text search keeps running alongside it, so a query like <code>202</code> also lists tasks that mention 202 in their title or description.</li>
+</ul>
+<p>Each view searches what it shows: the Backlog searches unstarted work, the Board searches the cards on its lanes, the Task list searches both. To search across projects — or for pages and projects too — use the global search (<kbd>Ctrl</kbd>+<kbd>K</kbd>), described under <a href="#search">Search</a>.</p>
+</section>
+
+<section id="task-panel">
+<h2>Task panel</h2>
+<p>Click any task card or list row to open the slide-in task panel. The URL updates to include <code>?task=TASK_ID</code> — reloading the page restores the panel exactly.</p>
+<div class="card">
+  <h3>Panel tabs</h3>
+  <ul>
+    <li><strong>Details</strong> — title, description, status, priority, type, assignee, reviewer, created by, due date, sprint, release, labels, plus the attachment sidebar: uploaded files (drag-and-drop or pick a file; images preview inline)</li>
+    <li><strong>Comments</strong> — threaded comments with <code>@mention</code> support</li>
+    <li><strong>Links</strong> — external URLs attached to the task; type a title and URL and press <kbd>Enter</kbd> (or Add)</li>
+    <li><strong>Relations</strong> — relates-to / blocks / blocked-by / duplicates links to other tasks: pick a relation type and a task to add one; each row names the other task (click it to open) with the relation read from this task's side. The task's child tasks are listed here too (when it has any), and a <strong>dependency map</strong> under the lists draws the same links as a diagram</li>
+    <li><strong>Branches</strong> — linked Git branch references and live PR status</li>
+    <li><strong>Activity</strong> — full audit trail of every change to this task</li>
+  </ul>
+</div>
+
+<h3>Editing fields</h3>
+<p>Click any field in the Details tab to edit it inline. Changes save immediately. The title in the panel header is editable too: click it (or the pencil button next to it, or press <kbd>E</kbd>) to start editing, then <kbd>Enter</kbd> saves and <kbd>Esc</kbd> reverts. Press <kbd>A</kbd> to assign the task to yourself.</p>
+<p><strong>Status</strong> is also where a task sits on the board: setting it moves the task into the column that carries that status, so you can move work along without opening the board or dragging anything. A task that was not on the board yet joins it — that is how something you have actually started stops hiding in the backlog. There is no separate "board column" field; the two used to be able to disagree with each other. The one thing status will not do is commit a task to a <a href="#sprints">sprint</a>: a sprint's scope is a planning decision, so use the sprint field or the sprint board for that. A task already committed to a sprint joins that sprint's board rather than the project board.</p>
+<p>The <strong>Assignee</strong> and <strong>Reviewer</strong> lists offer the project's members plus your instance's global admins, who appear marked <em>(admin)</em> — they administer the instance without being members of any particular project. Someone who has since left the project, or whose account was disabled, stays visible on the tasks they still hold, marked <em>(no longer a member)</em>.</p>
+<p>Picking an admin who is not a member offers to add them to the project as a <strong>Viewer</strong>: administering the instance does not by itself grant access to a project, so without a membership they could not open the task. If you are not allowed to add members, you are told so and can ask someone who is. Super Admins reach every project already and are never asked about.</p>
+<p><strong>Created by</strong> records who created the task. It is set once, at creation, and cannot be edited afterwards.</p>
+
+<h3>Rich-text description</h3>
+<p>The task <strong>description</strong> is a rich-text editor with a formatting toolbar: <strong>Bold</strong>, <strong>Italic</strong>, <strong>Bullet list</strong>, <strong>Numbered list</strong>, <strong>Heading</strong>, <strong>Code block</strong>, <strong>Insert link</strong>, and <strong>Attach file</strong>. You can also use <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>B</kbd> and <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>I</kbd> for bold and italic. Edits are saved with the <strong>Save</strong> button below the editor; the status line shows whether you have unsaved changes.</p>
+<div class="tip"><strong>Heading and Code block toggle.</strong> The <strong>Heading</strong> and <strong>Code block</strong> buttons switch the current line into that format, and clicking the same button again on a formatted line turns it back into a normal paragraph.</div>
+<p>Attach a file with the toolbar's <strong>Attach file</strong> button, or by dragging it onto the editor or pasting an image from the clipboard. Uploaded images can be inserted into the text, where they are shown as the picture itself while you write.</p>
+<p>The editor can be made taller or shorter by dragging the handle in its bottom-right corner. The height you pick is kept for the rest of your session.</p>
+
+<h3>Quick actions</h3>
+<p>At the bottom of the Details tab sit the task-level actions:</p>
+<ul>
+  <li><strong>Move to Backlog</strong> — removes the task from the board and places it in the backlog, returning its status to <strong>Planned</strong> (only shown when the task is currently on the board).</li>
+  <li><strong>Archive / Reopen</strong> — archives an open task or reopens an archived one.</li>
+  <li><strong>Delete</strong> — permanently deletes the task after a confirmation dialog (unlike archiving, this cannot be undone).</li>
+</ul>
+
+<h3>Task statuses</h3>
+<p><strong>PLANNED → IN_PROGRESS → IN_REVIEW → DONE → ARCHIVED</strong>. A task in DONE or ARCHIVED is <strong>frozen, but narrowly</strong>. What freezes is what the task <em>says</em> — its title, description, type, effort estimate and due date, plus its status, which is the workflow outcome. That is the historical record, and it takes a <strong>Reopen</strong> to change.</p>
+<p>Everything else about a finished task stays live, and deliberately so:</p>
+<ul>
+  <li><strong>Where it sits</strong> — parent, release, sprint and its place on the board — so a project can be reorganized into an epic/story hierarchy after the work is done, and completed work can be attributed to the sprint and release it belongs to. (Status itself is frozen, and since a lane <em>is</em> a status, that includes dragging: a finished card can be reordered within its lane or sent back to the backlog, but moving it to another lane is refused until the task is reopened.)</li>
+  <li><strong>Who holds it</strong> — assignee and reviewer can still be changed, so finished work can be handed over or corrected.</li>
+  <li><strong>Its priority</strong> — still editable, which is also what lets a finished blocker be downgraded.</li>
+  <li><strong>Its discussion</strong> — comments and replies stay open on a finished task, because a comment is a note <em>about</em> the record rather than part of it, and a retrospective remark is most likely to be written after the work is done. See <a href="#comments">Comments &amp; mentions</a>.</li>
+</ul>
+<p>A DONE task is <strong>auto-archived 30 days after it was completed</strong> so finished work clears off the board on its own; archived tasks are never deleted — they move to the <a href="#archive">Archive</a> view, where any of them can be reopened. The task panel shows the split directly: the frozen editors are disabled with a hint explaining that the task must be <strong>reopened</strong> to be edited, while everything in the list above stays usable. In the mobile companion app, tapping the status of a DONE or ARCHIVED task offers a single <strong>Reopen</strong> action (back to PLANNED) instead of the status list.</p>
+<div class="tip"><strong>Blockers hold a parent open.</strong> A task cannot be moved to <strong>DONE</strong> while any <em>open</em> task anywhere below it — a child, or a child's child — still has <strong>BLOCKER</strong> priority; Octbase refuses the change (on the board, the task panel, and bulk actions alike) until the blocking task is resolved or given a lower priority. A task that is already DONE or ARCHIVED doesn't count: a finished blocker blocks nothing.</div>
+<div class="tip"><strong>Closing a container over live work asks first.</strong> Completing an epic or story while unfinished tasks still sit under it is allowed — <strong>BLOCKER</strong> priority above is how you make it refused when that is what you want — but it is no longer silent. Octbase asks first, saying how many tasks below are still open, naming the first few, and pointing out that they keep running: completing the parent does not close them. You get the same question at each way of completing a task — the <strong>Status</strong> control in the task panel, a drag into the <em>Done</em> lane, and the bulk <strong>Set status</strong> action — so it can't be sidestepped by using a different one. <strong>On the phone too:</strong> the mobile companion app (<code>/m/</code>) asks the same question when you tap <em>Done</em> in the status sheet or move a task into a <em>Done</em> column, so the warning doesn't disappear on the surface where a status is most likely to be tapped in a hurry.</div>
+
+<h3>Types, hierarchy, and priorities</h3>
+<p>Types: <strong>EPIC · STORY · TASK · SUBTASK</strong> (plus the optional <strong>THEME</strong> and <strong>INITIATIVE</strong> levels — see below)<br>
+Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a project may define more)</p>
+<p>Types form a strict hierarchy: <strong>epics contain stories, stories contain tasks, tasks contain subtasks</strong>. Set a task's place in it with the <strong>Parent</strong> field (task panel or create dialog): a subtask <em>always</em> needs a parent task, everything else may live without a parent, and the top level of the hierarchy never has one. The panel lists a task's children on the <strong>Relations</strong> tab (only when it has any), and the parent options always show only the tasks one level up.</p>
+<div class="tip"><strong>Children come first.</strong> A task that still has children cannot be deleted, and its type cannot be changed to one its children no longer fit under — move or delete the children first.</div>
+<p>Changing a task's <strong>Type</strong> in the panel keeps the hierarchy consistent for you: turning a task into a <strong>subtask</strong> first asks you to pick the parent task (the change is saved once you choose it in the <strong>Parent</strong> field), and changing to a type the current parent no longer fits under clears the parent automatically.</p>
+
+<h3>Per-project task settings (admins)</h3>
+<p>Project owners and admins can tailor the type hierarchy and the priority list for their project from the project menu (the gear button in the top bar) → <strong>Task types &amp; priorities</strong>.</p>
+<ul>
+  <li><strong>Extra hierarchy levels.</strong> Switch <strong>Theme</strong> and <strong>Initiative</strong> on to extend the hierarchy upward — the full chain becomes <strong>Theme → Initiative → Epic → Story → Task → Subtask</strong>. Each level is independent: with only Theme enabled, a theme sits directly above epics. Once a level is on, its type appears in the create dialog, filters and parent pickers. A level cannot be switched off while any task (or template) of that type still exists — convert or delete those first.</li>
+  <li><strong>Custom priorities.</strong> Add your own priorities on top of the built-in five (for example <em>URGENT</em>). Names are stored in upper case and must not clash with a built-in. Custom priorities are then selectable everywhere the built-ins are — create dialog, task panel, filters and bulk actions. A custom priority cannot be deleted while a task or template still uses it.</li>
+  <li><strong>Effort estimation.</strong> Choose whether the project estimates effort, and in which unit: <strong>No estimation</strong> (the default), <strong>Story points</strong>, or <strong>Hours</strong>. See <a href="#estimation">Effort estimation</a> below.</li>
+  <li><strong>Board lanes.</strong> <strong>Cards per lane</strong> sets how many cards a board lane shows at once — <strong>20</strong> by default. See <a href="#board-lane-paging">How many cards a lane shows</a> below.</li>
+</ul>
+<p>Each change saves the moment you make it — there is no separate save step. The board, backlog and task views behind the dialog are left alone while you work and pick up the change when you close it, so a settings visit never reloads the page under you.</p>
+<p>These settings belong to the project: they travel with a project <a href="#import">export/import</a>, and they do not affect any other project.</p>
+
+<h3 id="board-lane-paging">How many cards a lane shows</h3>
+<p>A board lane shows the first <strong>20</strong> cards and loads the rest as you scroll down. A lane that is holding more than it shows ends in a <strong>Load N&nbsp;more cards</strong> button saying exactly how many are waiting; scrolling towards it loads the next page on its own, and clicking it does the same without a mouse wheel. This keeps a board with a few hundred finished tasks in its Done lane quick to open and quick to drag on.</p>
+<p><strong>Nothing is hidden from the counts.</strong> The number beside a lane's name is always the whole lane, not the part currently drawn — so a lane reading <em>71</em> while showing twenty cards is behaving correctly. Nothing has left the lane, and searching, filtering and dragging still see every card.</p>
+<p>A card you have just created or dragged into a lane is always shown, even when it lands past the point the lane had drawn to. Owners and admins can change the number under <strong>Task types &amp; priorities → Board lanes</strong>, and setting it to <strong>0</strong> turns paging off and draws every card as before.</p>
+
+<h3 id="estimation">Effort estimation</h3>
+<p>A project can give its tasks an <strong>effort estimate</strong>, measured either in <strong>story points</strong> or in <strong>hours</strong>. It is <strong>off by default</strong>: until an owner or admin picks a unit under <strong>Task types &amp; priorities → Effort estimation</strong>, no estimate field appears anywhere in the project — no box on the task, no badge on the cards. A team that does not estimate never has to look at one.</p>
+<p>Once a unit is on, every <strong>story, task and subtask</strong> gains an estimate field in that unit — in the task panel and in the create dialog — and shows it as a small badge on board cards and backlog rows. In the story-points case the panel also offers <strong>Fibonacci shortcut chips</strong> (1 · 2 · 3 · 5 · 8 · 13 · 21); they are a convenience only — you can type any whole number from 0 to 100, so a team on a different scale is not forced onto Fibonacci. Hours accept up to two decimal places, from 0 to 1000. Clicking the chip that is already selected clears the estimate again.</p>
+<ul>
+  <li><strong>Empty is not zero.</strong> A task with no estimate is <em>unestimated</em>, which is a different statement from an estimate of <strong>0</strong> (“this costs nothing”). Both are allowed, and Octbase keeps them apart. Clear the field to go back to unestimated.</li>
+  <li><strong>Epics, initiatives and themes are not estimated.</strong> They are containers — their effort is whatever they contain. Octbase refuses an estimate on them, and refuses to change an already-estimated task into one of those types until you clear its estimate first.</li>
+  <li><strong>Switching units loses nothing.</strong> If you move a project from story points to hours, the points you already entered are kept — they are simply hidden while hours are the active unit, and they come back unchanged if you switch back. The same is true of switching estimation off entirely.</li>
+  <li><strong>Hours are an estimate, not a timesheet.</strong> This is what you <em>expect</em> the work to take. Octbase does not track logged or remaining time.</li>
+  <li><strong>Estimate as you create, or later.</strong> The <strong>Create task</strong> dialog carries the estimate field too, so work can be created already estimated instead of needing a second edit. Leave it empty and the task starts unestimated. The field appears there under the same rules as everywhere else — only when the project estimates, and only while the chosen type can carry an estimate, so switching the type to an epic takes the box away again.</li>
+  <li><strong>On the phone too.</strong> The mobile companion app (<code>/m/</code>) shows the estimate on its task cards and on the task detail, and lets you change it: tap the estimate row to get the Fibonacci shortcuts and a number field, or <strong>Clear estimate</strong> to go back to unestimated. Mobile's create form carries the field as well.</li>
+</ul>
+<p>Changing the unit is recorded in the project's Activity, and changing a task's estimate in the task's. Estimates travel with a project <a href="#import">export/import</a> and are carried by <strong>Copy task</strong>. Task templates do not carry a default estimate. Once a project estimates, the <a href="#sprints">sprint burndown and velocity</a> and the <a href="#statistics">project statistics page</a> can measure the estimate instead of counting tickets.</p>
+</section>
+
+<section id="bulk-actions">
+<h2>Bulk actions</h2>
+<p>Select multiple tasks using the checkboxes on the board or task list, then use the bulk action bar that appears at the bottom to apply a change to all selected tasks at once.</p>
+<p>Available bulk operations: set <strong>status</strong>, <strong>priority</strong>, or <strong>assignee</strong>; <strong>move</strong> the selection onto a board column or back to the backlog; <strong>archive</strong>; and <strong>delete</strong> (delete is only offered if your role permits it). Both archive and delete ask for confirmation first. Setting a status in bulk places the selection the same way the task panel does — each task lands in the column carrying that status.</p>
+<p>The <strong>Assign to</strong> list offers the same people the task panel does: the project's members plus your instance's global admins, marked <em>(admin)</em>.</p>
+<div class="tip">Shift-click a second checkbox to select a range of tasks in one action.</div>
+</section>
+
+<section id="tasklist">
+<h2>Task list view</h2>
+<p>The task list is a tabular alternative to the Kanban board — every task in the project is shown in a single scrollable table, grouped by status. It is useful for quickly scanning status across all work or applying bulk changes to a large set of tasks.</p>
+<div class="card">
+  <h3>Columns</h3>
+  <ul>
+    <li><strong>Type</strong> — icon badge (EPIC · STORY · TASK · SUBTASK, plus THEME and INITIATIVE where the project has <a href="#task-panel">switched those levels on</a>)</li>
+    <li><strong>Sequence #</strong> — unique identifier (e.g. <code>DP-42</code>)</li>
+    <li><strong>Title</strong> — click to open the task panel</li>
+    <li><strong>Priority</strong> — LOW · MEDIUM · HIGH · CRITICAL · BLOCKER, plus any custom priority the project has added. In a project that estimates, the <a href="#estimation">effort estimate</a> is shown next to it as a small badge.</li>
+    <li><strong>Status</strong> — current workflow state</li>
+    <li><strong>Assignee</strong> — the person responsible</li>
+    <li><strong>Due date</strong> — shown in red when past due</li>
+  </ul>
+  <p>Release and sprint are not columns here: open a task to see or change them, or use the <a href="#backlog">Backlog</a>, which groups its rows by release.</p>
+</div>
+<p>Use the filter bar above the table to narrow by type, priority, or status. Filters are encoded in the URL the same way as the board — the view is bookmarkable. The search box next to them matches the title and description of a task, or its ID — see <a href="#find-by-id">Finding a task by its ID</a>.</p>
+<p><strong>Sorting.</strong> Click any column header to sort the whole table by that column — the status grouping collapses into one flat, sorted list. Click the same header again to reverse the direction (an ▲/▼ arrow marks the active column), and a third click clears the sort and returns to the status grouping.</p>
+<p>Select rows with their checkboxes to use <a href="#bulk-actions">bulk actions</a> across many tasks at once. Each row also has a <strong>delete</strong> button (shown only if your role permits it) to remove a single task after a confirmation. A task that still has subtasks cannot be deleted directly — delete or detach its subtasks first, and the app tells you when this is why.</p>
+</section>
+
+<section id="mindmap">
+<h2>Mindmap</h2>
+<p>The <strong>Mindmap</strong> entry in the project sidebar renders the project's <strong>open</strong> tasks as a left-to-right map: the project at the root, then <strong>epics → user stories → tasks → subtasks</strong>. It gives you a one-screen picture of how the work hangs together. Click any node to open its <a href="#task-panel">task panel</a>; <strong>double-click a node to fold or unfold its children</strong> — a folded node shows a <code>+N</code> badge with the number of hidden children. Folding is a view setting only and lasts until you leave the app.</p>
+<p>The hierarchy follows each task's <strong>Parent</strong> field: a story nests under its epic, a task under its story, a subtask under its task.</p>
+<div class="card">
+  <h3>What the map shows</h3>
+  <ul>
+    <li><strong>Open work by default</strong> — everything that is not <span class="badge badge-gray">DONE</span>. On a project with a long history the finished tasks outnumber the running ones, and the map would answer "what did we ever do here?" instead of "what is left?".</li>
+    <li><strong>Done tasks on request</strong> — <strong>Show done tasks (N)</strong> above the map brings them in, and the button then reads <strong>Hide done tasks</strong>. The choice is remembered per project, in this browser.</li>
+    <li><strong>Done branches that still carry open work</strong> — a finished epic or story with a task still running under it stays on the map, <em>dimmed</em>, so its open children keep their place in the hierarchy instead of dropping into "Unlinked tasks".</li>
+    <li><strong>Never archived tasks</strong> — <span class="badge badge-gray">ARCHIVED</span> tasks are out of the map in both modes; they live in the <a href="#archive">Archive</a>.</li>
+  </ul>
+</div>
+<div class="card">
+  <h3>Synthetic branches</h3>
+  <ul>
+    <li><strong>Stories without epic</strong> — user stories that have no parent epic</li>
+    <li><strong>Unlinked tasks</strong> — tasks with no parent story</li>
+  </ul>
+</div>
+<div class="tip"><strong>Empty or flat mindmap?</strong> Set a story's parent to an epic and a task's parent to a story (task panel → <strong>Parent</strong>) and the map groups them automatically. Sibling nodes are sorted alphabetically by title.</div>
+</section>
+
+<section id="archive">
+<h2>Archive</h2>
+<p>The <strong>Archive</strong> view lists every task in the project that has the <span class="badge badge-gray">ARCHIVED</span> status — both tasks you archived by hand and tasks Octbase archived automatically. Open it from the <strong>Archive</strong> entry in the project sidebar.</p>
+<div class="tip"><strong>Auto-archiving keeps the board clear.</strong> A task is archived automatically <strong>30 days after it is marked DONE</strong>. Auto-archived tasks disappear from the board, backlog, and task list, but they are never deleted — they remain here, fully readable, and the auto-archive is recorded in the <a href="#activity">project activity</a> log.</div>
+<p>Click a task's title to open its panel. Use <strong>Reopen</strong> on any row to bring a task back to the <strong>PLANNED</strong> status and onto the board again.</p>
+</section>
+
+<section id="activity">
+<h2>Project activity</h2>
+<p>The project activity view shows a reverse-chronological event log for everything that has happened across the entire project — task changes, comments, page publishes, sprint transitions, and more.</p>
+<p>Each entry shows the event type, the actor, a human-readable description, and the timestamp (hover for the exact date and time). Entries that relate to a task are clickable and open that task panel directly.</p>
+<div class="card">
+  <h3>Event types logged</h3>
+  <ul>
+    <li>Task created, updated, copied, status changed, priority changed</li>
+    <li>Task assignee or reviewer changed</li>
+    <li>Task moved between board columns, or removed from the board</li>
+    <li>Task archived — manually, or auto-archived 30 days after completion — and reopened</li>
+    <li>Comment added, edited, or deleted</li>
+    <li>Release closed or reopened</li>
+    <li>Sprint started or completed</li>
+    <li>Page created, published, archived, or deleted</li>
+    <li>Branch created or linked, pull request opened</li>
+    <li>Project imported, and tasks imported from a Jira CSV export</li>
+  </ul>
+</div>
+<div class="tip">The per-task version of this log is available on the <strong>Activity</strong> tab inside any task panel.</div>
+<p>Activity entries are <strong>purged automatically after a retention period</strong> (365 days by default; the operator can configure or disable this), so the log shows recent history rather than the project's full lifetime.</p>
+</section>
+
+<section id="releases">
+<h2>Releases</h2>
+<p>A release is a long-horizon target that groups tasks into a shippable product increment. Press <kbd>R</kbd> from inside a project to open the Releases view.</p>
+
+<h3>Lifecycle</h3>
+<ul>
+  <li><span class="badge badge-green">PLANNED</span> — work in progress toward this release</li>
+  <li><span class="badge badge-gray">CLOSED</span> — all tasks done; the release has shipped</li>
+</ul>
+<p>A release cannot be closed if it still has open tasks — Octbase will show which tasks are blocking the transition.</p>
+
+<div class="tip">The Dashboard surfaces releases due within 14 days in the <strong>Upcoming releases</strong> section.</div>
+</section>
+
+<section id="sprints">
+<h2>Sprints</h2>
+<p>Sprints are time-boxed iterations (typically 1–2 weeks) used to execute toward a release step by step. Only one sprint can be <strong>ACTIVE</strong> per project at a time. Press <kbd>S</kbd> to open the Sprints view.</p>
+
+<h3>Sprint states</h3>
+<ul>
+  <li><span class="badge badge-gray">PLANNED</span> — created but not yet started; this is when you plan the scope by adding tasks to its board</li>
+  <li><span class="badge badge-blue">ACTIVE</span> — currently running (shown with a blue left border on the card); the scope is locked</li>
+  <li><span class="badge badge-gray">COMPLETED</span> — finished; unfinished tasks are automatically moved back to the backlog and returned to <strong>Planned</strong></li>
+</ul>
+
+<h3>The sprint board</h3>
+<p>Every sprint gets its own <strong>sprint board</strong> the moment it is created (its lanes are copied from the project's default board). Open it from the <strong>Plan board</strong> / <strong>Open board</strong> button on the sprint card; the board's banner shows the sprint name and links back to the Sprints view. The sprint board exists from creation until the sprint is completed.</p>
+
+<h3>Planning the scope (before starting)</h3>
+<p>While a sprint is <strong>PLANNED</strong>, open its board and turn on the <strong>backlog column</strong> (toolbar toggle), then drag tasks from the backlog onto a lane. Dragging a task onto the sprint board adds it to the sprint. Plan all the work you intend to commit to before you start.</p>
+
+<h3>Starting and completing a sprint</h3>
+<p>Click <strong>Start Sprint</strong> on any PLANNED sprint to activate it. Once a sprint is <strong>ACTIVE</strong> its <strong>scope is locked</strong>: you can no longer drag new tasks onto its board (you'll see a "scope is locked" message), but tasks already in the sprint move freely between lanes. At the end of the iteration click <strong>Complete Sprint</strong> — a confirmation dialog warns that any unfinished tasks will be moved back to the backlog. They return as <strong>Planned</strong>, ready to be picked up again in a later sprint; the sprint's own result is recorded before that happens, so the numbers below are unaffected.</p>
+<p>Completing a sprint records its result as <em>done / committed</em> — for example <strong>2/5</strong> means 5 tasks were on the board and 2 were DONE. The count reflects what was on the board, and the completed sprint card keeps showing it even after the unfinished tasks return to the backlog.</p>
+
+<h3>Assigning tasks to a sprint</h3>
+<p>The primary way to add tasks is to drag them onto the sprint board while planning (above). You can also set a task's sprint directly from a task panel → Details tab → <strong>Sprint</strong> field; only PLANNED and ACTIVE sprints appear in the selector.</p>
+<div class="tip"><strong>The board defines the scope</strong> — a sprint's <em>done / committed</em> count is based on what is on its board, not on the Sprint field alone. Setting the Sprint field tags a task with the sprint but does not place it on the board, so for it to count toward the sprint, drag it onto a lane of the sprint board.</div>
+
+<h3>Sprint reports: burndown &amp; velocity</h3>
+<p>Every ACTIVE or COMPLETED sprint card has a <strong>Report</strong> button that expands two charts:</p>
+<ul>
+  <li><strong>Burndown</strong> — remaining work per calendar day of the sprint window against the ideal straight line to zero. For a running sprint, future days are blank and the current day updates live.</li>
+  <li><strong>Velocity</strong> — committed vs. completed figures for the project's last completed sprints (up to six), so you can see the throughput trend across iterations.</li>
+</ul>
+<p>In a project that estimates in <a href="#estimation">story points or hours</a>, the panel gains a <strong>Tasks / Story points</strong> (or <strong>Tasks / Hours</strong>) switch and opens on the effort view: the burndown then falls by a task's estimate on the day it finishes rather than by one per ticket, so three 1-point chores and one 13-point epic no longer read the same. Committed tasks with no estimate weigh nothing, and the chart says how many there are rather than quietly under-reporting the commitment. Velocity switches to effort automatically once sprints have been completed under estimation; if the project changed its unit part-way through its history, velocity keeps counting tasks instead of adding points to hours.</p>
+<div class="tip"><strong>A completed sprint keeps the unit it was measured in.</strong> The committed and completed figures are captured when you complete the sprint, so switching the project from points to hours later never rewrites what a past sprint achieved.</div>
+<p>Reports are a desktop feature; the mobile companion app does not include them.</p>
+
+</section>
+
+<section id="statistics">
+<h2>Project statistics</h2>
+<p>The <strong>chart icon</strong> in the top bar, immediately left of the project-settings gear, opens the project's statistics page — the overview a project manager wants before a standup or a steering meeting. It is per project and read-only, and every project member can open it.</p>
+<ul>
+  <li><strong>Headline tiles</strong> — open tasks, in progress, finished in the last 30 days (against how many were created in the same window), overdue, and unassigned. Overdue and unassigned count <em>open</em> tasks only: a finished task that was late is history, not something to act on.</li>
+  <li><strong>Sprint burndown</strong> — the running sprint, or the most recently completed one when none is running, using effort wherever the project estimates.</li>
+  <li><strong>Throughput</strong> — how much finished in each of the last 8 weeks. A quiet week is a zero bar, not a missing one.</li>
+  <li><strong>Cycle time</strong> — how long a task took from creation to done, over the last 90 days. The median sits beside the average because one long-running straggler drags the average somewhere no real task lives.</li>
+  <li><strong>Distributions</strong> — tasks by status, tasks by type, and open work by priority (finished and archived tasks are left out of the priority chart: the point is what is still queued).</li>
+  <li><strong>Open work per person</strong> — how the open tasks are spread across the team, with the effort total per person where the project estimates, plus how many open tasks nobody owns.</li>
+  <li><strong>Velocity and releases</strong> — the velocity trend and the release plan: how many are open and closed, the next due date, and whether any open release is already past it.</li>
+</ul>
+<p>Switch effort estimation on for the project (see <a href="#estimation">Effort estimation</a>) and the page adds an effort summary — remaining, done, and how many tasks are still unestimated — and measures the burndown and throughput in that unit. With estimation off, none of it appears and everything counts tasks.</p>
+</section>
+
+<section id="comments">
+<h2>Comments &amp; mentions</h2>
+<p>Add comments on any task from the <strong>Comments</strong> tab of the task panel — <em>any</em> task, including one that is already DONE or ARCHIVED: a finished task is frozen in what it says, not closed to discussion (see <a href="#task-panel">Task statuses</a>). The comment box has the same formatting toolbar as the task description, including <strong>Attach file</strong> — so a comment can carry a screenshot or a document. You can also drag a file onto the box or paste an image straight into it, and an inserted image is shown as the picture itself while you write. The same applies while editing an existing comment.</p>
+<p>The comment box and the description editor both carry a <strong>drag handle in their bottom-right corner</strong>: pull it down to give a long comment more room. The size lasts for that editing session.</p>
+
+<h3>@mentions</h3>
+<p>Type <code>@</code> followed by a team member's name to mention them. A dropdown suggests matching members. Mentioning someone creates an in-app notification and optionally sends them an email.</p>
+
+<h3>Replies</h3>
+<p>Use <strong>Reply</strong> on any comment to respond to it directly; replies are threaded underneath the comment they answer. You can edit or delete your own comments and replies — deleting a comment that has replies removes the whole thread beneath it.</p>
+</section>
+
+<section id="notifications">
+<h2>Notifications</h2>
+<p>The bell icon in the top bar shows your unread notification count. Click it to see the full list.</p>
+<div class="card">
+  <h3>What triggers a notification</h3>
+  <ul>
+    <li>A task is <strong>assigned</strong> to you</li>
+    <li>You are set as the <strong>reviewer</strong> on a task</li>
+    <li>You are <strong>@mentioned</strong> in a comment</li>
+    <li>The <strong>status</strong> of a task you reported changes</li>
+    <li>A <strong>task you created or are assigned to is changed</strong> by someone else — you get a brief email summarizing what changed (title, description, type, status, priority, due date, assignee, and so on)</li>
+  </ul>
+</div>
+<p>Notifications are delivered in-app and optionally by email. You can toggle per-type preferences (in-app / email / both) on your <a href="#settings">Settings</a> page.</p>
+<div class="tip"><strong>Task-change emails.</strong> The "task changed" notification is delivered <em>by email only</em> and is <strong>on by default</strong>, so the people closest to a task (its creator and assignee) stay informed without watching the board. You never get an email about your own edits. Turn it off in the notification preferences section of Settings.</div>
+</section>
+
+<section id="notif-prefs">
+<h2>Notification preferences</h2>
+<p>Notification preferences live on your <a href="#settings">Settings</a> page (<code>/#/settings</code>), between the language/theme preferences and the two-factor authentication panel. Open the notification panel and click <strong>Preferences</strong> at the bottom to jump straight there. You choose — per notification kind — whether to receive in-app notifications, email notifications, both, or neither.</p>
+<div class="card">
+  <h3>Configurable notification kinds</h3>
+  <table class="role-table">
+    <thead><tr><th>Kind</th><th>Triggered when…</th></tr></thead>
+    <tbody>
+      <tr><td>Task changed</td><td>A task you created or are assigned to is edited by someone else (email only, on by default)</td></tr>
+      <tr><td>Task assigned</td><td>A task is assigned to you</td></tr>
+      <tr><td>Reviewer set</td><td>You are set as the reviewer on a task</td></tr>
+      <tr><td>Mentioned</td><td>Someone <code>@mentions</code> you in a comment</td></tr>
+      <tr><td>Status changed</td><td>A task you reported changes status</td></tr>
+    </tbody>
+  </table>
+</div>
+<p>For each kind you can independently toggle <strong>In-App</strong> and <strong>Email</strong> delivery. Changes take effect immediately.</p>
+</section>
+
+<section id="realtime">
+<h2>Real-time updates</h2>
+<p>Octbase uses Server-Sent Events (SSE) to push live updates to all users viewing the same project. When a teammate moves a task, changes a status, or posts a comment, a <strong>&ldquo;This content has changed&rdquo;</strong> banner appears within about a second on the <strong>Board</strong>, <strong>Backlog</strong> and <strong>Tasks</strong> views, with a <strong>Reload</strong> button.</p>
+<p>The page deliberately does <em>not</em> redraw on its own: a view that repaints while you are reading it costs you your scroll position, your selection, and your place in a half-finished edit. You reload when it suits you. Your own changes never raise the banner — they are already on your screen.</p>
+<p>The green dot in the top bar indicates an active live connection. If it drops, the app reconnects automatically with exponential backoff (1 s → 2 s → 4 s → max 30 s).</p>
+</section>
+
+<section id="pages">
+<h2>Wiki pages</h2>
+<p>Each project has a built-in wiki. Pages are written in <strong>AsciiDoc</strong> with a live split-pane preview that updates as you type (debounced 300 ms). Press <kbd>P</kbd> to open the Pages view, and use the <strong>Syntax help</strong> button in the editor for a quick reference.</p>
+
+<h3>Supported AsciiDoc</h3>
+<p>The editor renders genuine AsciiDoc: section titles (<code>=</code> through <code>======</code>), bold <code>*text*</code>, italic <code>_text_</code>, monospace <code>`text`</code>, links (<code>https://site[label]</code>, <code>link:target[label]</code>) and bare URLs, unordered (<code>*</code>/<code>-</code>) and ordered (<code>.</code>) lists with nesting, code blocks (<code>----</code> or <code>[source,lang]</code>), block quotes (<code>____</code>), admonitions (<code>NOTE:</code>, <code>TIP:</code>, <code>WARNING:</code>, <code>IMPORTANT:</code>, <code>CAUTION:</code>), tables (<code>|===</code>), and relative block images (<code>image::/path[alt]</code>). <code>TASK-&lt;id&gt;</code> mentions become links to the task.</p>
+<p>For safety, raw-HTML passthrough and external image sources are intentionally <em>not</em> supported, and all rendered output is sanitized on the server, so a page can never run injected scripts. Note that the bold marker is a single <code>*</code> as in standard AsciiDoc (the older Markdown-style <code>**double**</code> form now renders as ordinary bold via AsciiDoc's unconstrained marker).</p>
+
+<h3>Page statuses</h3>
+<ul>
+  <li><span class="badge badge-gray">DRAFT</span> — work in progress, not yet visible to readers</li>
+  <li><span class="badge badge-green">PUBLISHED</span> — visible to all project members; each publish creates a revision snapshot</li>
+  <li><span class="badge badge-gray">ARCHIVED</span> — hidden from the active page list</li>
+</ul>
+
+<h3>Table of contents</h3>
+<p>When a published page has three or more headings, a sticky TOC sidebar is generated automatically on the read view.</p>
+
+<h3>Revision history</h3>
+<p>Every publish action creates an immutable revision. Open the revisions panel to see who changed what and when.</p>
+
+<h3>Task cross-references</h3>
+<p>Type a task reference in the form <code>TASK-&lt;id&gt;</code> (the task's full ID, as in <code>TASK-00000000-0000-0000-0000-000000000abc</code>) in page content to create a cross-link. On publish, the reference appears in the task panel under the Activity tab as <em>Referenced in</em>.</p>
+</section>
+
+<section id="scm">
+<h2>Repository connections</h2>
+<p>Connect a Git repository to a project so that you can create branches and open pull/merge requests for tasks directly from Octbase, with PR status shown on task panels. Supported providers: <strong>GitHub</strong>, <strong>GitLab</strong>, and <strong>Bitbucket</strong>. You can connect more than one repository to a project — useful when a project spans multiple repos (e.g. a separate frontend and backend) — and choose which one to branch in per task.</p>
+
+<h3>Adding a repository connection</h3>
+<p>Open your project and select <strong>Repositories</strong> from the project navigation. Fill in the form:</p>
+<ul>
+  <li><strong>Display name</strong> — a friendly label shown in the UI (e.g. <em>backend</em>)</li>
+  <li><strong>Repository URL</strong> — the full HTTPS clone URL</li>
+  <li><strong>Provider</strong> — GitHub, GitLab, or Bitbucket</li>
+  <li><strong>Default branch</strong> — typically <code>main</code> or <code>master</code></li>
+  <li><strong>Access token</strong> — a Personal Access Token (PAT) for the provider, used to create branches and pull/merge requests on your behalf (see required permissions below). The token is encrypted at rest and never shown again.</li>
+</ul>
+<p>Click <strong>Add</strong>. When a token is supplied, Octbase validates the repository against the provider on save and adopts its real default branch. The connection then appears in the list and is immediately available in the Branches tab of any task panel in this project.</p>
+<div class="tip"><strong>OAuth instead of a PAT</strong> — if your administrator has configured an OAuth app for the provider, you can use <strong>Connect with OAuth</strong> on the connection instead of pasting a token; Octbase then manages and refreshes the access token for you.</div>
+<div class="tip"><strong>Self-hosted providers</strong> — for a self-hosted GitHub Enterprise or GitLab instance you can point the connection at its own API base URL, but it must be a publicly reachable <code>https</code> (or <code>http</code>) address. URLs that resolve to an internal, loopback, or link-local address are rejected on save with <em>"SCM API base URL points at a disallowed …"</em> — a deliberate safeguard so a connection cannot be used to reach the server's own internal network.</div>
+
+<h3>Access token permissions</h3>
+<p>The token only needs to read the repository, create branches, and open pull/merge requests. A token that is missing these is rejected on save with <em>"SCM provider rejected the access token"</em>.</p>
+<p><strong>GitHub</strong> — create a token under <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">Settings → Developer settings → Personal access tokens</a> (see GitHub's guide: <a href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens" target="_blank" rel="noopener">Managing your personal access tokens</a>):</p>
+<ul>
+  <li><strong>Classic token</strong> — enable the <a href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps" target="_blank" rel="noopener"><code>repo</code> scope</a> (or <code>public_repo</code> for public repositories only).</li>
+  <li><strong>Fine-grained token</strong> — grant access to the specific repository, then set <strong>Contents: Read and write</strong> (branches) and <strong>Pull requests: Read and write</strong> (the mandatory <strong>Metadata: Read-only</strong> is selected automatically).</li>
+  <li>If the repository belongs to an organization with SAML SSO enabled, <strong>authorize the token for that organization</strong> (Configure SSO), or GitHub returns a 403.</li>
+</ul>
+<p><strong>GitLab</strong> — create a <a href="https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html" target="_blank" rel="noopener">project or personal access token</a> with the <code>api</code> scope.</p>
+<p><strong>Bitbucket</strong> — create an <a href="https://support.atlassian.com/bitbucket-cloud/docs/access-tokens/" target="_blank" rel="noopener">access token</a> with <strong>Repositories: Read &amp; Write</strong> and <strong>Pull requests: Read &amp; Write</strong>.</p>
+
+<h3>Creating a branch for a task</h3>
+<p>Open the task panel → <strong>Branches</strong> tab. Select the repository, choose a branch type (feature / bugfix / hotfix / release), and enter the branch name. Octbase suggests a name based on the task type and title — for example <code>feature/dp-42-improve-search</code>. Click <strong>Link Branch</strong> and Octbase <strong>creates the branch on the remote</strong> (from the repository's default branch) and records it on the task. Use the copy button if you instead just want the suggested name for your terminal.</p>
+
+<h3>Opening a pull request</h3>
+<p>Once a branch is linked, use <strong>Open PR</strong> on the branch to open a pull request (GitHub/Bitbucket) or merge request (GitLab) from that branch into the repository's default branch. The PR link and status then appear on the task.</p>
+
+<h3>PR status</h3>
+<p>Once a webhook is configured (see below), PR status updates appear automatically on the task panel: <strong>open</strong>, <strong>merged</strong>, or <strong>declined</strong>, with a direct link to the PR in your provider.</p>
+
+<h3>Administrator setup</h3>
+<p>Two server-side settings are required before repository connections work:</p>
+<ul>
+  <li><strong>Token encryption key</strong> — set <code>OCTBASE_SCM_ENC_KEY</code> to a 32-byte key (base64- or hex-encoded; generate with <code>openssl rand -base64 32</code>). Access tokens are encrypted at rest with this key, so adding a connection fails with <em>"access token encryption is not configured"</em> until it is set. Do not change it once tokens are stored — existing connections would need to be re-added.</li>
+  <li><strong>OAuth apps</strong> (optional, only for <em>Connect with OAuth</em>) — register an OAuth app with each provider and set <code>OCTBASE_OAUTH_&lt;PROVIDER&gt;_CLIENT_ID</code> / <code>_CLIENT_SECRET</code> (e.g. <code>OCTBASE_OAUTH_GITHUB_CLIENT_ID</code>) plus <code>OCTBASE_OAUTH_REDIRECT_BASE</code> (the public origin that serves the API). The callback URL to register with the provider is:</li>
+</ul>
+<pre><code>&lt;OCTBASE_OAUTH_REDIRECT_BASE&gt;/api/v1/oauth/&lt;github|gitlab|bitbucket&gt;/callback</code></pre>
+<p>It must match the OAuth app's registered callback exactly. The default authorize/token endpoints and scopes are GitHub's, GitLab's, and Bitbucket's public ones; for self-hosted instances override them with <code>OCTBASE_OAUTH_&lt;PROVIDER&gt;_AUTH_URL</code> / <code>_TOKEN_URL</code> / <code>_SCOPE</code>.</p>
+</section>
+
+<section id="webhooks">
+<h2>Webhooks</h2>
+<p>Configure a webhook in your Git provider to send push and PR events to Octbase. The receiver endpoints are:</p>
+<ul>
+  <li><code>POST /api/v1/webhooks/bitbucket</code></li>
+  <li><code>POST /api/v1/webhooks/github</code></li>
+</ul>
+<p>Both use <strong>HMAC-SHA256</strong> signature validation. Enter the shared secret in your provider's webhook settings and set the matching environment variables on the server (<code>OCTBASE_WEBHOOK_SECRET_BITBUCKET</code> / <code>OCTBASE_WEBHOOK_SECRET_GITHUB</code>). Ask your administrator to configure these.</p>
+</section>
+
+<section id="import">
+<h2>Import &amp; export</h2>
+
+<h3>Octbase project archives</h3>
+<p>The recommended way to back up a project or move it between Octbase instances is the whole-project ZIP export/import in the project's <strong>settings gear</strong> menu (<strong>Export project</strong> / <strong>Import project</strong>). It round-trips tasks, comments, files, wiki pages, and the releases, sprints and boards they are planned in — see <a href="#projects">Projects</a> for details.</p>
+
+<h3>Migrating from Jira</h3>
+<p>Import existing Jira data per project via the Jira CSV import (availability depends on your edition).</p>
+
+<h3>Jira CSV import</h3>
+<p>Export your Jira project as CSV (Project → Export → Export Excel CSV). Then open the project's <strong>settings gear</strong> menu and choose <strong>Import Jira CSV</strong>. Octbase maps Jira statuses and priorities to Octbase equivalents and stores the original Jira issue key in the <code>external_ref</code> field for cross-referencing during the transition period. Comments and attachments round-trip too: repeating <code>Comment</code> columns become task comments, and repeating <code>Attachment</code> columns become attachment entries on the imported tasks.</p>
+<div class="tip"><strong>Attachment links reference your Jira instance.</strong> Imported attachments are links to the original Jira URLs, not copies — opening one requires access to your Jira instance. Download anything you still need before decommissioning Jira.</div>
+
+<h3>Import report</h3>
+<p>The import response is a report: how many tasks and attachment links were imported, how many rows were skipped, and a per-row list of warnings (with row number and Jira issue key) for anything that needed a fallback — unknown statuses or priorities, users that could not be matched by email, or malformed attachment/comment cells. The import also appears as a single entry in the project's <strong>Activity</strong> view.</p>
+
+<h3>Dry run</h3>
+<p>The importer supports a <strong>dry run</strong> mode that shows a preview of what would be created without writing anything to the database. Use it to verify the mapping before committing the import.</p>
+</section>
+
+<section id="roles">
+<h2>Roles &amp; permissions</h2>
+<p>Octbase has two layers of roles: a <strong>global role</strong> (set once per user for the whole platform) and a <strong>project role</strong> (set per project membership). Authorization is enforced server-side on every request.</p>
+
+<h3>Global roles</h3>
+<table class="role-table">
+  <thead><tr><th>Role</th><th>What they can do</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-red">SUPER_ADMIN</span></td>
+      <td>Full platform access — manages all users, sees all projects regardless of membership, views the audit log.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-blue">ADMIN</span></td>
+      <td>Can create projects, invite users, run imports, and manage project memberships.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-green">USER</span></td>
+      <td>Standard team member. Can work in any project they are a member of.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-gray">GUEST</span></td>
+      <td>Read-only. Can view content in projects where they hold the PROJECT_VIEWER role.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Project roles</h3>
+<table class="role-table">
+  <thead><tr><th>Role</th><th>What they can do</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-red">PROJECT_OWNER</span></td>
+      <td>Everything PROJECT_ADMIN can do, plus the only role that can transfer ownership or grant/revoke the OWNER role on other members. Every project always has at least one owner — the last owner cannot be demoted or removed.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-red">PROJECT_ADMIN</span></td>
+      <td>Full control — create/edit/delete tasks, manage members (except granting/revoking OWNER), manage repository connections, archive or delete the project.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-green">PROJECT_MEMBER</span></td>
+      <td>Can create, edit, and delete tasks, comments, pages, and branches. Cannot manage memberships or delete the project.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-gray">PROJECT_VIEWER</span></td>
+      <td>Read-only. Can view all content but cannot make any changes.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Every project always has at least one <strong>PROJECT_OWNER</strong>. When a project is created, the creator becomes its owner. Ownership can be transferred to another member by first promoting them to OWNER (only an existing owner can do this), then optionally stepping down.</p>
+
+<div class="warning"><strong>Note:</strong> Hiding a UI element does not grant or restrict access. The API independently validates every request regardless of what is visible in the frontend.</div>
+</section>
+
+<section id="admin">
+<h2>Admin panel</h2>
+<p>The admin panel (<code>/#/admin</code>) is visible only to <strong>SUPER_ADMIN</strong> users. It provides:</p>
+<ul>
+  <li><strong>User management</strong> — list all users, change global role, enable/disable accounts, delete users. Disabling a user immediately invalidates all their active sessions.</li>
+  <li><strong>Audit log</strong> (<code>/#/admin/audit-logs</code>) — immutable record of all privileged actions: logins, user changes, project deletes, and more.</li>
+  <li><strong>Invitations</strong> — generate accept links for new team members.</li>
+</ul>
+
+<h3>User management</h3>
+<p>The user list page opens with a row of <strong>statistics cards</strong> showing total users, active users, disabled accounts, and a breakdown by global role (SUPER_ADMIN / ADMIN). Use the search box and the role / status filter dropdowns to narrow the list. For each user you can:</p>
+<ul>
+  <li>Edit their display name, email address, or global role — after an email change, a security notice is sent to the previous address so a hijacked change doesn't go unnoticed</li>
+  <li>Enable or disable their account (disabling immediately invalidates all active sessions)</li>
+  <li>Delete the account</li>
+</ul>
+<div class="tip"><strong>Deleting a user is a GDPR-style erasure.</strong> The account's personal data (name, email, password) is anonymized and its memberships, sessions, notifications, and pending invitations are removed — but content the person authored (tasks, comments, pages) is kept, attributed to <em>"Deleted user"</em>. The freed email address can be registered again.</div>
+
+<h3>Audit log</h3>
+<p>The audit log at <code>/#/admin/audit-logs</code> is an immutable, append-only record of privileged actions. Each entry shows the timestamp, the actor (user or system), the action type, the target, and metadata such as the affected IP address or changed field values.</p>
+<p>Filter by <strong>action type</strong> using the dropdown to focus on a specific category (e.g. all <code>LOGIN_FAILED</code> events, or all <code>PROJECT_DELETED</code> events). The list is paginated — use the previous / next controls at the top.</p>
+<p>For data-protection reasons, audit entries are <strong>purged automatically after a retention period</strong> (365 days by default; the operator can configure or disable this).</p>
+<div class="card">
+  <h3>Logged action categories</h3>
+  <ul>
+    <li><strong>Auth</strong> — LOGIN_SUCCESS, LOGIN_FAILED</li>
+    <li><strong>Users</strong> — USER_CREATED, USER_UPDATED, USER_EMAIL_CHANGED, USER_DISABLED, USER_ENABLED, USER_ROLE_CHANGED, USER_DELETED</li>
+    <li><strong>Projects</strong> — PROJECT_CREATED, PROJECT_UPDATED, PROJECT_ARCHIVED, PROJECT_DELETED</li>
+    <li><strong>Memberships</strong> — PROJECT_MEMBER_ADDED, PROJECT_MEMBER_ROLE_CHANGED, PROJECT_MEMBER_REMOVED</li>
+    <li><strong>Tasks</strong> — TASK_DELETED</li>
+  </ul>
+</div>
+</section>
+
+<section id="invitations">
+<h2>Inviting users</h2>
+<p>There is no self-registration. ADMIN and SUPER_ADMIN users invite teammates by email. Project OWNERs and ADMINs can also invite users directly to their project.</p>
+<ol class="steps">
+  <li>Go to the Admin panel → <strong>Invitations</strong>, or open a project's <strong>Members</strong> settings as a PROJECT_OWNER or PROJECT_ADMIN.</li>
+  <li>Enter the invitee's email address and optionally select a project and role. Only an existing PROJECT_OWNER can invite someone directly as PROJECT_OWNER.</li>
+  <li>Octbase generates an accept link and emails the invitation to the invitee automatically (when SMTP is configured on the server). The link is also shown on screen and copied to your clipboard so you can share it manually.</li>
+  <li>The invitee opens the link, enters their name and a password, and their account is created and they are logged in immediately.</li>
+</ol>
+<div class="tip">Invitation links expire after <strong>7 days</strong> and are single-use. Generate a new one if it expires before it is used.</div>
+
+<h3>Adding an existing user (Super Admin)</h3>
+<p>A SUPER_ADMIN can add someone who <em>already has an Octbase account</em> straight into a project — no invitation email and no accept step. Open the project's <strong>Members</strong> settings; under <strong>Add an existing user</strong>, pick the account, choose a project role, and click <strong>Add to project</strong>. The user becomes a member immediately. Accounts that are already members, and disabled accounts, are not offered in the list.</p>
+<div class="tip">Use this for people who are already onboarded. For brand-new teammates who don't have an account yet, send an email invitation instead.</div>
+</section>
+
+<section id="settings">
+<h2>Personal settings</h2>
+<p>The <strong>Settings</strong> page collects the preferences that belong to <em>you</em> rather than to a project. Open it with the <strong>user icon</strong> in the top bar's right corner, or navigate to <code>/#/settings</code>. (The <strong>gear</strong> icon next to it is different — it holds the <em>project</em> settings of the project you are in.)</p>
+<div class="card">
+  <h3>What you can manage here</h3>
+  <ul>
+    <li><strong>Profile picture</strong> — upload a photo (PNG, JPEG, GIF or WebP, up to 2&nbsp;MB) or remove it again</li>
+    <li><strong>Two-factor authentication</strong> — enroll, view status, regenerate recovery codes, or disable (see <a href="#mfa">below</a>)</li>
+    <li><strong>Language</strong> — English or German, applied to the whole interface</li>
+    <li><strong>Theme</strong> — System · Light · Dark · Octopus (see <a href="#appearance">Appearance &amp; themes</a>)</li>
+    <li><strong>Vocabulary</strong> — agile wording or classic project management (see <a href="#vocabulary">Vocabulary: agile or classic</a>)</li>
+    <li><strong>Notification preferences</strong> — per-kind in-app / email delivery (see <a href="#notif-prefs">Notification preferences</a>)</li>
+  </ul>
+  <p>Your <strong>profile picture</strong> sits at the top. Once uploaded, it replaces your initials everywhere a person appears — the sidebar, task assignees on cards and in the task view, comment authors, and member lists — so teammates can tell at a glance who a task belongs to. Until you upload one (or if the image can't load), your initials are shown instead.</p>
+  <p>Two-factor authentication follows, then the language and theme preferences. Language and theme are each picked with a <strong>segmented switch</strong> — tap the option you want; the highlighted segment with the check mark is what's currently active. Changes apply and save immediately; there is no separate save button.</p>
+</div>
+<p>Language and theme are <strong>saved to your account</strong>, not just to the browser — sign in on another device or browser and your choices follow you. Changing the language or theme from the top-bar switchers keeps the account preference in sync automatically.</p>
+<div class="tip"><strong>On mobile</strong> — the companion app (<code>/m/</code>) lets you upload or remove your profile picture directly from the <strong>profile sheet</strong> (the user icon), and has the same Settings entry for two-factor authentication plus the language and theme choices (including <em>Octopus</em>). The Settings page is the one place to change these on mobile.</div>
+</section>
+
+<section id="mfa">
+<h2>Two-factor authentication</h2>
+<p>Two-factor authentication (2FA) adds an extra layer of security to your account: after entering your password, you also enter a 6-digit time-based code from an authenticator app (Google Authenticator, 1Password, Authy, …). Each user enables it for their own account on the <a href="#settings">Settings</a> page.</p>
+
+<h3>Enabling 2FA</h3>
+<ol class="steps">
+  <li>Open <strong>Settings</strong> and click <strong>Enable two-factor authentication</strong>.</li>
+  <li>A <strong>QR code</strong> and a <strong>setup key</strong> are shown. Scan the QR code with your authenticator app, or add the key manually as a new account (use the copy button to copy it).</li>
+  <li>Enter the 6-digit code your app now generates and click <strong>Confirm and enable</strong>.</li>
+  <li>Octbase shows your <strong>recovery codes</strong> — save them somewhere safe (there is a copy button). They are shown <strong>only this once</strong>. Confirm with <strong>I've saved these codes</strong>.</li>
+</ol>
+<p>From then on, every sign-in asks for a code from your authenticator app after the password step.</p>
+
+<h3>Recovery codes</h3>
+<p>Recovery codes are your fallback if you lose access to your authenticator app. At the sign-in verification step, enter a recovery code instead of the 6-digit code. Each code works <strong>exactly once</strong>; letter case and the hyphen don't matter when typing one in.</p>
+<p>Use <strong>Regenerate recovery codes</strong> on the Settings page to get a fresh set at any time — this invalidates all previous codes.</p>
+
+<h3>Disabling 2FA</h3>
+<p>Click <strong>Disable two-factor authentication</strong> on the Settings page. Disabling — like regenerating recovery codes — always requires you to <strong>re-prove your identity</strong> first: enter your current password, or a code from your authenticator app / a recovery code.</p>
+
+<div class="warning"><strong>Locked out?</strong> If you lose both your authenticator app and your recovery codes, there is no self-service reset — contact the administrator who operates your Octbase instance. Repeated wrong codes at the verification step are rate-limited, so wait a few minutes before retrying if you see a "too many attempts" message.</div>
+
+<h3>Administrator setup</h3>
+<p>MFA enrollment requires one server-side setting: <code>OCTBASE_MFA_ENC_KEY</code>, a 32-byte key (base64- or hex-encoded; generate with <code>openssl rand -base64 32</code>) used to encrypt users' authenticator secrets at rest. It is deliberately separate from the SCM token key. Until it is set, users cannot enable two-factor authentication. Do not change it once users are enrolled — they would have to re-enroll.</p>
+<h3>Requiring 2FA</h3>
+<p>Administrators can make two-factor authentication mandatory with the server-side setting <code>OCTBASE_REQUIRE_MFA</code>: <code>off</code> (default — 2FA stays voluntary), <code>admins</code> (required for ADMIN and SUPER_ADMIN accounts), or <code>all</code> (required for everyone). When an account in scope signs in without 2FA enabled, the login is interrupted by a <strong>forced-enrollment step</strong>: the user scans the QR code, saves their recovery codes, and confirms a code from their authenticator app before continuing. Users who already have 2FA enabled just see the normal verification step.</p>
+</section>
+
+<section id="shortcuts">
+<h2>Keyboard shortcuts</h2>
+<p>Press <kbd>?</kbd> at any time to show the full shortcut overlay inside the app.</p>
+
+<h3>Navigation</h3>
+<div class="shortcut-grid">
+  <div class="shortcut-row"><kbd>B</kbd> <span>Board view</span></div>
+  <div class="shortcut-row"><kbd>L</kbd> <span>Backlog view</span></div>
+  <div class="shortcut-row"><kbd>R</kbd> <span>Releases view</span></div>
+  <div class="shortcut-row"><kbd>S</kbd> <span>Sprints view</span></div>
+  <div class="shortcut-row"><kbd>P</kbd> <span>Pages view</span></div>
+  <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>K</kbd> <span>Command palette</span></div>
+</div>
+
+<h3>Task actions</h3>
+<div class="shortcut-grid">
+  <div class="shortcut-row"><kbd>N</kbd> <span>New task (inline on board)</span></div>
+  <div class="shortcut-row"><kbd>E</kbd> <span>Edit focused task title</span></div>
+  <div class="shortcut-row"><kbd>A</kbd> <span>Assign task to me</span></div>
+  <div class="shortcut-row"><kbd>Esc</kbd> <span>Close task panel / cancel</span></div>
+</div>
+
+<h3>General</h3>
+<div class="shortcut-grid">
+  <div class="shortcut-row"><kbd>?</kbd> <span>Show all shortcuts</span></div>
+</div>
+</section>
+
+<section id="command-palette">
+<h2>Command palette</h2>
+<p>Press <kbd>Ctrl</kbd>+<kbd>K</kbd> (or <kbd>Cmd</kbd>+<kbd>K</kbd> on Mac) from any view to open the command palette.</p>
+<p>Type three or more characters to search across <strong>tasks</strong>, <strong>pages</strong>, and <strong>projects</strong> in one box. Navigate results with <kbd>↑</kbd> <kbd>↓</kbd> and open with <kbd>Enter</kbd>. Press <kbd>Esc</kbd> to close.</p>
+</section>
+
+<section id="search">
+<h2>Search</h2>
+<p>Octbase has two ways to search:</p>
+<ul>
+  <li><strong>Command palette</strong> (<kbd>Ctrl</kbd>+<kbd>K</kbd>) — fast, keyboard-driven, stays in context. Best for quickly jumping to a known task or page.</li>
+  <li><strong>Search page</strong> (<code>/#/search</code>) — a dedicated full-screen search that queries tasks, pages, and projects together and groups results by type. Useful when you need to scan broadly or share a search URL with a teammate.</li>
+</ul>
+<p>On the search page, type a term and press <kbd>Enter</kbd> or click <strong>Search</strong>. Results are grouped into Tasks, Pages, and Projects. Click any result to navigate directly to it. Search terms need at least three characters — shorter ones return no results.</p>
+</section>
+
+<section id="language">
+<h2>Language</h2>
+<p>Octbase ships with the interface available in <strong>English</strong> and <strong>German</strong>. Use the language switcher in the top bar — or the <a href="#settings">Settings</a> page — to change the display language. The choice is saved to your account, so it follows you across devices and browsers.</p>
+<p>Changing the language affects all UI labels, buttons, and messages immediately. Content created by users (task titles, comments, page text) is not translated.</p>
+</section>
+
+<section id="vocabulary">
+<h2>Vocabulary: agile or classic</h2>
+<p>Not every team speaks Scrum. On the <a href="#settings">Settings</a> page, next to language and theme, <strong>Vocabulary</strong> switches the words the interface uses between <strong>Agile</strong> (the default) and <strong>Classic project management</strong>. Like the language, the choice is saved to your account and follows you across devices — and it is yours alone, so a colleague on the same project can keep the agile wording.</p>
+<div class="card">
+  <h3>What changes</h3>
+  <ul>
+    <li>Sprint → <strong>Phase</strong></li>
+    <li>Backlog → <strong>Task pool</strong></li>
+    <li>Epic → <strong>Work package</strong></li>
+    <li>Story → <strong>Requirement</strong></li>
+    <li>Story points → <strong>Effort points</strong></li>
+    <li>Release → <strong>Milestone</strong></li>
+  </ul>
+</div>
+<p><strong>Only the labels change.</strong> Your projects, tasks, boards and reports are untouched, nothing is converted or migrated, and the API keeps its field names — so integrations and exports are unaffected. Switching back and forth costs nothing.</p>
+<p>Two chart names stay as they are in both vocabularies: <strong>burndown</strong> and <strong>velocity</strong>. They are agile measurements rather than agile names for something classic, so translating them would invent a term rather than replace one. The words around them still follow your vocabulary — in classic wording a sprint burndown is a <em>phase burndown</em>, and velocity is counted in <em>effort points</em>.</p>
+</section>
+
+<section id="appearance">
+<h2>Appearance &amp; themes</h2>
+<p>Octbase ships several colour themes. Click the <strong>theme</strong> button in the top bar to cycle through them, or pick one directly on the <a href="#settings">Settings</a> page; your choice is saved to your account and follows you across devices.</p>
+<div class="card">
+  <h3>Available themes</h3>
+  <ul>
+    <li><strong>System</strong> — follows your operating system's light / dark setting. This is the default.</li>
+    <li><strong>Light</strong> — the forest-green light palette.</li>
+    <li><strong>Dark</strong> — the matching dark palette, tuned for low-light use.</li>
+    <li><strong>Octopus</strong> — a warm coral palette, named for Octbase's octopus mascot.</li>
+  </ul>
+</div>
+<p>The <strong>octopus mascot</strong> now sits in the bottom-right corner of the desktop app in <strong>every</strong> theme, not just Octopus &mdash; and it is a new, simpler line drawing in place of the detailed painting it used to be. It is drawn in black, switching to white on the Dark theme so it stays visible. It is decorative only: it never covers a control and never reacts to clicks. It doesn't appear on phone screens, where the space is needed.</p>
+<p>Themes change only how the interface looks; they have no effect on your data or on what other users see. The mobile companion app supports all the same themes, including <strong>Octopus</strong> (without the corner mascot, to save space on phone screens).</p>
+</section>
+
+<section id="urls">
+<h2>Bookmarkable URLs</h2>
+<p>Every view in Octbase has a stable, shareable URL. Filter state and the open task panel are encoded in the URL hash so you can bookmark or share an exact state.</p>
+<div class="card">
+  <h3>URL examples</h3>
+  <ul>
+    <li><code>/#/projects/ID/board</code> — board view</li>
+    <li><code>/#/projects/ID/board?priority=HIGH</code> — board filtered to HIGH priority</li>
+    <li><code>/#/projects/ID/board?task=TASK_ID</code> — board with task panel open</li>
+    <li><code>/#/projects/ID/backlog</code> — backlog</li>
+    <li><code>/#/projects/ID/releases</code> — releases</li>
+    <li><code>/#/projects/ID/sprints</code> — sprints</li>
+    <li><code>/#/projects/ID/pages</code> — wiki pages</li>
+    <li><code>/#/projects/ID/activity</code> — project activity log</li>
+    <li><code>/#/projects/ID/archive</code> — archived tasks</li>
+    <li><code>/#/search?q=TERM</code> — global search</li>
+    <li><code>/#/settings</code> — personal settings (language, theme, vocabulary, notification preferences, two-factor authentication)</li>
+    <li><code>/#/admin</code> — admin panel (SUPER_ADMIN only)</li>
+    <li><code>/#/admin/audit-logs</code> — audit log (SUPER_ADMIN only)</li>
+  </ul>
+</div>
+<p>Copy the URL from the browser address bar to share an exact view with a team member — filters, sorting, and open panels are all preserved.</p>
+</section>
+
+</main>
+</div>
+
+<script src="js/user-guide-nav.js"></script>
+</body>
+</html>

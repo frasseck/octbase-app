@@ -1,0 +1,120 @@
+# Global options. Must be the first, unnamed block in the file. Kept in step with
+# caddy/Caddyfile — the two drift easily and changing only one is the likely
+# mistake.
+#
+# trusted_proxies decides whether an inbound X-Forwarded-For is PRESERVED (this
+# server's peer appended to it) or REPLACED with the peer address. Empty is the
+# secure default and fails CLOSED — verified against Caddy v2.11.4, `trusted_proxies
+# static` with no ranges trusts nobody.
+#
+# ⚠ In THIS topology the container terminates TLS and is itself the public entry,
+# so it should almost always be left empty. Rootless podman NATs published-port
+# traffic: every caller — legitimate or not — arrives as the container's own
+# address, so there is no peer this server could trust without also trusting the
+# whole internet. Only set OCTBASE_FRONTEND_TRUSTED_PROXIES here if a CDN or load
+# balancer fronts the container AND the port is unreachable except from it.
+#
+# Corollary worth knowing: under that NAT no client IP survives to the API in this
+# topology, so per-IP rate limiting degrades to one shared bucket. Recovering it
+# needs an edge proxy on the host (see caddy/Caddyfile + docs/hosting-concept.md)
+# or a port handler that preserves source IPs.
+{
+    servers {
+        trusted_proxies static {$OCTBASE_FRONTEND_TRUSTED_PROXIES:}
+    }
+}
+
+:8080 {
+    redir https://{host}{uri} 301
+}
+
+:8443 {
+    tls /etc/caddy/tls/tls.crt /etc/caddy/tls/tls.key
+
+    root * /usr/share/caddy
+
+    header Strict-Transport-Security "max-age=63072000; includeSubDomains"
+    header X-Content-Type-Options "nosniff"
+    header X-Frame-Options "DENY"
+    header Referrer-Policy "strict-origin-when-cross-origin"
+    header Permissions-Policy "geolocation=(), camera=(), microphone=()"
+    # App CSP. script-src has no 'unsafe-inline': every first-party page loads
+    # only external scripts (see js/theme-init.js & friends). connect-src is
+    # 'self' only — the app talks to /api and SSE on its own origin and uses no
+    # WebSockets. /docs (proxied Swagger UI) is excluded: the API sets its own
+    # route-specific CSP there, and layering this stricter one on top would
+    # break Swagger's inline init (multiple CSP headers intersect).
+    @nonDocs not path /docs /docs/*
+    header @nonDocs Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none';"
+
+    # Cache policy — kept in step with caddy/Caddyfile, where the rationale
+    # lives: /assets/* is content-hashed by the Vite build (37b stage 5) and so
+    # is immutable for a year; stable-named files served from the image
+    # (vendor/swagger-ui, the verbatim fonts/ copy) get an hour; HTML is always
+    # revalidated. `not path /assets/*` keeps a hashed asset from matching both
+    # rules and receiving two Cache-Control headers.
+    @hashed path /assets/*
+    header @hashed Cache-Control "public, max-age=31536000, immutable"
+    # Extensions, not just the two script types: /img/*, /locales/*.json and
+    # poweredby.png had NO Cache-Control at all, which does not mean "do not
+    # cache" — it hands the decision to each browser's heuristic (roughly a
+    # tenth of the age since Last-Modified), so the same favicon could be held
+    # for weeks by one client and refetched every navigation by another. An
+    # hour is a stated answer rather than an accident.
+    # The locales are in this bucket on purpose: they are unhashed and they
+    # change with a release, so an hour is the bound on how long a user reads
+    # yesterday's wording.
+    @unhashed {
+        path *.js *.css *.woff2 *.woff *.ttf *.otf *.png *.jpg *.jpeg *.gif *.webp *.avif *.svg *.ico *.json
+        not path /assets/*
+    }
+    header @unhashed Cache-Control "public, max-age=3600"
+    @html path / *.html
+    header @html Cache-Control "no-cache"
+
+    # Compression — kept in step with caddy/Caddyfile; see the longer rationale
+    # there. Scoped to the paths served from disk so the encoder never touches
+    # the SSE stream (text/event-stream matches Caddy's default text/* matcher).
+    @compressible not path /api/* /docs /docs/* /health /openapi.yaml
+    encode @compressible zstd gzip
+
+    # Optional installation password (front-door HTTP Basic Auth). Enabled by
+    # setting OCTBASE_SITE_PASSWORD_HASH to a bcrypt hash (`caddy hash-password`);
+    # blank keeps the front door open. The base image is shell-less, so the
+    # toggle is pure Caddy: compose derives OCTBASE_SITE_AUTH="on" only when a
+    # hash is set, and the route imports auth-{$OCTBASE_SITE_AUTH:}.caddy —
+    # `auth-on.caddy` (basic_auth) when on, `auth-.caddy` (no-op) when empty. The
+    # indirection avoids handing an empty password to basic_auth, which would
+    # crash the container (compose always passes the var set-but-empty). @sitegate
+    # excludes /api/* (Bearer-JWT / HMAC webhooks / SSE reuse or lack the
+    # Authorization header), /health and /metrics (unauthenticated probes),
+    # so the gate covers only the browser-facing app.
+    @sitegate not path /api/* /health /metrics
+
+    route {
+        import /etc/caddy/auth-{$OCTBASE_SITE_AUTH:}.caddy
+
+        @sse path_regexp ^/api/v1/projects/.*/events
+        reverse_proxy @sse octbase-api:8000 {
+            flush_interval -1
+        }
+
+        # /metrics is deliberately NOT proxied, matching caddy/Caddyfile and
+        # octbase-mobile/caddy/Caddyfile. Prometheus scrapes the API service
+        # directly (docs/operations.md §Prometheus Metrics); the API puts no auth
+        # on the route, so any config that proxies it publishes it.
+        #
+        # This previously proxied /metrics behind `not remote_ip 10.0.0.0/8 …`,
+        # which could never deny anything: rootless podman NATs published-port
+        # traffic, so every caller — including an anonymous one off the internet —
+        # arrives with a private container address as the peer and passes the
+        # check. `client_ip` would not save it either, since this config is itself
+        # the public entry and has no trustworthy proxy in front. Not proxying the
+        # route is the only control that holds here.
+        @backend path /api/* /docs /docs/* /health /openapi.yaml
+        reverse_proxy @backend octbase-api:8000
+
+        try_files {path} /index.html
+        file_server
+    }
+}

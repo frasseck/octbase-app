@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Octbase</title>
+<link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/img/favicon.ico" sizes="any">
+<link rel="preload" href="fonts/ibm-plex-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<!-- Synchronous (no defer), before the stylesheet, so the saved theme applies
+     before CSS paints; kept external (not inline) so the Caddy CSP needs no
+     'unsafe-inline' for scripts. -->
+<script src="js/theme-init.js"></script>
+<link rel="stylesheet" href="css/app.css">
+<!-- The SPA is a graph of ES modules bundled by Vite (37b stage 2); main.js is
+     the single entry and imports the rest, so there is no load order here to
+     keep in step. See js/README.md. Since 37b stage 3 that graph includes the
+     shared modules (@octbase/shared: i18n, task metadata and the rich-text
+     sanitizer), and since stage 4 the third-party ones too: DOMPurify and the
+     QR generator were the last two classic <script> tags here, publishing the
+     globals `DOMPurify` and `qrcode` for modules that used them without
+     importing them. They are the `dompurify` and `qrcode-generator` npm
+     packages now, imported by name like anything else — so this file no longer
+     decides what any module can see.
+     The one consumer this shape does not serve is the standalone demo, which is
+     opened from disk: a browser refuses `import` from a file:// origin. That
+     artifact is a separate build target producing one self-contained IIFE
+     bundle — `npm run build:standalone`, output in dist-standalone/. -->
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<!-- App shell is rendered dynamically by app.js after auth check -->
+<div id="app-bootstrap">
+  Loading Octbase…
+</div>
+</body>
+</html>

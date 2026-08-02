@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#
+# pre-push — the heavier security/quality gate before code leaves the machine.
+#
+# Runs static analysis, the dependency vulnerability scan, and the test suite
+# (see scripts/security-heavy.sh). Too slow for every commit; right for a push.
+# Override in a pinch with `git push --no-verify`.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+exec "$root/scripts/security-heavy.sh"

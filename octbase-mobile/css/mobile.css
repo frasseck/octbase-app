@@ -1,0 +1,533 @@
+/* ═══════════════════════════════════════════════════════════
+   OCTBASE MOBILE — Material Design 3 (green), phone-first
+   Shares the desktop token vocabulary; layout is built fresh
+   for one-handed phone use. Authored for 360–430px portrait.
+═══════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── M3 color (identical to desktop) ── */
+  --md-primary:#006C4F; --md-on-primary:#FFFFFF;
+  --md-primary-container:#B0EDD0; --md-on-primary-container:#002115;
+  --md-secondary:#4A6455; --md-on-secondary:#FFFFFF;
+  --md-secondary-container:#CCE8D6; --md-on-secondary-container:#072015;
+  --md-tertiary-container:#E3E9BE; --md-on-tertiary-container:#1B1E00;
+  --md-error:#BA1A1A; --md-on-error:#FFFFFF;
+  --md-error-container:#FFDAD6; --md-on-error-container:#410002;
+  --color-purple-container:#EDE7FF; --color-on-purple-container:#4527A0;
+  /* Priority fills — solid badge backgrounds, always paired with a text label.
+     Constant across themes (an accent, not a surface), and byte-identical to
+     the desktop values in octbase-frontend/css/app.css: the same priority must
+     not be a different colour on a phone. */
+  --prio-low:#36B37E; --prio-medium:#F4811F; --prio-high:#DE350B;
+  --prio-critical:#6554C0; --prio-blocker:#BF2600; --prio-custom:#42526E;
+  --prio-on-fill:#FFFFFF;
+  --md-background:#F6FAF6; --md-on-background:#191D19;
+  --md-surface:#F6FAF6; --md-on-surface:#191D19;
+  --md-surface-variant:#D6E4D9; --md-on-surface-variant:#3E4940;
+  --md-inverse-surface:#2D312D; --md-inverse-on-surface:#ECF2ED;
+  --md-surface-cl:#FFFFFF; --md-surface-c-low:#F0F5F0; --md-surface-c:#EAF0EA;
+  --md-surface-c-high:#E4EBE4; --md-surface-c-highest:#DFE5DF;
+  --md-outline:#6D7870; --md-outline-variant:#BBCABD;
+
+  --md-e1: 0 1px 2px rgba(0,0,0,.3), 0 1px 3px 1px rgba(0,0,0,.15);
+  --md-e2: 0 1px 2px rgba(0,0,0,.3), 0 2px 6px 2px rgba(0,0,0,.15);
+  --md-e3: 0 1px 3px rgba(0,0,0,.3), 0 4px 8px 3px rgba(0,0,0,.15);
+
+  --md-xs:.25rem; --md-sm:.5rem; --md-md:.75rem; --md-lg:1rem; --md-xl:1.75rem; --md-full:9999px;
+
+  --space-1:.25rem; --space-2:.5rem; --space-3:.75rem; --space-4:1rem;
+  --space-5:1.25rem; --space-6:1.5rem; --space-8:2rem;
+
+  /* ── mobile-only layout tokens ── */
+  --app-bar-h:3.5rem;
+  --bottom-nav-h:3.75rem;
+  --touch:2.75rem;            /* >=44px hit target */
+  --content-pad:var(--space-4);
+  --safe-top:env(safe-area-inset-top, 0px);
+  --safe-bottom:env(safe-area-inset-bottom, 0px);
+}
+
+/* ── THEME (light / dark / system / octopus) ────────────────
+   First theme support on mobile (previously light-only). Ported from
+   octbase-frontend/css/app.css's dark and octopus palettes, limited to the
+   --md-* tokens this file actually uses. Set by js/theme-init.js (pre-CSS,
+   avoids a flash) and js/app.js's applyTheme(); the two apps share the
+   'octbase-theme' localStorage key since they're reverse-proxied under one
+   origin (/ vs /m/). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="octopus"]) {
+    --md-primary:#7ADCAD; --md-on-primary:#003825; --md-primary-container:#005138; --md-on-primary-container:#97F9C9;
+    --md-secondary:#B2CCBC; --md-on-secondary:#1D3528; --md-secondary-container:#334B3E; --md-on-secondary-container:#CDE9D6;
+    --md-tertiary-container:#464B2A; --md-on-tertiary-container:#E3E9BE;
+    --md-inverse-surface:#E1E3DE; --md-inverse-on-surface:#2D312D;
+    --md-error:#FFB4AB; --md-on-error:#690005; --md-error-container:#93000A; --md-on-error-container:#FFDAD6;
+    --md-background:#191C1A; --md-on-background:#FFFFFF; --md-surface:#191C1A; --md-on-surface:#FFFFFF;
+    --md-surface-variant:#404943; --md-on-surface-variant:#BFC9C1;
+    --md-surface-cl:#1B211D; --md-surface-c-low:#191C1A; --md-surface-c:#1D211E; --md-surface-c-high:#272B27; --md-surface-c-highest:#323632;
+    --md-outline:#899389; --md-outline-variant:#404943;
+  }
+}
+:root[data-theme="dark"] {
+  --md-primary:#7ADCAD; --md-on-primary:#003825; --md-primary-container:#005138; --md-on-primary-container:#97F9C9;
+  --md-secondary:#B2CCBC; --md-on-secondary:#1D3528; --md-secondary-container:#334B3E; --md-on-secondary-container:#CDE9D6;
+  --md-tertiary-container:#464B2A; --md-on-tertiary-container:#E3E9BE;
+  --md-inverse-surface:#E1E3DE; --md-inverse-on-surface:#2D312D;
+  --md-error:#FFB4AB; --md-on-error:#690005; --md-error-container:#93000A; --md-on-error-container:#FFDAD6;
+  --md-background:#191C1A; --md-on-background:#FFFFFF; --md-surface:#191C1A; --md-on-surface:#FFFFFF;
+  --md-surface-variant:#404943; --md-on-surface-variant:#BFC9C1;
+  --md-surface-cl:#1B211D; --md-surface-c-low:#191C1A; --md-surface-c:#1D211E; --md-surface-c-high:#272B27; --md-surface-c-highest:#323632;
+  --md-outline:#899389; --md-outline-variant:#404943;
+}
+/* Octopus — the warm coral/salmon light-style palette from the desktop app.
+   Like on desktop it never engages by system preference, only explicitly via
+   [data-theme="octopus"], so it stays excluded from the prefers-dark guard
+   above. */
+:root[data-theme="octopus"] {
+  --md-primary:#C03A2F; --md-on-primary:#FFFFFF; --md-primary-container:#FFDAD3; --md-on-primary-container:#410200;
+  --md-secondary:#985247; --md-on-secondary:#FFFFFF; --md-secondary-container:#FFDBD1; --md-on-secondary-container:#3A0A03;
+  --md-tertiary-container:#FFDDAE; --md-on-tertiary-container:#271900;
+  --md-error:#BA1A1A; --md-on-error:#FFFFFF; --md-error-container:#FFDAD6; --md-on-error-container:#410002;
+  --md-background:#FFF8F6; --md-on-background:#271715; --md-surface:#FFF8F6; --md-on-surface:#271715;
+  --md-surface-variant:#F5DDD7; --md-on-surface-variant:#534340;
+  --md-surface-cl:#FFFFFF; --md-surface-c-low:#FFF1ED; --md-surface-c:#FCEBE6; --md-surface-c-high:#F7E4DE; --md-surface-c-highest:#F1DED7;
+  --md-outline:#85736E; --md-outline-variant:#D8C2BB;
+  --md-inverse-surface:#3A2B27; --md-inverse-on-surface:#FFEDE8;
+}
+/* Recolor the green login wordmark to the coral primary (same filter chain as
+   desktop's .logo-img/.auth-logo rule — flatten to black, then colorize). */
+:root[data-theme="octopus"] .login-logo img {
+  filter: brightness(0) saturate(100%) invert(38%) sepia(58%) saturate(2400%) hue-rotate(336deg) brightness(96%) contrast(92%);
+}
+
+@font-face {
+  font-family:'IBM Plex Sans'; font-style:normal; font-weight:100 700; font-display:swap;
+  src:url('../fonts/ibm-plex-sans-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family:'IBM Plex Sans'; font-style:normal; font-weight:100 700; font-display:swap;
+  src:url('../fonts/ibm-plex-sans-latin-ext.woff2') format('woff2');
+  unicode-range:U+0100-02BA, U+02BD-02C5, U+0304, U+0308, U+0329, U+1E00-1E9F, U+2020, U+20A0-20AB, U+2C60-2C7F;
+}
+
+html { -webkit-text-size-adjust:100%; }
+body {
+  font-family:'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  background:var(--md-background); color:var(--md-on-background);
+  font-size:.9375rem; line-height:1.5; -webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:none;
+}
+button, input, textarea, select { font:inherit; color:inherit; }
+button { cursor:pointer; }
+a { color:var(--md-primary); text-decoration:none; }
+ul { list-style:none; }
+svg.icon-svg { display:inline-block; vertical-align:middle; flex:none; }
+
+/* ── boot / spinner ── */
+.boot { display:grid; place-items:center; min-height:100dvh; }
+.spinner {
+  width:2rem; height:2rem; border:3px solid var(--md-surface-c-high);
+  border-top-color:var(--md-primary); border-radius:50%; animation:spin .8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading { display:grid; place-items:center; padding:var(--space-8); }
+
+/* ═══ APP SHELL ═══ */
+#app-root { min-height:100dvh; }
+.app {
+  display:flex; flex-direction:column; min-height:100dvh;
+  padding-bottom:calc(var(--bottom-nav-h) + var(--safe-bottom));
+}
+
+/* ── top app bar ── */
+.appbar {
+  position:sticky; top:0; z-index:30;
+  display:flex; align-items:center; gap:var(--space-2);
+  height:calc(var(--app-bar-h) + var(--safe-top));
+  padding:var(--safe-top) var(--space-3) 0;
+  background:var(--md-primary); color:var(--md-on-primary);
+  box-shadow:var(--md-e2);
+}
+.appbar-title {
+  flex:1; min-width:0; font-size:1.0625rem; font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.appbar .icon-btn { color:var(--md-on-primary); }
+.appbar-badge { position:relative; }
+.appbar-badge[data-count]:not([data-count="0"])::after {
+  content:attr(data-count); position:absolute; top:.2rem; right:.2rem;
+  min-width:1rem; height:1rem; padding:0 .25rem; border-radius:var(--md-full);
+  background:var(--md-error); color:var(--md-on-error); font-size:.625rem; line-height:1rem;
+  text-align:center; font-weight:600;
+}
+
+/* ── icon button ── */
+.icon-btn {
+  display:inline-grid; place-items:center;
+  width:var(--touch); height:var(--touch); border:none; background:transparent;
+  border-radius:var(--md-full); color:var(--md-on-surface-variant);
+}
+.icon-btn:active { background:rgba(0,0,0,.08); }
+
+/* ── main content ── */
+.content { flex:1; padding:var(--content-pad); }
+.content.flush { padding:0; }
+.page-section { margin-bottom:var(--space-6); }
+.section-head {
+  display:flex; align-items:center; gap:var(--space-2);
+  margin:0 0 var(--space-3); font-size:.75rem; font-weight:600;
+  text-transform:uppercase; letter-spacing:.06em; color:var(--md-on-surface-variant);
+}
+.section-head .count { color:var(--md-outline); font-weight:500; }
+.section-link { margin-left:auto; font-size:.75rem; text-transform:none; letter-spacing:0; }
+
+/* ═══ BOTTOM NAVIGATION ═══ */
+.bottom-nav {
+  position:fixed; left:0; right:0; bottom:0; z-index:30;
+  display:flex; height:calc(var(--bottom-nav-h) + var(--safe-bottom));
+  padding-bottom:var(--safe-bottom);
+  background:var(--md-surface-cl); border-top:1px solid var(--md-outline-variant);
+  box-shadow:var(--md-e2);
+}
+.nav-item {
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2px; border:none; background:transparent; color:var(--md-on-surface-variant);
+  font-size:.625rem; font-weight:500; min-width:0; position:relative; padding:.25rem 0;
+}
+.nav-item .icon-svg { color:inherit; }
+.nav-item.active { color:var(--md-primary); }
+/* Label: a quarter-width cell is only 90px on a 360px phone, so nav labels are
+   kept short by hand (nav.notifications is "Nachrichten", not the view's
+   "Benachrichtigungen"). This clips a label that outgrows its cell anyway —
+   without it the overhang of the outermost item is sliced by the screen edge. */
+.nav-lbl {
+  max-width:100%;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* Icon wrapper: a fixed box centred on the icon. The active highlight is the
+   wrapper's own background, so it can never paint over the icon (an element's
+   background always renders behind its content) regardless of stacking quirks. */
+.nav-ic { display:grid; place-items:center; width:2.5rem; height:1.5rem; }
+.nav-item.active .nav-ic {
+  background:var(--md-primary-container); border-radius:var(--md-full);
+}
+.nav-badge {
+  position:absolute; top:.25rem; left:calc(50% + .4rem);
+  min-width:1rem; height:1rem; padding:0 .25rem; border-radius:var(--md-full);
+  background:var(--md-error); color:var(--md-on-error); font-size:.5625rem; line-height:1rem;
+  text-align:center; font-weight:700;
+}
+
+/* ═══ CARDS ═══ */
+.card {
+  display:block; width:100%; text-align:left;
+  background:var(--md-surface-cl); border:1px solid var(--md-outline-variant);
+  border-radius:var(--md-md); padding:var(--space-3) var(--space-4);
+  margin-bottom:var(--space-3); box-shadow:var(--md-e1); color:inherit;
+}
+.card:active { background:var(--md-surface-c-low); }
+.card-list { display:block; }
+
+/* task card */
+.task-card { display:flex; flex-direction:column; gap:var(--space-2); }
+.task-card-top { display:flex; align-items:flex-start; gap:var(--space-2); }
+.task-key {
+  font-size:.6875rem; font-weight:600; color:var(--md-on-surface-variant);
+  font-family:'SFMono-Regular', Consolas, monospace; flex:none; padding-top:.1rem;
+}
+.task-title { flex:1; min-width:0; font-weight:500; line-height:1.35; word-break:break-word; }
+.task-card-meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-2); }
+
+/* project / dashboard list rows */
+.row-card { display:flex; align-items:center; gap:var(--space-3); }
+.row-card .row-icon {
+  width:2.5rem; height:2.5rem; flex:none; display:grid; place-items:center;
+  border-radius:var(--md-md); background:var(--md-primary-container); color:var(--md-on-primary-container);
+}
+.row-body { flex:1; min-width:0; }
+.row-title { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row-sub { font-size:.8125rem; color:var(--md-on-surface-variant); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row-card .chev { color:var(--md-outline); flex:none; }
+
+/* ═══ BADGES / CHIPS ═══ */
+.badge, .chip {
+  display:inline-flex; align-items:center; gap:.25rem;
+  font-size:.6875rem; font-weight:500; border-radius:var(--md-full);
+  padding:.15rem .55rem; white-space:nowrap;
+}
+.badge-planned    { background:var(--md-surface-c-high); color:var(--md-on-surface-variant); }
+.badge-in-progress{ background:var(--md-primary-container); color:var(--md-on-primary-container); }
+.badge-in-review  { background:var(--color-purple-container); color:var(--color-on-purple-container); }
+.badge-done       { background:var(--md-secondary-container); color:var(--md-on-secondary-container); }
+.badge-archived   { background:var(--md-surface-c-highest); color:var(--md-on-surface-variant); }
+.badge-muted      { background:var(--md-surface-c-highest); color:var(--md-on-surface-variant); } /* custom lane statuses */
+
+.prio-badge { color:var(--prio-on-fill); font-weight:600; text-transform:uppercase; letter-spacing:.03em; font-size:.625rem; }
+.prio-low{ background:var(--prio-low); } .prio-medium{ background:var(--prio-medium); }
+.prio-high{ background:var(--prio-high); } .prio-critical{ background:var(--prio-critical); }
+.prio-blocker{ background:var(--prio-blocker); }
+.prio-custom{ background:var(--prio-custom); } /* admin-defined project priorities */
+
+.type-chip { font-weight:600; }
+.type-task    { background:var(--md-primary-container); color:var(--md-on-primary-container); }
+.type-story   { background:var(--md-secondary-container); color:var(--md-on-secondary-container); }
+.type-epic    { background:var(--color-purple-container); color:var(--color-on-purple-container); }
+.type-subtask { background:var(--md-surface-c-high); color:var(--md-on-surface-variant); font-size:.5625rem; }
+.type-initiative { background:var(--md-tertiary-container, #FFE9C7); color:var(--md-on-tertiary-container, #5C3A00); }
+.type-theme      { background:var(--md-inverse-surface); color:var(--md-inverse-on-surface); font-size:.5625rem; }
+
+.type-glyph {
+  width:1.25rem; height:1.25rem; flex:none; display:grid; place-items:center;
+  border-radius:var(--md-xs); font-size:.625rem; font-weight:700;
+}
+
+.avatar {
+  width:1.75rem; height:1.75rem; flex:none; border-radius:var(--md-full);
+  background:var(--md-secondary); color:var(--md-on-secondary); display:grid; place-items:center;
+  font-size:.6875rem; font-weight:600;
+}
+.avatar.sm { width:1.5rem; height:1.5rem; font-size:.625rem; }
+/* Profile picture: an uploaded image fills the avatar chip over the initials,
+   transparent until it has a fetched src (hydrateAvatars) so initials show while
+   loading / on no picture / on failure. */
+.avatar { position:relative; overflow:hidden; }
+.avatar-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border:0; opacity:0; transition:opacity .15s ease; }
+.avatar-img[src] { opacity:1; }
+.meta-spacer { margin-left:auto; }
+
+/* ═══ SEGMENTED CONTROL / FILTER CHIPS (board columns, filters) ═══ */
+.seg-scroll {
+  display:flex; gap:var(--space-2); overflow-x:auto; padding:var(--space-3) var(--content-pad);
+  -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  position:sticky; top:calc(var(--app-bar-h) + var(--safe-top)); z-index:20;
+  background:var(--md-background);
+}
+.seg-scroll::-webkit-scrollbar { display:none; }
+.seg {
+  flex:none; border:1px solid var(--md-outline-variant); background:var(--md-surface-cl);
+  border-radius:var(--md-full); padding:.4rem .85rem; font-size:.8125rem; font-weight:500;
+  color:var(--md-on-surface-variant); display:inline-flex; align-items:center; gap:.35rem;
+}
+.seg.active { background:var(--md-primary); color:var(--md-on-primary); border-color:var(--md-primary); }
+.seg .seg-count {
+  font-size:.6875rem; background:rgba(0,0,0,.08); border-radius:var(--md-full);
+  padding:0 .35rem; min-width:1.1rem; text-align:center;
+}
+.seg.active .seg-count { background:rgba(255,255,255,.22); }
+
+/* ═══ BUTTONS ═══ */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2);
+  min-height:var(--touch); padding:0 var(--space-5); border:none; border-radius:var(--md-full);
+  font-weight:600; font-size:.9375rem; background:var(--md-surface-c-high); color:var(--md-on-surface);
+}
+.btn-primary { background:var(--md-primary); color:var(--md-on-primary); }
+.btn-block { display:flex; width:100%; }
+.btn:disabled { opacity:.5; }
+.btn-text { background:transparent; color:var(--md-primary); padding:0 var(--space-3); }
+
+/* FAB */
+.fab {
+  position:fixed; right:var(--space-4);
+  bottom:calc(var(--bottom-nav-h) + var(--safe-bottom) + var(--space-4));
+  width:3.5rem; height:3.5rem; border-radius:var(--md-lg); border:none; z-index:25;
+  background:var(--md-primary); color:var(--md-on-primary); box-shadow:var(--md-e3);
+  display:grid; place-items:center;
+}
+.fab:active { background:#005240; }
+
+/* ═══ FORMS ═══ */
+.field { margin-bottom:var(--space-4); }
+.field-label { display:block; font-size:.8125rem; font-weight:500; margin-bottom:var(--space-2); color:var(--md-on-surface-variant); }
+.input, .textarea, .select {
+  width:100%; min-height:var(--touch); padding:.65rem var(--space-3);
+  border:1px solid var(--md-outline-variant); border-radius:var(--md-sm);
+  background:var(--md-surface-cl); font-size:1rem; /* >=16px avoids iOS zoom */
+}
+.textarea { min-height:7rem; resize:vertical; line-height:1.5; }
+.input:focus, .textarea:focus, .select:focus { outline:2px solid var(--md-primary); outline-offset:1px; border-color:var(--md-primary); }
+.form-error { color:var(--md-error); font-size:.8125rem; margin-top:var(--space-2); }
+:focus-visible { outline:2px solid var(--md-primary); outline-offset:2px; }
+
+/* ═══ SETTINGS / MFA ═══ */
+/* .seg-switch: M3-style segmented buttons — the settings page's picker control
+   (language, theme), mirroring the desktop app's (octbase-frontend app.css).
+   Full-width with equal segments to give phone thumbs a fair target. */
+.seg-switch { display:flex; width:100%; border:1px solid var(--md-outline); border-radius:var(--md-full); overflow:hidden; }
+.seg-switch button {
+  appearance:none; border:0; background:none; cursor:pointer;
+  flex:1; min-width:0; min-height:var(--touch);
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--space-1);
+  font:inherit; font-size:.8125rem; color:var(--md-on-surface); padding:var(--space-2) var(--space-1);
+}
+.seg-switch button + button { border-left:1px solid var(--md-outline); }
+.seg-switch button:focus-visible { outline-offset:-2px; }
+.seg-switch button[aria-checked="true"] { background:var(--md-secondary-container); color:var(--md-on-secondary-container); font-weight:500; }
+.seg-switch button .icon { flex:none; }
+.seg-switch button span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.seg-switch-follow { margin-top:var(--space-4); }
+/* Enrollment QR — white backing plate keeps the code scannable in dark mode. */
+.mfa-qr { display:block; width:max-content; margin:0 auto var(--space-3); background:#fff; padding:var(--space-2); border-radius:var(--md-md); line-height:0; }
+.mfa-qr:empty { display:none; }
+.mfa-qr svg { width:10rem; height:10rem; }
+.mfa-secret-row { display:flex; align-items:center; gap:var(--space-2); }
+.mfa-secret { font-family:monospace; font-size:.9375rem; background:var(--md-surface-c); padding:var(--space-1) var(--space-2); border-radius:var(--md-sm); word-break:break-all; flex:1; }
+.mfa-status-mobile { display:flex; align-items:center; gap:var(--space-2); color:var(--md-primary); font-weight:600; }
+.recovery-codes-list { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-2); list-style:none; margin:var(--space-3) 0; }
+.recovery-codes-list code { display:block; font-family:monospace; font-size:.8125rem; background:var(--md-surface-c); padding:var(--space-2); border-radius:var(--md-sm); text-align:center; }
+
+/* ═══ LOGIN ═══ */
+.login {
+  min-height:100dvh; display:flex; flex-direction:column; justify-content:center;
+  padding:var(--space-6) var(--space-5); gap:var(--space-4);
+}
+.login-logo { display:flex; flex-direction:column; align-items:center; gap:var(--space-3); margin-bottom:var(--space-4); }
+.login-logo img { width:18rem; max-width:80%; height:auto; }
+.login h1 { font-size:1.375rem; font-weight:600; text-align:center; }
+/* Privacy/imprint links below the login form (GDPR transparency). */
+.auth-legal { display:flex; gap:var(--space-2); justify-content:center; font-size:.75rem; color:var(--md-on-surface-variant); }
+.auth-legal a { color:var(--md-on-surface-variant); text-decoration:underline; }
+.login-alert {
+  background:var(--md-error-container); color:var(--md-on-error-container);
+  border-radius:var(--md-sm); padding:var(--space-3); font-size:.875rem;
+}
+.login-alert.hidden { display:none; }
+
+/* ═══ TASK DETAIL (full screen) ═══ */
+.detail-head { display:flex; align-items:flex-start; gap:var(--space-2); margin-bottom:var(--space-4); }
+.detail-title { font-size:1.25rem; font-weight:600; line-height:1.3; word-break:break-word; }
+.detail-key { font-size:.75rem; color:var(--md-on-surface-variant); font-family:'SFMono-Regular',Consolas,monospace; margin-bottom:var(--space-1); }
+.detail-chips { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-bottom:var(--space-5); }
+.prop-list { display:flex; flex-direction:column; gap:var(--space-1); margin-bottom:var(--space-5); }
+.prop {
+  display:flex; align-items:center; gap:var(--space-3); width:100%;
+  min-height:var(--touch); padding:var(--space-2) var(--space-3); text-align:left;
+  background:var(--md-surface-cl); border:1px solid var(--md-outline-variant); border-radius:var(--md-sm); color:inherit;
+}
+button.prop:active { background:var(--md-surface-c-low); }
+.prop-label { font-size:.8125rem; color:var(--md-on-surface-variant); flex:none; width:5.5rem; }
+.prop-value { flex:1; min-width:0; font-weight:500; display:flex; align-items:center; gap:var(--space-2); }
+.prop .chev { color:var(--md-outline); flex:none; }
+.detail-block-title { font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--md-on-surface-variant); margin:var(--space-5) 0 var(--space-2); }
+.rich {
+  background:var(--md-surface-cl); border:1px solid var(--md-outline-variant);
+  border-radius:var(--md-sm); padding:var(--space-3); word-break:break-word;
+}
+.rich p { margin:0 0 var(--space-2); } .rich :last-child { margin-bottom:0; }
+.rich h3,.rich h4 { margin:var(--space-2) 0; } .rich ul,.rich ol { padding-left:1.25rem; }
+.rich pre { background:var(--md-surface-c); padding:var(--space-2); border-radius:var(--md-xs); overflow-x:auto; }
+.rich code { font-family:'SFMono-Regular',Consolas,monospace; font-size:.85em; }
+.rich img { max-width:100%; height:auto; border-radius:var(--md-xs); }
+
+/* comments */
+.comment { background:var(--md-surface-cl); border:1px solid var(--md-outline-variant); border-radius:var(--md-sm); padding:var(--space-3); margin-bottom:var(--space-2); }
+.comment-head { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-2); }
+.comment-author { font-weight:500; font-size:.8125rem; }
+.comment-time { font-size:.6875rem; color:var(--md-outline); margin-left:auto; }
+.comment-body { font-size:.875rem; word-break:break-word; }
+.comment-form { display:flex; flex-direction:column; gap:var(--space-2); margin-top:var(--space-3); }
+
+/* ═══ BOTTOM SHEET ═══ */
+.scrim {
+  position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.45);
+  opacity:0; transition:opacity .2s ease;
+}
+.scrim.open { opacity:1; }
+.sheet {
+  position:fixed; left:0; right:0; bottom:0; z-index:41;
+  background:var(--md-surface-cl); border-radius:var(--md-xl) var(--md-xl) 0 0;
+  box-shadow:var(--md-e3); padding:var(--space-3) var(--space-4) calc(var(--space-4) + var(--safe-bottom));
+  max-height:85dvh; overflow-y:auto;
+  transform:translateY(100%); transition:transform .25s ease;
+}
+.sheet.open { transform:translateY(0); }
+.sheet-grip { width:2.25rem; height:.25rem; border-radius:var(--md-full); background:var(--md-outline-variant); margin:0 auto var(--space-3); }
+.sheet-title { font-size:1rem; font-weight:600; margin-bottom:var(--space-3); }
+.sheet-opt {
+  display:flex; align-items:center; gap:var(--space-3); width:100%;
+  min-height:var(--touch); padding:var(--space-2) var(--space-2); border:none; background:transparent;
+  border-radius:var(--md-sm); text-align:left; color:inherit; font-size:.9375rem;
+}
+.sheet-opt:active { background:var(--md-surface-c-low); }
+.sheet-opt.selected { background:var(--md-primary-container); color:var(--md-on-primary-container); font-weight:600; }
+.sheet-opt .check { margin-left:auto; color:var(--md-primary); }
+.sheet-opt.selected .check { color:var(--md-on-primary-container); }
+
+/* Confirm sheet — prose plus two buttons, where the option sheets are a list of
+   taps. The hint carries the names of what is still running, so it stays
+   readable at a glance rather than shrinking to a footnote. */
+.confirm-body { font-size:.9375rem; line-height:1.45; margin-bottom:var(--space-3); }
+.confirm-hint { margin-top:var(--space-2); color:var(--md-on-surface-variant); font-size:.875rem; }
+
+/* Effort estimate — the card/detail chip, and the sheet's Fibonacci shortcuts
+   above the free number box (points only; hours get the box alone). */
+.est-chip { background:var(--md-surface-c-high); color:var(--md-on-surface-variant); font-variant-numeric:tabular-nums; }
+.est-presets { display:flex; flex-wrap:wrap; gap:var(--space-2); padding:var(--space-2) 0; }
+.est-preset {
+  min-width:var(--touch); min-height:var(--touch); padding:0 var(--space-3);
+  border:1px solid var(--md-outline-variant); border-radius:var(--md-sm);
+  background:transparent; color:inherit; font-size:.9375rem; font-variant-numeric:tabular-nums;
+}
+.est-preset:active { background:var(--md-surface-c-low); }
+.est-preset.selected { background:var(--md-primary-container); color:var(--md-on-primary-container); border-color:transparent; font-weight:600; }
+.est-form { display:flex; gap:var(--space-2); align-items:center; padding:var(--space-2) 0; }
+.est-form .input { flex:1; }
+
+/* ═══ EMPTY / ERROR STATES ═══ */
+.state { display:flex; flex-direction:column; align-items:center; text-align:center; gap:var(--space-3); padding:var(--space-8) var(--space-5); color:var(--md-on-surface-variant); }
+.state-icon { color:var(--md-outline-variant); }
+.state-title { font-weight:600; color:var(--md-on-surface); }
+.state p { font-size:.875rem; max-width:18rem; }
+
+/* "open on desktop" banner */
+.desktop-cta {
+  display:flex; align-items:center; gap:var(--space-2); justify-content:center;
+  margin:var(--space-4) 0; padding:var(--space-3); font-size:.8125rem;
+  color:var(--md-on-surface-variant); background:var(--md-surface-c-low);
+  border-radius:var(--md-sm); border:1px dashed var(--md-outline-variant);
+}
+
+/* ═══ TOASTS ═══ */
+#toast-container {
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom:calc(var(--bottom-nav-h) + var(--safe-bottom) + var(--space-3));
+  z-index:60; display:flex; flex-direction:column; gap:var(--space-2); width:calc(100% - 2*var(--space-4)); max-width:24rem;
+  pointer-events:none;
+}
+.toast {
+  background:var(--md-inverse-surface); color:var(--md-inverse-on-surface); border-radius:var(--md-sm);
+  padding:var(--space-3) var(--space-4); font-size:.875rem; box-shadow:var(--md-e3);
+  animation:toast-in .2s ease;
+}
+.toast-error { background:var(--md-error); color:var(--md-on-error); }
+.toast-success { background:var(--md-primary); color:var(--md-on-primary); }
+@keyframes toast-in { from { opacity:0; transform:translateY(.5rem); } }
+
+.hidden { display:none !important; }
+.muted { color:var(--md-on-surface-variant); }
+.notif-unread { border-left:3px solid var(--md-primary); }
+
+/* ═══ DESKTOP / TABLET: centered phone frame ═══
+   The handoff redirect was removed, so the mobile UI now runs on every
+   viewport. On wide screens it presents as a centered phone-width column
+   rather than stretching edge-to-edge. `transform` on the frame makes it the
+   containing block for the fixed bottom nav / FAB / bottom sheet, and
+   `overflow-y:auto` makes it the scroll context so the sticky app bar works. */
+@media (min-width: 768px) {
+  body { background:#cdd8cf; }
+  #app-root { display:flex; justify-content:center; align-items:flex-start; min-height:100dvh; }
+  .app, .login, .boot {
+    width:100%; max-width:26.875rem;   /* ~430px phone */
+    height:100dvh; overflow-y:auto; overscroll-behavior:contain;
+    background:var(--md-background);
+    box-shadow:var(--md-e3);
+    transform:translateZ(0);
+  }
+  .login { display:flex; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}

@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_tasks_done_at;
+ALTER TABLE tasks DROP COLUMN IF EXISTS done_at;

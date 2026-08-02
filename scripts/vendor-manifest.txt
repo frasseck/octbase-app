@@ -1,0 +1,70 @@
+# Vendored-dependency integrity manifest.
+#
+# Octbase used to vendor third-party JS files instead of pulling them from a CDN
+# or an npm dependency graph at build time. That stance was retired on
+# 2026-07-30 (docs/architecture.md §5.2), and 37b stage 4 moved both RUNTIME
+# libraries to pinned npm dependencies — so what is left here is build-time
+# only, and nothing this manifest pins reaches a browser any more.
+#
+# This manifest pins the SHA-256 of each remaining vendored copy so
+# scripts/check-vendor-integrity.sh (run in CI's "Security scan" job) can
+# fail the build if any vendored file drifts — in either direction — from the
+# reviewed bytes. It also records the upstream package, version, URL and upstream
+# SHA-256 so a human can re-verify provenance against the source at any time.
+#
+# Recommended by docs/security-assessment-2026-07-14.md §290-293. It used to
+# exclude the frontend images' `npx --yes esbuild@0.24.2` on the grounds that
+# integrity-pinning it would mean adopting a package-lock.json. That objection
+# expired: since 37b stage 3 both images run `npm ci` against the committed
+# lockfile, so their whole toolchain is integrity-pinned there and needs no
+# entry here. That is a considered decision, not an oversight.
+#
+# FORMAT: the enforced lines are `<sha256>  <path>` (two spaces — sha256sum(1)
+# compatible, but the checker parses them itself). Everything starting with `#`
+# is provenance for humans and is ignored by the checker. To re-pin after a
+# deliberate upgrade: update the version/URL/upstream-sha comment, re-run the
+# fetch-and-diff, and replace the `<sha256>  <path>` line with the new digest in
+# the SAME commit as the file change.
+#
+# Re-verify a vendored file against upstream (clean diff expected — only the
+# prepended Octbase provenance header differs):
+#   curl -sSL <upstream-url> | diff - <path>
+
+# ── dompurify + qrcode-generator — REMOVED 2026-07-31 (37b stage 4) ────────
+#   `octbase-shared/purify.js` (dompurify 3.4.11) and `octbase-shared/qrcode.js`
+#   (qrcode-generator 1.4.4) were the two vendored RUNTIME libraries this
+#   manifest was written for. They are now ordinary npm dependencies —
+#   `dompurify` on @octbase/shared, `qrcode-generator` on both SPAs — pinned to
+#   exact versions in their package.json files and integrity-pinned by
+#   package-lock.json, which is a stronger guarantee than a hand-maintained
+#   SHA-256 line: npm verifies the tarball hash on every `npm ci`, and
+#   `npm audit --omit=dev` (CI "Frontend checks") now watches them for
+#   advisories, which this manifest never could.
+#
+#   Both were verified byte-identical to the published packages before deletion
+#   (header and ESM-export footer stripped), so nothing about the shipped
+#   sanitizer or QR generator changed at the swap.
+#
+#   Do not re-add a runtime library here. If a browser-shipped dependency ever
+#   cannot come from npm, that is a decision to argue in docs/architecture.md
+#   §5.2 first — the reason this file existed at all was the no-npm stance that
+#   section retired.
+
+# ── acorn 8.17.0 — npm, MIT — Marijn Haverbeke et al. ──────────────────────
+#   role:     build-time (AST cross-reference; added d7e7b33 for the retired
+#             check-exports.mjs, now carrying scripts/check-tdz.mjs)
+#   upstream: https://unpkg.com/acorn@8.17.0/dist/acorn.mjs  (ESM)
+#   upstream sha256: 1cbcbf252a5800e496dc505c706f309a9dd4e1789392e12963c77ae9497ff6f7
+#   local delta: byte-identical to upstream (verified 2026-07-21).
+1cbcbf252a5800e496dc505c706f309a9dd4e1789392e12963c77ae9497ff6f7  scripts/vendor/acorn.mjs
+
+# ── acorn-walk — REMOVED 2026-07-30, do not re-vendor without an importer ──
+#   `scripts/vendor/acorn-walk.mjs` (+ its LICENSE) was vendored alongside acorn
+#   in d7e7b33 but nothing ever imported it — check-exports.mjs walks the AST
+#   with its own free-variable walker. Its provenance could not be re-derived
+#   either: the vendored copy carried a `visitNode` indirection absent from
+#   acorn-walk@8.3.x dist/walk.mjs, so it did not reproduce from a clean npm
+#   dist (checked 2026-07-21). Unused code whose bytes cannot be traced to an
+#   upstream release is exactly what this manifest exists to surface, so it was
+#   deleted rather than left pinned. If a future tool genuinely needs a walker,
+#   vendor it fresh from a verified upstream dist and pin it here.

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#
+# pre-commit — fast, deterministic security sweep (no stack/DB/network; ~1-2s).
+#
+# The slower gate (go vet, golangci-lint, govulncheck, go test) runs in the
+# pre-push hook. Override in a pinch with `git commit --no-verify`.
+#
+# Until 37b stage 5 this hook also restamped the SPA index.html `?v=` asset
+# hashes and re-staged the files. Vite content-hashes those filenames now
+# (scripts/vite-hash-classic-assets.mjs), so there is nothing derived left in
+# index.html to keep in step — and a hook that silently rewrote a tracked file
+# mid-commit could pull an unrelated working-tree change into the commit.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+
+exec "$root/scripts/security-sweep.sh"

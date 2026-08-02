@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Octbase favicon">
+  <defs>
+    <linearGradient id="brand" x1="8" y1="4" x2="24" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#008F69"/>
+      <stop offset="1" stop-color="#005A42"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#brand)" d="M17.2 5.08L29.8 26.92Q31 29 28.6 29H3.4Q1 29 2.2 26.92L14.8 5.08Q16 3 17.2 5.08Z"/>
+</svg>

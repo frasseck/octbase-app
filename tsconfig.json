@@ -1,0 +1,47 @@
+{
+  "//": [
+    "Type-checking for a plain-JavaScript codebase (37b stage 7). There are no",
+    ".ts files and there is no compile step — `noEmit` is the whole point. What",
+    "this buys is the check the SPAs never had: the API contract, generated from",
+    "octbase-api/api/openapi.yaml into octbase-frontend/types/openapi.d.ts and",
+    "consumed through JSDoc, so a renamed Go JSON tag becomes a build error",
+    "instead of a runtime `undefined` the e2e suite may or may not walk into.",
+    "",
+    "`checkJs` is deliberately FALSE. The opt-in is a `// @ts-check` line at the",
+    "top of a file, which is what makes this expandable file by file: adding one",
+    "line brings a file under the checker without dragging every module it",
+    "imports in with it. The current members of that allowlist are listed in",
+    "docs/architecture.md and in js/README.md; grep for `@ts-check` for the",
+    "authoritative list.",
+    "",
+    "`include` is wide so imports resolve — being listed here does NOT mean a",
+    "file is checked."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": [
+    "octbase-frontend/js/**/*.js",
+    "octbase-frontend/types/**/*.d.ts",
+    "octbase-shared/*.js"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/dist",
+    "**/dist-standalone",
+    "octbase-frontend/js/*.test.js",
+    "octbase-frontend/js/testutil.js",
+    "octbase-shared/purify.js",
+    "octbase-shared/qrcode.js"
+  ]
+}

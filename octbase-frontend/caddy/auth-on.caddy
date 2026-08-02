@@ -1,0 +1,17 @@
+# Installation password gate ENABLED.
+#
+# Imported (as auth-on.caddy) only when OCTBASE_SITE_AUTH=on — the Caddyfiles
+# import auth-{$OCTBASE_SITE_AUTH:}.caddy, so this file (and its non-empty
+# password requirement) is never parsed when the gate is off. That indirection
+# is deliberate: `basic_auth` rejects an empty password at parse time, and
+# compose always passes env vars as set-but-empty (Caddy's {$VAR:default} only
+# fills UNSET vars, not empty ones), so feeding the hash straight into basic_auth
+# would crash-loop the container whenever the gate is disabled. Enabling
+# therefore takes two .env entries: OCTBASE_SITE_AUTH=on and a non-empty
+# OCTBASE_SITE_PASSWORD_HASH.
+#
+# @sitegate is defined at site level in each Caddyfile (it differs: the TLS
+# front door also excludes /metrics). OCTBASE_SITE_USER defaults to "octbase".
+basic_auth @sitegate {
+	{$OCTBASE_SITE_USER:octbase} {$OCTBASE_SITE_PASSWORD_HASH}
+}

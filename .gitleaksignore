@@ -1,0 +1,112 @@
+# gitleaks baseline — accepted findings, one fingerprint per line.
+#
+# CI's "Security scan" job runs `gitleaks detect` over the FULL history
+# (.github/workflows/ci.yml, checkout with fetch-depth: 0), so a finding is
+# attributed to the commit that introduced the line and stays reportable
+# forever — rewriting history is not on the table. This file is how a reviewed,
+# accepted finding stops failing the build, and it is the only sanctioned way:
+# the scan itself is never disabled, downgraded to a warning, or narrowed by an
+# allowlist. (An allowlist was measured and rejected — see below.)
+#
+# Format: <commit>:<file>:<rule>:<line>, from the Fingerprint field of
+#   gitleaks detect --report-format json
+# Comment lines are ignored by the parser.
+#
+# ── The rule for adding to this file ──────────────────────────────────────
+# A new fingerprint goes in ONLY after a human has read the flagged line and
+# confirmed it is not a credential. Never append one to make a red build green
+# — that is the same trap tests/KNOWN_FAILURES.md warns about, and it converts
+# the secret scan into decoration. If the value IS a real secret: rotate it
+# first, then remove it, and only then discuss the fingerprint.
+#
+# ── What is accepted here (all 43 entries) ────────────────────────────────
+# Every entry is rule `generic-api-key` — gitleaks' catch-all heuristic — firing
+# on hardcoded PASSWORD FIXTURES in Go auth/usermgmt tests: request bodies of
+# the form {"currentPassword": "<16-char mixed-case literal>"}, as in
+# change_password_test.go. They match the rule's `password…=…<10+ chars>` shape
+# and clear its entropy floor of 3.5, so they read as secrets to a regex. They
+# are literals in _test.go files, compiled into the test binary and used against
+# an ephemeral test database. (No fixture value is reproduced here — see the
+# note below on key-shaped strings in this file.)
+#
+# They come from three commits, all from July 2026:
+#   71461a7 (2026-07-10) Security hardening, v1.0.2 changelog release …  30
+#   df49d80 (2026-07-11) Add self-service password reset and Jira CSV …   7
+#   48dcf89 (2026-07-18) updates                                          6
+#
+# ── Why a config allowlist was NOT used instead ───────────────────────────
+# The obvious alternative is .gitleaks.toml with
+#   [allowlist] paths = ['''.*_test\.go$''']
+# It was tried against gitleaks 8.18.4 and rejected on evidence: a global
+# allowlist's `paths` and `regexes` are OR'd, not AND'd, so a path entry
+# exempts the file from EVERY rule. Verified by planting AWS's own published
+# example access-key id in a _test.go file and scanning a throwaway clone: with
+# this baseline it is still caught as `aws-access-token`; with that allowlist it
+# is dropped silently. The literal is deliberately NOT reproduced here — a
+# key-shaped string in this file is itself a finding, which is how that was
+# found out. Scoping the allowlist to the one noisy rule would mean restating
+# gitleaks' own generic-api-key rule, whose stopword list is ~1480 lines and
+# would drift from upstream on every version bump. A per-finding baseline keeps
+# all ~150 provider rules live everywhere, including in test files.
+
+
+# octbase-api/internal/auth/auth_extra_test.go — 11 password fixtures
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:282
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:342
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:433
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:483
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:718
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:769
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:800
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:832
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:878
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:932
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/auth_extra_test.go:generic-api-key:964
+
+# octbase-api/internal/auth/change_password_test.go — 6 password fixtures
+48dcf8962e2a7b296ac1644c9577c56f9742f2ca:octbase-api/internal/auth/change_password_test.go:generic-api-key:36
+48dcf8962e2a7b296ac1644c9577c56f9742f2ca:octbase-api/internal/auth/change_password_test.go:generic-api-key:52
+48dcf8962e2a7b296ac1644c9577c56f9742f2ca:octbase-api/internal/auth/change_password_test.go:generic-api-key:67
+48dcf8962e2a7b296ac1644c9577c56f9742f2ca:octbase-api/internal/auth/change_password_test.go:generic-api-key:122
+48dcf8962e2a7b296ac1644c9577c56f9742f2ca:octbase-api/internal/auth/change_password_test.go:generic-api-key:140
+48dcf8962e2a7b296ac1644c9577c56f9742f2ca:octbase-api/internal/auth/change_password_test.go:generic-api-key:158
+
+# octbase-api/internal/auth/integration_test.go — 3 password fixtures
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/integration_test.go:generic-api-key:45
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/integration_test.go:generic-api-key:79
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/integration_test.go:generic-api-key:136
+
+# octbase-api/internal/auth/mfa_enforcement_test.go — 6 password fixtures
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_enforcement_test.go:generic-api-key:35
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_enforcement_test.go:generic-api-key:63
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_enforcement_test.go:generic-api-key:90
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_enforcement_test.go:generic-api-key:113
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_enforcement_test.go:generic-api-key:143
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_enforcement_test.go:generic-api-key:167
+
+# octbase-api/internal/auth/mfa_login_test.go — 4 password fixtures
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_login_test.go:generic-api-key:54
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_login_test.go:generic-api-key:82
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_login_test.go:generic-api-key:115
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/mfa_login_test.go:generic-api-key:141
+
+# octbase-api/internal/auth/password_reset_test.go — 7 password fixtures
+df49d80b7a05d2a49b1b49a035626f91c27a7314:octbase-api/internal/auth/password_reset_test.go:generic-api-key:117
+df49d80b7a05d2a49b1b49a035626f91c27a7314:octbase-api/internal/auth/password_reset_test.go:generic-api-key:132
+df49d80b7a05d2a49b1b49a035626f91c27a7314:octbase-api/internal/auth/password_reset_test.go:generic-api-key:196
+df49d80b7a05d2a49b1b49a035626f91c27a7314:octbase-api/internal/auth/password_reset_test.go:generic-api-key:205
+df49d80b7a05d2a49b1b49a035626f91c27a7314:octbase-api/internal/auth/password_reset_test.go:generic-api-key:221
+df49d80b7a05d2a49b1b49a035626f91c27a7314:octbase-api/internal/auth/password_reset_test.go:generic-api-key:241
+df49d80b7a05d2a49b1b49a035626f91c27a7314:octbase-api/internal/auth/password_reset_test.go:generic-api-key:277
+
+# octbase-api/internal/auth/user_limit_test.go — 1 password fixture
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/auth/user_limit_test.go:generic-api-key:62
+
+# octbase-api/internal/usermgmt/handler_test.go — 1 password fixture
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/usermgmt/handler_test.go:generic-api-key:653
+
+# octbase-api/internal/usermgmt/usermgmt_extra_test.go — 4 password fixtures
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/usermgmt/usermgmt_extra_test.go:generic-api-key:88
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/usermgmt/usermgmt_extra_test.go:generic-api-key:90
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/usermgmt/usermgmt_extra_test.go:generic-api-key:109
+71461a78beb4a880f1228fb6b4158a2c56723bdf:octbase-api/internal/usermgmt/usermgmt_extra_test.go:generic-api-key:130
