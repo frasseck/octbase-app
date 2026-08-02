@@ -72,7 +72,15 @@ async function handleRoute() {
   // dashboard pages write #content themselves, which is exactly where a banner
   // was left hanging over content it no longer referred to.
   clearContentStale();
-  if (!Auth.isAuthenticated()) {
+  // mayHaveSession, not isAuthenticated (see auth.js): the `hashchange` listener
+  // above is armed at module load, but boot only gets a token once its
+  // Auth.refresh() resolves — so a navigation arriving in between reached this
+  // guard with a null token and a live refresh cookie, and the bare token test
+  // sent a valid session to /login, discarding the route (OCT-321). The
+  // optimistic answer is safe because this is not the authorization boundary:
+  // the backend authorizes every request either way, and a refresh that then
+  // fails surfaces as a 401 the HTTP client turns into an expired session.
+  if (!Auth.mayHaveSession()) {
     const p = router.current();
     if (!p.startsWith('/login') && !p.startsWith('/invitations') &&
         !p.startsWith('/forgot-password') && !p.startsWith('/reset-password')) {

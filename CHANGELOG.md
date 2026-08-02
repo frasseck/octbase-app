@@ -109,6 +109,20 @@ All notable changes to Octbase are documented here.
 
 ### Fixed
 
+- **A navigation during boot no longer lands on the login page.** `handleRoute`
+  gated on `Auth.isAuthenticated()`, which is only ever "is there an access token
+  right now". The `hashchange` listener is armed when `router.js` evaluates, but
+  boot does not hold a token until its `Auth.refresh()` resolves — so a click (or
+  a test driving the app straight after load) arriving in between reached the
+  guard with a null token and a live refresh cookie, and a signed-in user was
+  shown the login page with the route they asked for discarded. Routing now asks
+  the new `Auth.mayHaveSession()`, which counts the refresh-cookie presence
+  marker exactly as `http.js:requireSession` already did — the two notions of
+  "signed in" had drifted, and this is the drift. The same guard in the **mobile**
+  SPA had the same defect and is fixed with it, as is the session-health probe,
+  which painted the indicator dead for the same window. Not an authorization
+  change: the backend authorizes every request either way, and a refresh that
+  does fail still surfaces as a 401 the client turns into an expired session.
 - **The seeded demo activity entry shows the task's title instead of a raw
   `{{title}}`.** `internal/seed/seed.go` wrote its one `activity_entries` row
   with `payload_json` `'{}'`, but the `TASK_CREATED` translation is
