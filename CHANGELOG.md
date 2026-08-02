@@ -28,6 +28,26 @@ All notable changes to Octbase are documented here.
   Activity tab load the first page and offer **Load older activity**. Both lists
   now render **newest first**; they used to reverse their single page, which
   only read correctly while there was nothing after it.
+- **The front door stops overriding the mobile SPA's cache headers.** The
+  `@unhashed` matcher in `octbase-frontend/caddy/Caddyfile` (and its `.tls`
+  twin) matched `*.js` outside `/assets/*`, but the mobile bundles arrive there
+  as `/m/assets/index-<hash>.js` — before `handle_path` strips the prefix — so
+  the front door stamped `max-age=3600` alongside the year-long `immutable` the
+  mobile container had already set, and clients saw two `Cache-Control` headers.
+  `not path /m/*` hands everything under `/m/` back to the mobile config that
+  already answers it. Perf only, no staleness risk; it had been verified
+  container-direct, which is exactly where the collision is invisible.
+- **1.9 MB of unreferenced images left the build.** `img/octopus_original.png`
+  (1.7 MB) and `img/octopus.png` (176 KB) were copied verbatim into `dist/` and
+  shipped in the image with nothing referencing them — 60% of a 3.2 MB build.
+  `octopus_small.png` (the mascot) and `octopus_small_original.png` (the source
+  the Octopus palette was sampled from, documented in the style guide) stay.
+- **The mobile SPA no longer carries 49 dead translation fallbacks.** Call sites
+  written as `t('common.back') !== 'common.back' ? t('common.back') : 'Back'`
+  became unreachable when `scripts/check-i18n-keys.mjs` (commit `e290adb`)
+  started proving every literal key exists in every locale — the guard was built
+  to kill exactly this pattern. The condition is now always true, so the
+  ternaries are gone and the hardcoded English with them.
 - **Test-side follow-ups to the above.** The retention fixture now inserts its
   project before the activity rows that reference it (migration `039`'s FK made
   the old order invalid); `views-task.test.js` learned the two new

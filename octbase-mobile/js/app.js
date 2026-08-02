@@ -89,7 +89,7 @@ function fmtRelative(d) {
   if (!d) return '';
   const dt = new Date(d); if (isNaN(dt)) return '';
   const diff = (Date.now() - dt.getTime()) / 1000;
-  if (diff < 60) return t('time.justNow') !== 'time.justNow' ? t('time.justNow') : 'just now';
+  if (diff < 60) return t('time.justNow');
   const mins = Math.floor(diff/60); if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins/60); if (hrs < 24) return `${hrs}h`;
   return fmtDate(d);
@@ -171,8 +171,8 @@ function hydrateAvatars(root) {
 // ═══════════════════════════════════════════════════════════
 function appbar(title, { back = null, action = '' } = {}) {
   const lead = back
-    ? `<button class="icon-btn" data-act="nav" data-a0="${esc(back)}" aria-label="${t('common.back') !== 'common.back' ? t('common.back') : 'Back'}">${icon('chevron-left')}</button>`
-    : `<button class="icon-btn" data-act="openProfile" aria-label="${t('nav.profile') !== 'nav.profile' ? t('nav.profile') : 'Profile'}">${icon('user')}</button>`;
+    ? `<button class="icon-btn" data-act="nav" data-a0="${esc(back)}" aria-label="${t('common.back')}">${icon('chevron-left')}</button>`
+    : `<button class="icon-btn" data-act="openProfile" aria-label="${t('nav.profile')}">${icon('user')}</button>`;
   return `<header class="appbar">
     ${lead}
     <h1 class="appbar-title">${esc(title)}</h1>
@@ -188,7 +188,7 @@ function bottomNav(active) {
     // Its own key, not notifications.title: a tab cell is a quarter of the
     // screen, so the nav needs the short wording ("Nachrichten") while the
     // view title stays the full one ("Benachrichtigungen").
-    { id:'notifications', path:'/notifications', ic:'bell',   label:t('nav.notifications') !== 'nav.notifications' ? t('nav.notifications') : 'Inbox' },
+    { id:'notifications', path:'/notifications', ic:'bell',   label:t('nav.notifications') },
   ];
   return `<nav class="bottom-nav" aria-label="${t('nav.mainNavigation')}">
     ${items.map(it => `
@@ -226,12 +226,12 @@ function errorState(e, retryAct) {
     <div class="state-icon">${icon('warning',{size:'hero'})}</div>
     <div class="state-title">${t('errors.generic')}</div>
     <p>${esc(apiErrorMessage(e))}</p>
-    ${retryAct?`<button class="btn" data-act="${retryAct}">${icon('refresh',{size:'sm'})} ${t('common.retry') !== 'common.retry' ? t('common.retry') : 'Retry'}</button>`:''}
+    ${retryAct?`<button class="btn" data-act="${retryAct}">${icon('refresh',{size:'sm'})} ${t('common.retry')}</button>`:''}
   </div>`;
 }
 function desktopCta(label) {
   if (IS_PHONE) return '';
-  return `<a class="desktop-cta" href="${esc(DESKTOP_URL)}">${icon('external',{size:'sm'})} ${esc(label || (t('mobile.openDesktop') !== 'mobile.openDesktop' ? t('mobile.openDesktop') : 'Open the full version on desktop'))}</a>`;
+  return `<a class="desktop-cta" href="${esc(DESKTOP_URL)}">${icon('external',{size:'sm'})} ${esc(label || t('mobile.openDesktop'))}</a>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -695,7 +695,7 @@ async function viewProjects() {
     const projects = await api.projects.list();
     el('#content').innerHTML = projects.length
       ? `<div class="card-list">${projects.map(projectRow).join('')}</div>`
-      : emptyState('project', t('dashboard.noProjects'), t('mobile.noProjectsBody') !== 'mobile.noProjectsBody' ? t('mobile.noProjectsBody') : '');
+      : emptyState('project', t('dashboard.noProjects'), t('mobile.noProjectsBody'));
   } catch (e) {
     el('#content').innerHTML = errorState(e, 'reloadRoute');
   }
@@ -775,7 +775,7 @@ function boardCard(tk) {
     <div class="task-card-top">
       ${typeGlyph(tk.taskType)}
       <span class="task-title">${esc(tk.title)}</span>
-      <button class="icon-btn" data-act="openMoveSheet" data-a0="${esc(tk.id)}" aria-label="${t('mobile.move') !== 'mobile.move' ? t('mobile.move') : 'Move'}" title="${t('mobile.move') !== 'mobile.move' ? t('mobile.move') : 'Move'}">${icon('more',{size:'sm'})}</button>
+      <button class="icon-btn" data-act="openMoveSheet" data-a0="${esc(tk.id)}" aria-label="${t('mobile.move')}" title="${t('mobile.move')}">${icon('more',{size:'sm'})}</button>
     </div>
     <div class="task-card-meta">
       ${tk.seqNumber!=null?`<span class="task-key">${esc(taskKey(tk,S.project))}</span>`:''}
@@ -841,7 +841,7 @@ function hasActiveFilters() { return !!(S.filters.status || S.filters.priority |
 
 function backlogFilterAction() {
   return `<button class="icon-btn${hasActiveFilters()?' active':''}" data-act="openFilterSheet"
-      aria-label="${t('filter.title') !== 'filter.title' ? t('filter.title') : 'Filter'}" title="${t('filter.title') !== 'filter.title' ? t('filter.title') : 'Filter'}">${icon('filter')}</button>`;
+      aria-label="${t('filter.title')}" title="${t('filter.title')}">${icon('filter')}</button>`;
 }
 
 // backlogBodyHtml is chips + card list for a given task list. The filters are
@@ -854,7 +854,7 @@ function backlogBodyHtml(tasks) {
   if (S.filters.type)     shown = shown.filter(tk => tk.taskType === S.filters.type);
   const list = shown.length
     ? `<div class="content"><div class="card-list">${shown.map(tk=>listCard(tk)).join('')}</div></div>`
-    : emptyState('backlog', t('task.emptyState'), activeFilters ? (t('filter.noMatch') !== 'filter.noMatch' ? t('filter.noMatch') : '') : t('task.emptyBody'));
+    : emptyState('backlog', t('task.emptyState'), activeFilters ? t('filter.noMatch') : t('task.emptyBody'));
   return (activeFilters?filterChips():'') + list;
 }
 
@@ -880,7 +880,7 @@ function filterChips() {
   if (S.filters.type)     chips.push(TYPE_META[S.filters.type]?.label);
   return `<div class="seg-scroll">
     ${chips.map(c=>`<span class="seg active">${esc(c)}</span>`).join('')}
-    <button class="seg" data-act="clearFilters">${t('filter.clear') !== 'filter.clear' ? t('filter.clear') : 'Clear'}</button>
+    <button class="seg" data-act="clearFilters">${t('filter.clear')}</button>
   </div>`;
 }
 
@@ -903,7 +903,7 @@ function openFilterSheet() {
   const group = (label, key, opts) => `
     <div class="sheet-title" style="margin-top:var(--space-3)">${esc(label)}</div>
     <button type="button" class="sheet-opt${!S.filters[key]?' selected':''}" data-act="applyFilter" data-a0="${key}" data-a1="">
-      <span>${t('filter.all') !== 'filter.all' ? t('filter.all') : 'All'}</span>${!S.filters[key]?`<span class="check">${icon('check',{size:'sm'})}</span>`:''}
+      <span>${t('filter.all')}</span>${!S.filters[key]?`<span class="check">${icon('check',{size:'sm'})}</span>`:''}
     </button>
     ${opts.map(o=>`<button type="button" class="sheet-opt${S.filters[key]===o.v?' selected':''}" data-act="applyFilter" data-a0="${key}" data-a1="${o.v}">
       <span>${o.labelHtml||esc(o.label)}</span>${S.filters[key]===o.v?`<span class="check">${icon('check',{size:'sm'})}</span>`:''}</button>`).join('')}`;
@@ -915,10 +915,10 @@ function openFilterSheet() {
   const taskStatuses = (cache?.tasks || []).map(tk => tk.status);
   const statusOpts = [...new Set([...STATUSES, ...laneStatuses, ...taskStatuses])]
     .filter(s => s && s !== 'ARCHIVED');
-  openSheet(t('filter.title') !== 'filter.title' ? t('filter.title') : 'Filter',
-    group(t('task.statusLabel') !== 'task.statusLabel' ? t('task.statusLabel') : t('task.status.PLANNED'), 'status', statusOpts.map(s=>({v:s,labelHtml:statusBadge(s)})))
-    + group(t('task.priorityLabel') !== 'task.priorityLabel' ? t('task.priorityLabel') : 'Priority', 'priority', priorityNames(S.priorities).map(p=>({v:p,labelHtml:prioBadge(p)})))
-    + group(t('task.typeLabel') !== 'task.typeLabel' ? t('task.typeLabel') : 'Type', 'type', projectTaskTypes(S.project).map(t2=>({v:t2,label:TYPE_META[t2].label}))));
+  openSheet(t('filter.title'),
+    group(t('task.statusLabel'), 'status', statusOpts.map(s=>({v:s,labelHtml:statusBadge(s)})))
+    + group(t('task.priorityLabel'), 'priority', priorityNames(S.priorities).map(p=>({v:p,labelHtml:prioBadge(p)})))
+    + group(t('task.typeLabel'), 'type', projectTaskTypes(S.project).map(t2=>({v:t2,label:TYPE_META[t2].label}))));
 }
 function applyFilter(key, value) {
   S.filters[key] = value;
@@ -964,7 +964,7 @@ function backForTask() {
 
 function renderTask(task, comments) {
   const desc = renderDescriptionHTML(task.description);
-  const action = `<button class="icon-btn" data-act="openTaskMenu" aria-label="${t('common.more') !== 'common.more' ? t('common.more') : 'More'}" title="${t('common.more') !== 'common.more' ? t('common.more') : 'More'}">${icon('kebab')}</button>`;
+  const action = `<button class="icon-btn" data-act="openTaskMenu" aria-label="${t('common.more')}" title="${t('common.more')}">${icon('kebab')}</button>`;
   render(taskKey(task, S.project) || t('nav.tasks'), '', { back: backForTask(), action });
   el('#content').innerHTML = html`
     <div class="detail-head">
@@ -981,17 +981,17 @@ function renderTask(task, comments) {
 
     <div class="prop-list">
       <button class="prop" data-act="openStatusSheet" data-a0="${task.id}">
-        <span class="prop-label">${raw(t('task.statusLabel') !== 'task.statusLabel' ? t('task.statusLabel') : 'Status')}</span>
+        <span class="prop-label">${raw(t('task.statusLabel'))}</span>
         <span class="prop-value">${raw(statusBadge(task.status))}</span>
         <span class="chev">${raw(icon('chevron-right',{size:'sm'}))}</span>
       </button>
       <button class="prop" data-act="openPrioritySheet" data-a0="${task.id}">
-        <span class="prop-label">${raw(t('task.priorityLabel') !== 'task.priorityLabel' ? t('task.priorityLabel') : 'Priority')}</span>
+        <span class="prop-label">${raw(t('task.priorityLabel'))}</span>
         <span class="prop-value">${raw(prioBadge(task.priority))}</span>
         <span class="chev">${raw(icon('chevron-right',{size:'sm'}))}</span>
       </button>
       <button class="prop" data-act="openAssigneeSheet" data-a0="${task.id}">
-        <span class="prop-label">${raw(t('task.assignee') !== 'task.assignee' ? t('task.assignee') : 'Assignee')}</span>
+        <span class="prop-label">${raw(t('task.assignee'))}</span>
         <span class="prop-value">${task.assigneeId?raw(avatar(task.assigneeId,true)):''} ${task.assigneeId?memberName(task.assigneeId):t('task.unassigned')}</span>
         <span class="chev">${raw(icon('chevron-right',{size:'sm'}))}</span>
       </button>
@@ -1001,7 +1001,7 @@ function renderTask(task, comments) {
         <span class="chev">${raw(icon('chevron-right',{size:'sm'}))}</span>
       </button>`):''}
       ${task.dueDate?raw(html`<div class="prop">
-        <span class="prop-label">${raw(t('task.dueDateLabel') !== 'task.dueDateLabel' ? t('task.dueDateLabel') : 'Due')}</span>
+        <span class="prop-label">${raw(t('task.dueDateLabel'))}</span>
         <span class="prop-value">${raw(icon('calendar',{size:'sm'}))} ${fmtDate(task.dueDate)}</span>
       </div>`):''}
       <div class="prop">
@@ -1012,11 +1012,11 @@ function renderTask(task, comments) {
 
     ${desc ? raw(html`<div class="detail-block-title">${raw(t('task.description'))}</div><div class="rich">${raw(desc)}</div>`) : ''}
 
-    <div class="detail-block-title">${raw(t('task.comments') !== 'task.comments' ? t('task.comments') : 'Comments')} (${comments.length})</div>
-    <div id="comment-list">${comments.length?raw(comments.map(commentItem).join('')):raw(html`<p class="muted" style="font-size:.875rem">${raw(t('task.noComments') !== 'task.noComments' ? t('task.noComments') : 'No comments yet')}</p>`)}</div>
+    <div class="detail-block-title">${raw(t('task.comments'))} (${comments.length})</div>
+    <div id="comment-list">${comments.length?raw(comments.map(commentItem).join('')):raw(html`<p class="muted" style="font-size:.875rem">${raw(t('task.noComments'))}</p>`)}</div>
     <form class="comment-form" data-submit="submitComment" data-a0="${task.id}">
-      <textarea class="textarea" id="comment-input" rows="2" placeholder="${t('task.addComment') !== 'task.addComment' ? t('task.addComment') : 'Add a comment…'}"></textarea>
-      <button class="btn btn-primary" type="submit">${raw(icon('comment',{size:'sm'}))} ${raw(t('task.comment') !== 'task.comment' ? t('task.comment') : 'Comment')}</button>
+      <textarea class="textarea" id="comment-input" rows="2" placeholder="${t('task.addComment')}"></textarea>
+      <button class="btn btn-primary" type="submit">${raw(icon('comment',{size:'sm'}))} ${raw(t('task.comment'))}</button>
     </form>`;
 }
 
@@ -1052,14 +1052,14 @@ async function submitComment(form, ev) {
     ta.value = '';
     const comments = await api.comments.list(taskId).catch(() => []);
     el('#comment-list').innerHTML = comments.length?comments.map(commentItem).join(''):'';
-    toast(t('task.commentAdded') !== 'task.commentAdded' ? t('task.commentAdded') : t('form.updated'), 'success');
+    toast(t('task.commentAdded'), 'success');
   } catch (e) { toast(apiErrorMessage(e), 'error'); }
   finally { ta.disabled = false; }
 }
 
 // ── property edit sheets ──
 async function openStatusSheet(taskId) {
-  const title = t('task.statusLabel') !== 'task.statusLabel' ? t('task.statusLabel') : 'Status';
+  const title = t('task.statusLabel');
   // DONE/ARCHIVED tasks are immutable on the API (TASK_IMMUTABLE) — offer the
   // dedicated reopen action instead of status options that can only fail.
   if (_task && _task.id === taskId && (_task.status === 'DONE' || _task.status === 'ARCHIVED')) {
@@ -1135,7 +1135,7 @@ function taskVersionFor(taskId) {
   return (_task && _task.id === taskId) ? _task.version : undefined;
 }
 function openPrioritySheet(taskId) {
-  openSheet(t('task.priorityLabel') !== 'task.priorityLabel' ? t('task.priorityLabel') : 'Priority',
+  openSheet(t('task.priorityLabel'),
     sheetOptions(priorityNames(S.priorities).map(p=>({id:taskId, value:p, labelHtml:prioBadge(p)})), _task?.priority, 'pickPriority'));
 }
 async function pickPriority(taskId, priority) {
@@ -1218,7 +1218,7 @@ function warnIfNotMember(userId) {
 function openAssigneeSheet(taskId) {
   const opts = [{ id:taskId, value:'', label:t('task.unassigned') }]
     .concat(S.assignables.map(m => ({ id:taskId, value:m.userId, label:assignableLabel(m) })));
-  openSheet(t('task.assignee') !== 'task.assignee' ? t('task.assignee') : 'Assignee',
+  openSheet(t('task.assignee'),
     sheetOptions(opts, _task?.assigneeId || '', 'pickAssignee'));
 }
 async function pickAssignee(taskId, userId) {
@@ -1230,9 +1230,9 @@ async function pickAssignee(taskId, userId) {
 function openTaskMenu() {
   if (!_task) return;
   openSheet(_task.title, `
-    <button type="button" class="sheet-opt" data-act="openStatusSheet" data-a0="${esc(_task.id)}">${icon('check')}<span>${t('task.statusLabel') !== 'task.statusLabel' ? t('task.statusLabel') : 'Change status'}</span></button>
-    <button type="button" class="sheet-opt" data-act="openMoveSheet" data-a0="${esc(_task.id)}">${icon('board')}<span>${t('mobile.move') !== 'mobile.move' ? t('mobile.move') : 'Move on board'}</span></button>
-    ${IS_PHONE ? '' : `<a class="sheet-opt" href="${esc(DESKTOP_URL)}">${icon('external')}<span>${t('mobile.editOnDesktop') !== 'mobile.editOnDesktop' ? t('mobile.editOnDesktop') : 'Edit on desktop'}</span></a>`}`);
+    <button type="button" class="sheet-opt" data-act="openStatusSheet" data-a0="${esc(_task.id)}">${icon('check')}<span>${t('task.statusLabel')}</span></button>
+    <button type="button" class="sheet-opt" data-act="openMoveSheet" data-a0="${esc(_task.id)}">${icon('board')}<span>${t('mobile.move')}</span></button>
+    ${IS_PHONE ? '' : `<a class="sheet-opt" href="${esc(DESKTOP_URL)}">${icon('external')}<span>${t('mobile.editOnDesktop')}</span></a>`}`);
 }
 
 // ── board move sheet ──
@@ -1240,7 +1240,7 @@ async function openMoveSheet(taskId) {
   let board = S.board;
   if (!board && S.project) board = await api.boards.getDefault(S.project.id).catch(()=>null);
   if (!board || !board.columns?.length) { toast(t('errors.noBoardAvailable'), 'error'); return; }
-  openSheet(t('mobile.moveToColumn') !== 'mobile.moveToColumn' ? t('mobile.moveToColumn') : 'Move to column',
+  openSheet(t('mobile.moveToColumn'),
     sheetOptions(board.columns.map(c=>({id:taskId, value:c.id, label:c.name})), null, 'pickMove'));
 }
 async function pickMove(taskId, colId) {
@@ -1277,24 +1277,24 @@ async function viewCreateTask(pid) {
           <div class="form-error hidden" id="ct-title-err">${raw(t('validation.titleRequired'))}</div>
         </div>
         <div class="field">
-          <label class="field-label" for="ct-type">${raw(t('task.typeLabel') !== 'task.typeLabel' ? t('task.typeLabel') : 'Type')}</label>
+          <label class="field-label" for="ct-type">${raw(t('task.typeLabel'))}</label>
           <select class="select" id="ct-type" data-change="ctTypeChanged">${projectTaskTypes(S.project).map(tt=>raw(html`<option value="${tt}">${TYPE_META[tt].label}</option>`))}</select>
         </div>
         <div class="field" id="ct-parent-field">${raw(ctParentFieldHtml('TASK'))}</div>
         <div class="field">
-          <label class="field-label" for="ct-priority">${raw(t('task.priorityLabel') !== 'task.priorityLabel' ? t('task.priorityLabel') : 'Priority')}</label>
+          <label class="field-label" for="ct-priority">${raw(t('task.priorityLabel'))}</label>
           <select class="select" id="ct-priority">${priorityNames(S.priorities).map(p=>raw(html`<option value="${p}" ${raw(p==='MEDIUM'?'selected':'')}>${priorityMeta(p).label}</option>`))}</select>
         </div>
         <div class="field" id="ct-estimate-field">${raw(ctEstimateFieldHtml('TASK'))}</div>
         <div class="field">
-          <label class="field-label" for="ct-assignee">${raw(t('task.assignee') !== 'task.assignee' ? t('task.assignee') : 'Assignee')}</label>
+          <label class="field-label" for="ct-assignee">${raw(t('task.assignee'))}</label>
           <select class="select" id="ct-assignee">
             <option value="">${raw(t('task.unassigned'))}</option>
             ${S.assignables.map(m=>raw(html`<option value="${m.userId}">${assignableLabel(m)}</option>`))}
           </select>
         </div>
         <div class="field">
-          <label class="field-label" for="ct-due">${raw(t('task.dueDateLabel') !== 'task.dueDateLabel' ? t('task.dueDateLabel') : 'Due date')}</label>
+          <label class="field-label" for="ct-due">${raw(t('task.dueDateLabel'))}</label>
           <input class="input" id="ct-due" type="date">
         </div>
         <div class="field">
@@ -1319,7 +1319,7 @@ function ctParentFieldHtml(taskType) {
   const rule = typeParentRule(S.project, taskType);
   if (!rule.parentType) return '';
   const opts = _ctParents.filter(tk => tk.taskType === rule.parentType);
-  const label = t('task.parentLabel') !== 'task.parentLabel' ? t('task.parentLabel') : 'Parent';
+  const label = t('task.parentLabel');
   return `
           <label class="field-label" for="ct-parent">${esc(label)} (${esc(TYPE_META[rule.parentType].label)})</label>
           <select class="select" id="ct-parent">
@@ -1407,7 +1407,7 @@ async function viewSearch(initialQ) {
   render(t('nav.search'), `
     <div class="field" style="margin-bottom:var(--space-3)">
       <input class="input" id="search-input" type="search" inputmode="search"
-        placeholder="${t('search.placeholder') !== 'search.placeholder' ? t('search.placeholder') : 'Search tasks…'}"
+        placeholder="${t('search.placeholder')}"
         value="${esc(initialQ||'')}" autofocus aria-label="${t('nav.search')}">
     </div>
     <div id="search-results"></div>`, { nav:'search' });
@@ -1420,14 +1420,14 @@ function onSearchInput(value) {
 async function runSearch(q) {
   const out = el('#search-results');
   if (!out) return;
-  if (!q || q.trim().length < 2) { out.innerHTML = html`<p class="muted" style="font-size:.875rem">${raw(t('search.hint') !== 'search.hint' ? t('search.hint') : 'Type at least 2 characters')}</p>`; return; }
+  if (!q || q.trim().length < 2) { out.innerHTML = html`<p class="muted" style="font-size:.875rem">${raw(t('search.hint'))}</p>`; return; }
   out.innerHTML = loadingState();
   try {
     const res = await api.search(q.trim());
     const tasks = (res.tasks || res.results || []).filter(Boolean);
     out.innerHTML = tasks.length
       ? html`<div class="card-list">${tasks.map(tk => raw(searchCard(tk)))}</div>`
-      : emptyState('search', t('search.noResults') !== 'search.noResults' ? t('search.noResults') : 'No results', '');
+      : emptyState('search', t('search.noResults'), '');
   } catch (e) {
     out.innerHTML = errorState(e);
   }
@@ -1443,15 +1443,15 @@ function searchCard(tk) {
 // NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════
 async function viewNotifications() {
-  const action = `<button class="icon-btn" data-act="markAllRead" aria-label="${t('notifications.markAllRead') !== 'notifications.markAllRead' ? t('notifications.markAllRead') : 'Mark all read'}" title="${t('notifications.markAllRead') !== 'notifications.markAllRead' ? t('notifications.markAllRead') : 'Mark all read'}">${icon('check')}</button>`;
-  render(t('notifications.title') !== 'notifications.title' ? t('notifications.title') : 'Inbox', loadingState(), { nav:'notifications', action });
+  const action = `<button class="icon-btn" data-act="markAllRead" aria-label="${t('notifications.markAllRead')}" title="${t('notifications.markAllRead')}">${icon('check')}</button>`;
+  render(t('notifications.title'), loadingState(), { nav:'notifications', action });
   try {
     const res = await api.notifications.list({ size:50 });
     const items = res.notifications || res.items || res || [];
     S.notifCount = items.filter(n => !n.isRead).length;
     el('#content').innerHTML = items.length
       ? `<div class="card-list">${items.map(notifCard).join('')}</div>`
-      : emptyState('bell', t('notifications.empty') !== 'notifications.empty' ? t('notifications.empty') : 'No notifications', '');
+      : emptyState('bell', t('notifications.empty'), '');
     // refresh the nav badge
     el('.nav-item.active .nav-badge')?.remove();
   } catch (e) {
@@ -1529,7 +1529,7 @@ function openProfile() {
     <input type="file" id="avatar-input-mobile" accept="image/png,image/jpeg,image/gif,image/webp" data-change="avatarPickMobile" style="display:none" aria-label="${t('settings.profileUpload')}">
     ${u.avatarUpdatedAt ? `<button type="button" class="sheet-opt" data-act="avatarRemoveMobile">${icon('delete')}<span>${t('settings.profileRemove')}</span></button>` : ''}
     <button type="button" class="sheet-opt" data-act="nav" data-a0="/settings">${icon('settings')}<span>${t('nav.settings')}</span></button>
-    ${IS_PHONE ? '' : `<a class="sheet-opt" href="${esc(DESKTOP_URL)}">${icon('external')}<span>${t('mobile.openDesktop') !== 'mobile.openDesktop' ? t('mobile.openDesktop') : 'Open desktop version'}</span></a>`}
+    ${IS_PHONE ? '' : `<a class="sheet-opt" href="${esc(DESKTOP_URL)}">${icon('external')}<span>${t('mobile.openDesktop')}</span></a>`}
     <button type="button" class="sheet-opt" data-act="doLogout" style="color:var(--md-error)">${icon('logout')}<span>${t('auth.signOut')}</span></button>`);
 }
 async function doLogout() {
