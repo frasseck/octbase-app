@@ -59,6 +59,17 @@ Default invocation (UI from `file://`, no `OCTBASE_ACCESS_*` set):
 **Zero failures.** Reproduced twice back-to-back at the commit above with an
 identical pass/skip/fail split and an identical skip list.
 
+Re-measured **2026-08-02** at `15d82c2` against the built `dist/` over HTTP (the
+37b invocation below), on a freshly seeded disposable stack:
+
+```
+401 passed, 22 skipped, 0 failed   (316s)
+```
+
+Same zero-failure, 22-skip shape; the pass count grew with the suite. A fresh
+stack is load-bearing in that number — the dev stack's demo project had been
+emptied of its seeded tasks that day, which no fixture repairs.
+
 The 22 skips are all deliberate env-gates or seed-state guards, not breakage:
 
 | Count | Tests | Why it skips |
@@ -121,6 +132,48 @@ therefore **12 passed / 1 failed** (or 11/2 when the flake fires).
   `test_projects`)**, with the mobile file green the second time and 31/31 when
   run alone. A failure set that changes completely between runs is a load
   symptom; take a stable node ID across runs as the signal instead.
+
+#### What was ruled out, and what changed (2026-08-02, later the same day)
+
+**"The search view is slow to paint its input" is not possible.**
+`renderSearchPage` (`js/views-shell.js`) assigns `#content.innerHTML` — input
+included — with **no `await` ahead of it**, so `#sp-input` exists in the same
+tick the route handler runs. An 8s timeout on it therefore never means a slow
+paint; it means the search route **never ran**, or ran and was replaced. That
+removes one of the three options this entry originally offered.
+
+The navigation these tests used could fail three ways, all of which present as
+that same bare timeout:
+
+1. `page.evaluate("() => window.router && window.router.go('/search')")` —
+   the `&&` **silently evaluates to `undefined`** when `window.router` is not
+   attached yet, so nothing is ever asked to render and the caller waits out its
+   whole timeout.
+2. `router.go()` only assigns `window.location.hash`, and **assigning the hash's
+   current value fires no `hashchange`**, so nothing routes. `router.navigate()`
+   exists precisely to cover both cases — the router's own comment says so, and
+   the tests were calling the wrong one.
+3. `handleRoute` bounces to `/login` whenever `Auth.isAuthenticated()` is false,
+   which is *also* the normal state while a token refresh is in flight
+   (`http.js:requireSession` documents that a null token alone is not proof of
+   being signed out — `handleRoute` does not make that distinction).
+
+`test_search.py` and the `demo_board` fixture now navigate through
+**`goto_route()`** (`conftest.py`), which waits for the router, uses
+`navigate()`, and **on timeout reports which of the three happened** — the hash,
+whether the login page is showing, what `#content` actually holds. A red search
+test should no longer cost anyone a bisect: the failure names its own mechanism.
+
+**This is a diagnosis and a hardening, not a proven fix.** The flake did **not
+reproduce here** — `test_search.py` ran green three times idle, once under 2×-CPU
+load, and a 20-iteration probe of the exact navigation passed 20/20 under load,
+all against a freshly seeded disposable stack. So the three mechanisms above are
+demonstrated hazards in the code, not a confirmed root cause. If the timeout
+returns, the assertion message now says which one it was — record it here.
+
+`OCTBASE_TEST_TIMEOUT_SCALE` (default `1`) multiplies `TIMEOUT`/`SHORT` for runs
+on a busy box, so a loaded machine gets headroom without editing constants that
+should stay tight on an idle one.
 
 ## Explicitly NOT baseline failures
 

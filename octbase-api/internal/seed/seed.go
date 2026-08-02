@@ -181,8 +181,11 @@ func Run(db *sql.DB) error {
 		// Branch reference
 		`INSERT INTO branch_references (id,task_id,repository_id,branch_name,branch_type,created_at) VALUES ('` + BranchID + `','` + TaskID + `','` + RepositoryID + `','feature/user-auth','feature','` + now + `') ON CONFLICT (id) DO NOTHING`,
 
-		// Activity
-		`INSERT INTO activity_entries (id,project_id,task_id,actor_user_id,type,message,payload_json,created_at) VALUES ('` + ActivityID + `','` + ProjectID + `','` + TaskID + `','` + DemoUserID + `','TASK_CREATED','Task created: Implement user authentication','{}','` + activityNow + `') ON CONFLICT (id) DO UPDATE SET created_at=EXCLUDED.created_at`,
+		// Activity. payload_json carries the params the TASK_CREATED translation
+		// interpolates ("Created task \"{{title}}\""); an empty object renders the
+		// placeholder verbatim in the Activity view. The conflict clause refreshes
+		// it too, so stacks seeded before this was fixed repair themselves.
+		`INSERT INTO activity_entries (id,project_id,task_id,actor_user_id,type,message,payload_json,created_at) VALUES ('` + ActivityID + `','` + ProjectID + `','` + TaskID + `','` + DemoUserID + `','TASK_CREATED','Task created: Implement user authentication','{"title":"Implement user authentication"}','` + activityNow + `') ON CONFLICT (id) DO UPDATE SET created_at=EXCLUDED.created_at, payload_json=EXCLUDED.payload_json`,
 	}
 
 	for _, stmt := range stmts {

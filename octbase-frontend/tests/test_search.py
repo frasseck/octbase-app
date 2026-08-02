@@ -3,25 +3,22 @@
 import pytest
 from conftest import (
     DEMO_PROJECT_ID, DEMO_TASK_TITLE, SHORT, TIMEOUT,
-    navigate_to, settle,)
+    goto_route, navigate_to, settle,)
 
 
 class TestSearchPageStructure:
     def test_search_page_accessible_from_hash(self, app):
         """Navigate to #/search directly and verify the search input renders."""
-        app.evaluate("() => window.router && window.router.go('/search')")
-        app.wait_for_selector(".search-page", timeout=TIMEOUT)
+        goto_route(app, '/search', ".search-page")
         assert app.is_visible("#sp-input")
         assert app.is_visible("#sp-results")
 
     def test_search_page_has_search_button(self, app):
-        app.evaluate("() => window.router && window.router.go('/search')")
-        app.wait_for_selector(".search-page", timeout=TIMEOUT)
+        goto_route(app, '/search', ".search-page")
         assert app.is_visible("button:has-text('Search')")
 
     def test_search_input_accepts_text(self, app):
-        app.evaluate("() => window.router && window.router.go('/search')")
-        app.wait_for_selector("#sp-input", timeout=TIMEOUT)
+        goto_route(app, '/search', "#sp-input")
         app.fill("#sp-input", "hello world")
         assert app.query_selector("#sp-input").input_value() == "hello world"
 
@@ -29,8 +26,7 @@ class TestSearchPageStructure:
 class TestSearchResults:
     def test_search_returns_task_result(self, app):
         """Searching for the seeded demo task title should return at least one result."""
-        app.evaluate("() => window.router && window.router.go('/search')")
-        app.wait_for_selector("#sp-input", timeout=TIMEOUT)
+        goto_route(app, '/search', "#sp-input")
         # Use a word from the seeded demo task title.
         query = "authentication"
         app.fill("#sp-input", query)
@@ -43,8 +39,7 @@ class TestSearchResults:
         assert has_results or has_empty
 
     def test_search_result_appears_after_enter_key(self, app):
-        app.evaluate("() => window.router && window.router.go('/search')")
-        app.wait_for_selector("#sp-input", timeout=TIMEOUT)
+        goto_route(app, '/search', "#sp-input")
         app.fill("#sp-input", "demo")
         app.press("#sp-input", "Enter")
         settle(app)
@@ -54,8 +49,7 @@ class TestSearchResults:
 
     def test_search_known_title_shows_result(self, app):
         """Searching the exact demo task title must return a search-result."""
-        app.evaluate("() => window.router && window.router.go('/search')")
-        app.wait_for_selector("#sp-input", timeout=TIMEOUT)
+        goto_route(app, '/search', "#sp-input")
         app.fill("#sp-input", "Implement user authentication")
         app.click("button:has-text('Search')")
         app.wait_for_selector(".search-result", timeout=TIMEOUT)
@@ -63,8 +57,7 @@ class TestSearchResults:
 
     def test_empty_query_does_not_submit(self, app):
         """An empty search should not produce results or an error."""
-        app.evaluate("() => window.router && window.router.go('/search')")
-        app.wait_for_selector("#sp-input", timeout=TIMEOUT)
+        goto_route(app, '/search', "#sp-input")
         app.fill("#sp-input", "")
         app.click("button:has-text('Search')")
         settle(app)
@@ -74,8 +67,7 @@ class TestSearchResults:
 
     def test_search_result_click_navigates(self, app):
         """Clicking a task search result should open the task panel or navigate away."""
-        app.evaluate("() => window.router && window.router.go('/search')")
-        app.wait_for_selector("#sp-input", timeout=TIMEOUT)
+        goto_route(app, '/search', "#sp-input")
         app.fill("#sp-input", "Implement user authentication")
         app.click("button:has-text('Search')")
         app.wait_for_selector(".search-result", timeout=TIMEOUT)
