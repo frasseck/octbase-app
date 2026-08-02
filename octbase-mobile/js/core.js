@@ -190,7 +190,14 @@ const Auth = (() => {
       }).catch(() => {});
       goLogin();
     },
+    // isAuthenticated answers "can a request be signed right now?" — it is about
+    // the token in hand. mayHaveSession answers "is this person signed in?",
+    // counting the refresh-cookie marker, and is the question ROUTING must ask:
+    // a null token is also the normal state during boot, before the boot
+    // refresh resolves, so the bare token test sends a valid session to /login
+    // and throws away the route (OCT-321; the desktop router had it too).
     isAuthenticated() { return USE_STANDALONE_DEMO_AUTH || !!_accessToken; },
+    mayHaveSession() { return this.isAuthenticated() || this.hasSessionHint(); },
   };
 })();
 

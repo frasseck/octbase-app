@@ -371,11 +371,18 @@ async function handleRoute() {
 
   if (path === '/forgot-password') { renderForgotPassword(); return; }
   if (path.startsWith('/reset-password/')) { renderResetPassword(path.split('/')[2]); return; }
-  if (!Auth.isAuthenticated()) {
+  // mayHaveSession, not isAuthenticated — see core.js. A navigation arriving
+  // before boot's refresh has resolved otherwise renders the login page to
+  // someone who is signed in, and the route they asked for is gone.
+  if (!Auth.mayHaveSession()) {
     if (path !== '/login') { navTo('/login'); return; }
     renderLogin(); return;
   }
-  if (path === '/login') { navTo('/dashboard'); return; }
+  // Bounce off /login only with a token actually in hand. Gating this on
+  // mayHaveSession instead would let a stale marker ping-pong /login →
+  // /dashboard → 401 → /login; the desktop router gates it the same way.
+  if (path === '/login' && Auth.token) { navTo('/dashboard'); return; }
+  if (path === '/login') { renderLogin(); return; }
 
   if (path === '/' || path === '/dashboard') { S.lastList='dashboard'; return viewDashboard(); }
   if (path === '/projects')                   { S.lastList='projects';  return viewProjects(); }

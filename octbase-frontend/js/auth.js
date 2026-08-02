@@ -91,7 +91,31 @@ const Auth = (() => {
       router.go('/login');
     },
 
+    // isAuthenticated reports whether a request can be signed RIGHT NOW — it is
+    // about the access token in hand, nothing else. Do not use it to decide
+    // whether someone is signed IN: a null token is also the normal state during
+    // boot, when the session may be perfectly valid.
     isAuthenticated() { return USE_STANDALONE_DEMO_AUTH || !!_accessToken; },
+
+    // mayHaveSession reports whether a session may still exist, counting the
+    // refresh-cookie presence marker as evidence. This is the question routing
+    // has to ask, and it is the same one http.js:requireSession already asks
+    // before failing a request locally. The two had drifted, and handleRoute's
+    // bare isAuthenticated() check sent a valid session to /login (OCT-321).
+    //
+    // The window is BOOT, precisely: router.js arms the `hashchange` listener at
+    // module load, while views-crud.js:init awaits Auth.refresh() before it
+    // navigates. A hashchange arriving in between — a click, or a test driving
+    // the app straight after load — reaches handleRoute with _accessToken still
+    // null and a live refresh cookie. (There is no mid-session window: refresh()
+    // assigns the token only on success and never clears it, and the one thing
+    // that does clear it, endSession, means the session really is over.)
+    //
+    // Deliberately optimistic: when the marker is set but the refresh then
+    // fails, the route's own request 401s, http.js recasts that as an expired
+    // session, and endSession routes to /login. Answering late and correctly
+    // beats answering early and wrongly.
+    mayHaveSession() { return this.isAuthenticated() || this.hasSessionHint(); },
   };
 })();
 

@@ -102,7 +102,12 @@ function stopSessionHeartbeat() {
 // token on a 401, so a rejection here means the session is genuinely stale
 // (server unreachable, or the refresh cookie expired).
 async function checkSession() {
-  if (!Auth.isAuthenticated()) { markSession(false); return; }
+  // mayHaveSession, not isAuthenticated: a heartbeat firing before boot's
+  // refresh has resolved would otherwise short-circuit on the null token and
+  // paint the indicator dead for a session that is fine. Probing is what this
+  // function is for — the comment above says the 401 retry is what tells stale
+  // from restorable, and the bare token test returned before it could (OCT-321).
+  if (!Auth.mayHaveSession()) { markSession(false); return; }
   try {
     await api.auth.me();
     markSession(true);
