@@ -4,7 +4,7 @@
   "type": "module",
   "dependencies": {
     "@octbase/shared": "*",
-    "qrcode-generator": "1.4.4"
+    "qrcode-generator": "2.0.4"
   },
   "scripts": {
     "build": "npm run build:site && npm run build:standalone",
