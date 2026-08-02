@@ -1420,6 +1420,16 @@ paths:
     post:
       tags: [Tasks]
       summary: Bulk action on multiple tasks
+      description: >-
+        Applies one action (set_status, set_priority, set_assignee, set_release,
+        archive, delete) to every selected task that belongs to the project.
+        Unknown and cross-project IDs are silently skipped; the response reports
+        how many tasks actually changed. set_status additionally skips DONE and
+        ARCHIVED tasks — finished work is immutable on this door exactly as on
+        the single-task status route (reopening is POST /tasks/{taskId}/reopen,
+        per task) — and archive skips already-ARCHIVED tasks. set_status to DONE
+        is refused entirely (422 TASK_HAS_BLOCKER) while any selected task has an
+        open BLOCKER descendant.
       operationId: bulkTasks
       requestBody:
         required: true
@@ -1433,7 +1443,14 @@ paths:
                 action: { type: string }
                 value: { type: string }
       responses:
-        '200': { description: Bulk result }
+        '200':
+          description: Bulk result — the number of tasks the action changed (skipped tasks are not counted).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated: { type: integer }
         '403': { $ref: '#/components/responses/Forbidden' }
         # VALIDATION_ERROR (empty taskIds) or BULK_TOO_MANY_TASKS (over maxItems).
         '422': { $ref: '#/components/responses/Unprocessable' }

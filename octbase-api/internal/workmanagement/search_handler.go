@@ -2,6 +2,7 @@ package workmanagement
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -179,7 +180,10 @@ func (h *Handler) writeBulkActivity(projectID string, taskIDs []string, actorID,
 	}
 }
 
-// BulkUpdateTasks applies one action to multiple tasks in a single transaction.
+// BulkUpdateTasks applies one action to multiple tasks. The column write itself
+// is one atomic statement (see bulkUpdate); the card realignment that follows a
+// status change is a per-task best-effort pass, not part of that statement — see
+// the set_status branch for how a realignment failure is reported.
 // realignBulkStatusPlacement brings the cards of a bulk status change back in
 // step with the status that was just written, using the same rules as the
 // single-task endpoint: a boarded card moves to its board's lane for the new
@@ -274,20 +278,32 @@ func (h *Handler) BulkUpdateTasks(w http.ResponseWriter, r *http.Request) {
 	)
 	switch req.Action {
 	case "set_status":
+		// DONE/ARCHIVED tasks in the selection are skipped by the repo (see
+		// BulkSetStatus): the bulk door honors the same immutability rule as the
+		// status route and MoveTask, and `updated` tells the client how many
+		// tasks actually changed.
 		ids, err = h.tasks.BulkSetStatus(projectID, req.TaskIDs, req.Value, now)
 		updated = len(ids)
-		// The bulk SET writes status and nothing else, so the cards it moved are
-		// left saying something different from their tasks: a boarded card sits
-		// in the lane for its OLD status, and an unboarded one stays in the
-		// backlog wearing an in-flight label. Realign them exactly as the
-		// single-task endpoint does (OCT-303).
 		if err == nil {
-			err = h.realignBulkStatusPlacement(projectID, ids, now)
+			// The bulk SET writes status and nothing else, so the cards it moved
+			// are left saying something different from their tasks: a boarded card
+			// sits in the lane for its OLD status, and an unboarded one stays in
+			// the backlog wearing an in-flight label. Realign them exactly as the
+			// single-task endpoint does (OCT-303). Best-effort by design: the
+			// statuses are already committed, so failing the request here would
+			// report an action as failed that has in fact fully happened. A card
+			// left in a stale lane is the recoverable pre-OCT-303 state and heals
+			// on the task's next status change or board move.
+			if raErr := h.realignBulkStatusPlacement(projectID, ids, now); raErr != nil {
+				slog.Warn("bulk set_status: board realignment incomplete", "projectId", projectID, "error", raErr)
+			}
+			// One entry per affected task, like a single status change, so bulk
+			// transitions stay replayable for the sprint burndown. No "from": the
+			// bulk update is a blind per-row SET and never read the old status.
+			// Only reached when the status write succeeded — activity must never
+			// record a change that was not committed.
+			h.writeBulkActivity(projectID, ids, actorID, "TASK_STATUS_CHANGED", map[string]any{"status": req.Value})
 		}
-		// One entry per affected task, like a single status change, so bulk
-		// transitions stay replayable for the sprint burndown. No "from": the
-		// bulk update is a blind per-row SET and never read the old status.
-		h.writeBulkActivity(projectID, ids, actorID, "TASK_STATUS_CHANGED", map[string]any{"status": req.Value})
 	case "set_priority":
 		ids, err = h.tasks.BulkSetPriority(projectID, req.TaskIDs, req.Value, now)
 		updated = len(ids)

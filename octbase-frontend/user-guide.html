@@ -507,6 +507,7 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
 <h2>Bulk actions</h2>
 <p>Select multiple tasks using the checkboxes on the board or task list, then use the bulk action bar that appears at the bottom to apply a change to all selected tasks at once.</p>
 <p>Available bulk operations: set <strong>status</strong>, <strong>priority</strong>, or <strong>assignee</strong>; <strong>move</strong> the selection onto a board column or back to the backlog; <strong>archive</strong>; and <strong>delete</strong> (delete is only offered if your role permits it). Both archive and delete ask for confirmation first. Setting a status in bulk places the selection the same way the task panel does — each task lands in the column carrying that status.</p>
+<p>Finished work is skipped: a <strong>DONE</strong> or <strong>ARCHIVED</strong> task in the selection keeps its status when you set a status in bulk, exactly as the task panel refuses to change it. Reopen a finished task individually (its <strong>Reopen</strong> button) if you really want it back in play. The other bulk operations — priority, assignee, archive — still apply to finished tasks, matching what the task panel allows on them.</p>
 <p>The <strong>Assign to</strong> list offers the same people the task panel does: the project's members plus your instance's global admins, marked <em>(admin)</em>.</p>
 <div class="tip">Shift-click a second checkbox to select a range of tasks in one action.</div>
 </section>
@@ -785,8 +786,7 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
   <li><code>POST /api/v1/webhooks/bitbucket</code></li>
   <li><code>POST /api/v1/webhooks/github</code></li>
 </ul>
-<p>Both use <strong>HMAC-SHA256</strong> signature validation. Enter the shared secret in your provider's webhook settings and set the matching environment variables on the server (<code>OCTBASE_WEBHOOK_SECRET_BITBUCKET</code> / <code>OCTBASE_WEBHOOK_SECRET_GITHUB</code>). Ask your administrator to configure these.</p>
-</section>
+<p>Both use <strong>HMAC-SHA256</strong> signature validation. Enter the shared secret in your provider's webhook settings and set the matching environment variables on the server (<code>OCTBASE_WEBHOOK_SECRET_BITBUCKET</code> / <code>OCTBASE_WEBHOOK_SECRET_GITHUB</code>). Ask your administrator to configure these.</p></section>
 
 <section id="import">
 <h2>Import &amp; export</h2>

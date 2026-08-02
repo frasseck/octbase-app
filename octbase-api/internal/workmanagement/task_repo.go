@@ -524,28 +524,45 @@ func parentsWithOutsideChildren(tx *sql.Tx, ids []string) (map[string]bool, erro
 // BulkSetStatus updates the status of all taskIDs that belong to projectID.
 // Returns the IDs of the rows actually updated, so callers can log a
 // replayable per-task status-change activity entry.
+//
+// DONE and ARCHIVED rows are skipped, not updated: a finished task is immutable
+// on every other status door (the status route refuses with TASK_IMMUTABLE,
+// MoveTask refuses the lane move), and reopening is a deliberate per-task
+// ceremony (POST /tasks/{id}/reopen), not something a bulk selection does as a
+// side effect. The skip extends the bulk contract's existing silent-skip
+// semantics (unknown and cross-project IDs) rather than failing the batch, so
+// a mixed selection still updates its open tasks.
 func (r *TaskRepo) BulkSetStatus(projectID string, taskIDs []string, status, now string) ([]string, error) {
-	return r.bulkUpdate(projectID, taskIDs, "status", status, now)
+	return r.bulkUpdate(projectID, taskIDs, "status", status, now, []string{StatusDone, StatusArchived})
 }
 
 // BulkSetPriority updates the priority of all taskIDs that belong to projectID.
+// No immutable-status skip: priority stays editable on finished tasks, exactly
+// like the single-task priority endpoint.
 func (r *TaskRepo) BulkSetPriority(projectID string, taskIDs []string, priority, now string) ([]string, error) {
-	return r.bulkUpdate(projectID, taskIDs, "priority", priority, now)
+	return r.bulkUpdate(projectID, taskIDs, "priority", priority, now, nil)
 }
 
 // BulkSetAssignee updates the assignee of all taskIDs that belong to projectID.
+// No immutable-status skip: assignee stays editable on finished tasks.
 func (r *TaskRepo) BulkSetAssignee(projectID string, taskIDs []string, assigneeID, now string) ([]string, error) {
-	return r.bulkUpdate(projectID, taskIDs, "assignee_id", assigneeID, now)
+	return r.bulkUpdate(projectID, taskIDs, "assignee_id", assigneeID, now, nil)
 }
 
 // BulkSetRelease updates the release of all taskIDs that belong to projectID.
+// No immutable-status skip: release placement stays editable on finished tasks
+// (re-attributing a DONE task to a release is how history gets corrected).
 func (r *TaskRepo) BulkSetRelease(projectID string, taskIDs []string, releaseID, now string) ([]string, error) {
-	return r.bulkUpdate(projectID, taskIDs, "release_id", releaseID, now)
+	return r.bulkUpdate(projectID, taskIDs, "release_id", releaseID, now, nil)
 }
 
 // BulkArchive sets status = ARCHIVED for all taskIDs that belong to projectID.
+// Already-ARCHIVED rows are skipped so re-archiving neither bumps updated_at
+// nor logs a second TASK_ARCHIVED activity entry; DONE rows are deliberately
+// archivable — DONE → ARCHIVED is the same transition the auto-archive sweep
+// performs.
 func (r *TaskRepo) BulkArchive(projectID string, taskIDs []string, now string) ([]string, error) {
-	return r.bulkUpdate(projectID, taskIDs, "status", StatusArchived, now)
+	return r.bulkUpdate(projectID, taskIDs, "status", StatusArchived, now, []string{StatusArchived})
 }
 
 // ArchiveStaleDone flips every DONE task in projectID whose done_at is older
@@ -587,7 +604,8 @@ var allowedBulkColumns = map[string]bool{
 }
 
 // bulkUpdate applies a single column = value update to every task of the project
-// in one statement, silently skipping tasks not found in the project. Only
+// in one statement, silently skipping tasks not found in the project and tasks
+// whose current status is in skipStatuses (nil means no status is skipped). Only
 // columns in allowedBulkColumns are accepted; others return an error to prevent
 // injection from future callers. Returns the IDs of the rows actually updated.
 //
@@ -595,7 +613,7 @@ var allowedBulkColumns = map[string]bool{
 // 500-task bulk action is a single query, and the update really is atomic — the
 // per-task loop this replaced could fail halfway and leave part of the selection
 // changed.
-func (r *TaskRepo) bulkUpdate(projectID string, taskIDs []string, col, value, now string) ([]string, error) {
+func (r *TaskRepo) bulkUpdate(projectID string, taskIDs []string, col, value, now string, skipStatuses []string) ([]string, error) {
 	if !allowedBulkColumns[col] {
 		return nil, fmt.Errorf("bulkUpdate: column %q is not allowed", col)
 	}
@@ -608,10 +626,16 @@ func (r *TaskRepo) bulkUpdate(projectID string, taskIDs []string, col, value, no
 	if col == "status" {
 		doneAtClause = `, done_at=CASE WHEN $1='DONE' THEN COALESCE(done_at,$2) ELSE NULL END`
 	}
+	skipClause := ""
+	args := []any{value, now, taskIDs, projectID}
+	if len(skipStatuses) > 0 {
+		skipClause = ` AND NOT (status = ANY($5))`
+		args = append(args, skipStatuses)
+	}
 	rows, err := r.db.Query( // #nosec G202 -- col comes from a fixed switch in the caller, never from input; values are parameterized
 		`UPDATE tasks SET `+col+`=$1, updated_at=$2`+doneAtClause+ // #nosec G202 -- col is a fixed switch value in the caller
-			` WHERE id = ANY($3) AND project_id=$4 RETURNING id`,
-		value, now, taskIDs, projectID,
+			` WHERE id = ANY($3) AND project_id=$4`+skipClause+` RETURNING id`,
+		args...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bulk update tasks: %w", err)
