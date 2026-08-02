@@ -64,9 +64,16 @@
     # The locales are in this bucket on purpose: they are unhashed and they
     # change with a release, so an hour is the bound on how long a user reads
     # yesterday's wording.
+    # `not path /m/*`: this matcher runs before handle_path strips the prefix,
+    # so the mobile SPA's hashed bundles arrive as /m/assets/index-<hash>.js,
+    # clear `not path /assets/*`, and got an hour from the front door over the
+    # year the mobile container had already granted. Everything under /m/ is
+    # answered by the mobile Caddyfile's own copy of these rules. Kept in step
+    # with caddy/Caddyfile, where the longer rationale lives.
     @unhashed {
         path *.js *.css *.woff2 *.woff *.ttf *.otf *.png *.jpg *.jpeg *.gif *.webp *.avif *.svg *.ico *.json
         not path /assets/*
+        not path /m/*
     }
     header @unhashed Cache-Control "public, max-age=3600"
     @html path / *.html

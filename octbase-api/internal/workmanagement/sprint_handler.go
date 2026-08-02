@@ -228,7 +228,7 @@ func (h *Handler) StartSprint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := shared.GetUserID(r)
-	_ = h.writeActivity(s.ProjectID, "", actorID, "SPRINT_STARTED", map[string]any{"name": s.Name})
+	_ = h.writeSprintActivity(s.ProjectID, s.ID, actorID, "SPRINT_STARTED", map[string]any{"name": s.Name})
 	shared.WriteJSON(w, http.StatusOK, s)
 }
 
@@ -270,7 +270,7 @@ func (h *Handler) CompleteSprint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actorID := shared.GetUserID(r)
-	_ = h.writeActivity(s.ProjectID, "", actorID, "SPRINT_COMPLETED", map[string]any{"name": s.Name})
+	_ = h.writeSprintActivity(s.ProjectID, s.ID, actorID, "SPRINT_COMPLETED", map[string]any{"name": s.Name})
 	// Tearing the sprint board down detaches its cards, and a detached task is
 	// reset to PLANNED (OCT-304) — so the unfinished work carried out of the
 	// sprint returns to the backlog as work not started. One replayable entry

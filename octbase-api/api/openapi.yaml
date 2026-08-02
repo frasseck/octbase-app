@@ -443,6 +443,40 @@ components:
         updatedAt: { type: string, format: date-time }
         version: { type: integer }
 
+    ActivityEntry:
+      description: >-
+        One entry in a project's append-only activity log. `type` plus `params`
+        is the message: the frontend renders `notifications.activity.<type>`
+        with `params` interpolated, so the entry stays localizable and no
+        English text is stored.
+
+        At most one of `taskId`, `releaseId` and `sprintId` is set — the thing
+        the entry describes. Deleting that thing does NOT delete the entry: the
+        log is history and outlives its subject. Instead the reference is
+        nulled and `targetDeleted` is set, which the UI renders as a muted,
+        unlinked row rather than a link that opens nothing. A null reference
+        with `targetDeleted` false is an entry that never had one (a
+        project-level event such as PAGE_PUBLISHED). Deleting the whole project
+        is the one case that removes entries, because no feed is left to read
+        them in.
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        taskId: { type: string, format: uuid, nullable: true }
+        releaseId: { type: string, format: uuid, nullable: true }
+        sprintId: { type: string, format: uuid, nullable: true }
+        targetDeleted:
+          type: boolean
+          description: The task, release or sprint this entry described has been deleted.
+        actorUserId: { type: string, format: uuid }
+        type: { type: string, example: TASK_STATUS_CHANGED }
+        params:
+          type: object
+          additionalProperties: true
+          description: Values interpolated into the localized message.
+        createdAt: { type: string, format: date-time }
+
     TaskUpdate:
       description: >-
         Fields PATCH /tasks/{taskId} actually applies. Any other key — most
@@ -1275,9 +1309,13 @@ paths:
       tags: [Projects]
       summary: Project activity feed
       operationId: getProjectActivity
+      # Newest first, 50 per page by default (activity.PageSize) rather than the
+      # 20 a task list serves — an activity row is one line.
       parameters: [ { $ref: '#/components/parameters/page' }, { $ref: '#/components/parameters/size' } ]
       responses:
-        '200': { description: Activity entries }
+        '200':
+          description: Activity entries, newest first
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ActivityEntry' } } } }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ───────────────────── Memberships ─────────────────────
@@ -1556,7 +1594,16 @@ paths:
       responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
   /api/v1/tasks/{taskId}/activity:
     parameters: [ { $ref: '#/components/parameters/taskId' } ]
-    get: { tags: [Tasks], summary: Task activity feed, operationId: getTaskActivity, responses: { '200': { description: Activity entries }, '404': { $ref: '#/components/responses/NotFound' } } }
+    get:
+      tags: [Tasks]
+      summary: Task activity feed
+      operationId: getTaskActivity
+      parameters: [ { $ref: '#/components/parameters/page' }, { $ref: '#/components/parameters/size' } ]
+      responses:
+        '200':
+          description: Activity entries, newest first
+          content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ActivityEntry' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /api/v1/tasks/{taskId}/comments:
     parameters: [ { $ref: '#/components/parameters/taskId' } ]

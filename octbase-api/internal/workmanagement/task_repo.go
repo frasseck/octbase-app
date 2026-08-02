@@ -382,14 +382,21 @@ func (r *TaskRepo) ListAll(projectID string) ([]Task, error) {
 	return ts, rows.Err()
 }
 
-// cascadeDeleteChildStmts lists, in order, the batched DELETE statements that
-// remove a task's child rows (branch references, page references, relations,
-// attachments, links, comments) before the task row itself is removed. Each
-// statement targets any of a slice of task IDs via = ANY($1), so it runs once
-// per table regardless of how many tasks are being deleted. Delete (a
-// 1-element slice) and BulkDelete (an N-element slice) both go through
+// cascadeDeleteChildStmts lists, in order, the batched statements that detach a
+// task's child rows (branch references, page references, relations,
+// attachments, links, comments, activity) before the task row itself is
+// removed. Each statement targets any of a slice of task IDs via = ANY($1), so
+// it runs once per table regardless of how many tasks are being deleted. Delete
+// (a 1-element slice) and BulkDelete (an N-element slice) both go through
 // cascadeDeleteTaskChildren, so a future child table only needs to be added
 // here once.
+//
+// Activity is the one that is unlinked rather than deleted: the log is the
+// project's history and survives the task it describes, so the entry keeps its
+// message and loses its reference. target_deleted is what tells the reader (and
+// the UI, which greys the row and drops the link) that the row is not merely
+// project-level. Missing this statement is not silent — activity_entries.task_id
+// carries an FK, so the task delete that follows would fail.
 var cascadeDeleteChildStmts = []string{
 	`DELETE FROM branch_references WHERE task_id = ANY($1)`,
 	`DELETE FROM page_task_references WHERE task_id = ANY($1)`,
@@ -397,9 +404,10 @@ var cascadeDeleteChildStmts = []string{
 	`DELETE FROM task_attachments WHERE task_id = ANY($1)`,
 	`DELETE FROM task_links WHERE task_id = ANY($1)`,
 	`DELETE FROM task_comments WHERE task_id = ANY($1)`,
+	`UPDATE activity_entries SET task_id=NULL, target_deleted=TRUE WHERE task_id = ANY($1)`,
 }
 
-// cascadeDeleteTaskChildren removes every child-table row referencing any of
+// cascadeDeleteTaskChildren detaches every child-table row referencing any of
 // taskIDs, batched as one statement per table. It does not delete the task
 // rows themselves; callers do that afterward, inside the same transaction.
 func cascadeDeleteTaskChildren(tx *sql.Tx, taskIDs []string) error {
