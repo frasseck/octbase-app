@@ -84,6 +84,17 @@ const S = {
   // focus). Populated by renderBoard (views-board.js); views-content.js reads
   // it for board-rank math.
   boardTasks: [],
+  // The Activity view's loaded window. The feed is paged (50 per page) and
+  // newest-first, so "load more" appends the next older page here and repaints
+  // the list in place rather than refetching what is already on screen.
+  // activityDone is set once a short page arrives, which is how the button
+  // knows there is nothing left without an X-Total-Count.
+  /** @type {import('../types/api').ActivityEntry[]} */
+  activityEntries: [],
+  activityPage: 0,
+  activityDone: false,
+  /** @type {Map<string, {seq: string, title: string}>} */
+  activityTaskMeta: new Map(),
   // contentGen is bumped on every renderContent() call. View renderers that
   // await a fetch before writing into #content capture it on entry and check
   // it again before their final DOM write, so a slow response from a

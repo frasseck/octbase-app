@@ -117,15 +117,29 @@ func GetUserID(r *http.Request) string {
 	return v
 }
 
+// DefaultPageSize is the page size a list endpoint serves when the caller asks
+// for none. MaxPageSize is the ceiling a caller may raise it to.
+const (
+	DefaultPageSize = 20
+	MaxPageSize     = 200
+)
+
 // ParsePagination parses page and size query params with sane defaults.
 func ParsePagination(r *http.Request) PaginationParams {
+	return ParsePaginationSize(r, DefaultPageSize)
+}
+
+// ParsePaginationSize is ParsePagination with a caller-chosen default size, for
+// endpoints whose rows are cheaper or shorter-lived than a task's. An explicit
+// ?size= still wins, and the 200 ceiling still applies.
+func ParsePaginationSize(r *http.Request, defaultSize int) PaginationParams {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	size, _ := strconv.Atoi(r.URL.Query().Get("size"))
 	if size <= 0 {
-		size = 20
+		size = defaultSize
 	}
-	if size > 200 {
-		size = 200
+	if size > MaxPageSize {
+		size = MaxPageSize
 	}
 	if page < 0 {
 		page = 0

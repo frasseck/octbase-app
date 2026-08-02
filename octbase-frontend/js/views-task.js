@@ -124,6 +124,9 @@ async function renderTaskPanel(taskId) {
     // …) re-renders from memory instead of refetching all seven endpoints.
     S.taskPanelData = {
       taskId, task, comments, activity, branches, links, relations, attachments,
+      // A full first page means there may be older entries; loadMoreTaskActivity
+      // appends them here so tab switches keep what was loaded.
+      activityDone: activity.length < TASK_ACTIVITY_PAGE_SIZE,
       projectTasks: (projectTasks || []).filter(tk => tk.status !== 'ARCHIVED'),
       branchSuggestion: suggestBranchName(task), relationsResolved: false,
     };
@@ -318,7 +321,7 @@ async function renderActiveTab(carriedAtts) {
     S.taskPanelTab === 'links'       ? renderTaskLinks(d.task, d.links) :
     S.taskPanelTab === 'relations'   ? renderTaskRelations(d.task, d.relations) :
     S.taskPanelTab === 'branches'    ? renderTaskBranches(d.task, d.branches, d.branchSuggestion) :
-    renderTaskActivity(d.activity);
+    renderTaskActivity(d.activity, d.activityDone);
   // Comments (rich text), attachments (thumbnails), etc. may contain auth-gated
   // images; swap their sources for authenticated object URLs.
   hydrateAuthImages(host);
@@ -1228,15 +1231,41 @@ function renderTaskBranches(task, branches, suggestion) {
     </div>`;
 }
 
-function renderTaskActivity(entries) {
+// The task panel's Activity tab. Newest first — the feed is paged (50 per page,
+// see activity.PageSize), so appending older pages below is only coherent in
+// that order; the unpaged version reversed its one page instead.
+//
+// A task's own activity never carries targetDeleted: an entry only gets it when
+// the thing it described was deleted, and a deleted task has no panel to open.
+function renderTaskActivity(entries, done) {
   if (!entries.length) return `<div class="empty"><div class="empty-title">${t('activity.empty')}</div></div>`;
   return `<div class="activity-list">
-    ${entries.slice().reverse().map(e=>`
+    ${entries.map(e=>`
       <div class="activity-item">
         <div class="activity-msg">${esc(activityMessage(e))}</div>
         <div class="activity-time">${fmtDateTime(e.createdAt)}</div>
       </div>`).join('')}
+    ${done ? '' : `<button class="btn btn-secondary btn-sm" data-act="loadMoreTaskActivity">${t('activity.loadMore')}</button>`}
   </div>`;
+}
+
+// Mirrors activity.PageSize on the server; used only to tell a full page (there
+// may be more) from a short one (there is not) without an X-Total-Count.
+const TASK_ACTIVITY_PAGE_SIZE = 50;
+
+// loadMoreTaskActivity appends the next older page into the cached panel payload
+// and repaints the tab. Writing to S.taskPanelData is what makes the growth
+// survive a switch to another tab and back, which renders from that cache.
+async function loadMoreTaskActivity() {
+  const d = S.taskPanelData;
+  if (!d || d.activityDone) return;
+  const page = Math.floor(d.activity.length / TASK_ACTIVITY_PAGE_SIZE);
+  try {
+    const more = await api.tasks.activity(d.taskId, { page });
+    d.activity = d.activity.concat(more);
+    d.activityDone = more.length < TASK_ACTIVITY_PAGE_SIZE;
+  } catch (e) { toast(apiErrorMessage(e),'error'); return; }
+  paintTaskPanel();
 }
 
 // TASK_ASSIGNED carries raw user ids (assigneeId and/or reviewerId, either of
@@ -2172,7 +2201,7 @@ async function createPullRequest(taskId, branchId) {
 
 // ── Delegation registration: this file's handlers ───────────────────────────
 // (see js/README.md "Delegation registration".)
-registerActions([closeTaskPanel, focusPanelTitle], _A0);
+registerActions([closeTaskPanel, focusPanelTitle, loadMoreTaskActivity], _A0);
 registerActions([
   addLink, addRelation, archiveTask, createBranch, openTaskPanel, reopenTask,
   saveTaskDescription, switchPanelTab, openTaskPreview, openLightbox, cancelReply,
