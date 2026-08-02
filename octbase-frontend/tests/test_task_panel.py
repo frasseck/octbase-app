@@ -725,7 +725,7 @@ class TestLinksTab:
 
         # Delete it. The row is only removed once the DELETE has gone out, so wait
         # for the app to go quiet rather than polling for the absence.
-        task_panel.locator("#panel-tab-content .link-row").last.locator(".btn-icon").click()
+        task_panel.locator("#panel-tab-content .link-row").last.locator(".icon-btn").click()
         settle(task_panel)
         final = api.get(f"/api/tasks/{DEMO_TASK_ID}/links")
         assert not any(l["id"] == new_link["id"] for l in final)

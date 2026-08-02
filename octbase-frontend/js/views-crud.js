@@ -615,7 +615,7 @@ function taskSettingsPrioHtml() {
     ${S.priorities.map(cp => `
       <div class="ts-prio-row">
         <span class="badge prio-badge prio-custom">${esc(cp.name)}</span>
-        <button type="button" class="btn-icon" data-act="taskSettingsDeletePriority" data-a0="${esc(cp.id)}"
+        <button type="button" class="icon-btn" data-act="taskSettingsDeletePriority" data-a0="${esc(cp.id)}"
           aria-label="${t('form.delete')} ${esc(cp.name)}" title="${t('form.delete')}">${icon('delete',{size:'sm'})}</button>
       </div>`).join('')}
     <div class="ts-prio-add">

@@ -322,7 +322,7 @@ function renderMfaSection() {
           <div class="form-label">${t('settings.mfa.manualEntry')}</div>
           <div class="mfa-secret-row">
             <code class="mfa-secret" id="mfa-secret-value">${esc(_mfaEnrollment.secret)}</code>
-            <button type="button" class="btn-icon btn-icon-sm" data-act="copyMfaSecret" title="${t('form.copy')}" aria-label="${t('form.copy')}">${icon('copy')}</button>
+            <button type="button" class="icon-btn icon-btn-sm" data-act="copyMfaSecret" title="${t('form.copy')}" aria-label="${t('form.copy')}">${icon('copy')}</button>
           </div>
           <p class="settings-desc">${t('settings.mfa.manualEntryHelp')}</p>
         </div>

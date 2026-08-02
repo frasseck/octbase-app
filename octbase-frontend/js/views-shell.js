@@ -196,24 +196,24 @@ function renderTopbar() {
   const liveDot = `<span id="live-indicator" class="live-indicator" title="${t('app.connecting')}" role="status" aria-label="${t('app.connecting')}"><span class="live-dot"></span></span>`;
   const bellIcon = icon('bell');
   const notifBtn = `
-    <button class="btn-icon notif-btn" data-act="toggleNotifPanel" title="${t('notifications.title')}">
+    <button class="icon-btn notif-btn" data-act="toggleNotifPanel" title="${t('notifications.title')}">
       ${bellIcon}<span id="notif-badge" class="notif-badge hidden"></span>
     </button>`;
 
   const themeBtn = `
-    <button class="btn-icon" data-act="cycleTheme" title="${esc(themeToggleLabel())}" aria-label="${esc(themeToggleLabel())}">
+    <button class="icon-btn" data-act="cycleTheme" title="${esc(themeToggleLabel())}" aria-label="${esc(themeToggleLabel())}">
       ${icon('theme')}
     </button>`;
 
   // Personal settings entry: a user icon in the topbar's right corner (the
   // gear stays reserved for per-project settings, see projectActions below).
   const userBtn = `
-    <button class="btn-icon" data-act="nav" data-a0="/settings" title="${t('nav.settings')}" aria-label="${t('nav.settings')}">
+    <button class="icon-btn" data-act="nav" data-a0="/settings" title="${t('nav.settings')}" aria-label="${t('nav.settings')}">
       ${icon('user')}
     </button>`;
 
   const logoutBtn = `
-    <button class="btn-icon" data-act="logout" title="${t('auth.signOut')}" aria-label="${t('auth.signOut')}">
+    <button class="icon-btn" data-act="logout" title="${t('auth.signOut')}" aria-label="${t('auth.signOut')}">
       ${icon('logout')}
     </button>`;
 
@@ -257,7 +257,7 @@ function renderTopbar() {
   // lists the places work is *done*, this is a view onto the project as a
   // whole, like the settings menu it sits next to.
   const statsBtn = `
-    <button class="btn-icon${S.view === 'statistics' ? ' active' : ''}" data-act="setView" data-a0="statistics" title="${t('nav.statistics')}" aria-label="${t('nav.statistics')}"${S.view === 'statistics' ? ' aria-current="page"' : ''}>
+    <button class="icon-btn${S.view === 'statistics' ? ' active' : ''}" data-act="setView" data-a0="statistics" title="${t('nav.statistics')}" aria-label="${t('nav.statistics')}"${S.view === 'statistics' ? ' aria-current="page"' : ''}>
       ${icon('stats')}
     </button>`;
 
@@ -270,7 +270,7 @@ function renderTopbar() {
   const projectActions = `
     ${statsBtn}
     <span class="project-settings-wrap" id="project-settings-wrap">
-      <button class="btn-icon" id="project-settings-btn" data-act="toggleProjectMenu" title="${t('nav.projectSettings')}" aria-label="${t('nav.projectSettings')}" aria-haspopup="true" aria-expanded="false">
+      <button class="icon-btn" id="project-settings-btn" data-act="toggleProjectMenu" title="${t('nav.projectSettings')}" aria-label="${t('nav.projectSettings')}" aria-haspopup="true" aria-expanded="false">
         ${icon('settings',{size:'md'})}
       </button>
       <div class="project-menu" id="project-menu" role="menu">

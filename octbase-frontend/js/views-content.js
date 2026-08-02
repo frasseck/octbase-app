@@ -355,7 +355,7 @@ async function renderRepos() {
               <div class="repo-actions">
                 ${r.oauthAvailable ? `<button class="btn btn-secondary btn-sm" data-act="connectRepoOAuth" data-a0="${esc(r.id)}">${t('repo.connectOAuth')}</button>` : ''}
                 ${r.authKind === 'OAUTH' ? `<button class="btn-text" data-act="refreshRepoToken" data-a0="${esc(r.id)}">${t('repo.refreshToken')}</button>` : ''}
-                <button class="btn-icon" title="${t('form.delete')}" data-act="deleteRepo" data-a0="${esc(r.id)}" data-a1="${esc((r.displayName))}">${icon('delete')}</button>
+                <button class="icon-btn" title="${t('form.delete')}" data-act="deleteRepo" data-a0="${esc(r.id)}" data-a1="${esc((r.displayName))}">${icon('delete')}</button>
               </div>
             </div>`).join('')}
       </div>

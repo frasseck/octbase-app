@@ -167,7 +167,7 @@ async function paintTaskPanel() {
             aria-label="${t('form.title')}"
             data-change="savePanelTitle" data-a0="${esc(task.id)}"
             data-keydown="panelTitleKeydown">
-          <button class="btn-icon panel-title-edit" data-act="focusPanelTitle"
+          <button class="icon-btn panel-title-edit" data-act="focusPanelTitle"
             aria-label="${t('task.editTitle')}" title="${t('task.editTitle')}">${icon('edit',{size:'sm'})}</button>
         </div>
         <div class="panel-title-meta">
@@ -177,7 +177,7 @@ async function paintTaskPanel() {
         </div>
       </div>
       <div class="panel-header-actions">
-        <button class="btn-icon panel-close" data-act="closeTaskPanel" aria-label="${t('task.closeTaskPanel')}" title="${t('task.close')}">${icon('close')}</button>
+        <button class="icon-btn panel-close" data-act="closeTaskPanel" aria-label="${t('task.closeTaskPanel')}" title="${t('task.close')}">${icon('close')}</button>
       </div>
     </div>
     <div class="panel-tabs">
@@ -763,7 +763,7 @@ function renderTaskLinks(task, links) {
       ${links.length ? links.map(l=>`
         <div class="link-row">
           <a class="link-url" href="${rtSafeHref(l.url) ? esc(l.url) : '#'}" target="_blank" rel="noopener">${esc(l.title || l.url)}</a>
-          <button class="btn-icon" data-act="deleteLink" data-a0="${esc(task.id)}" data-a1="${esc(l.id)}" aria-label="${t('task.deleteLink')}" title="${t('task.deleteLink')}">${icon('delete')}</button>
+          <button class="icon-btn" data-act="deleteLink" data-a0="${esc(task.id)}" data-a1="${esc(l.id)}" aria-label="${t('task.deleteLink')}" title="${t('task.deleteLink')}">${icon('delete')}</button>
         </div>`).join('') : `<div class="empty"><div class="empty-title">${t('task.noLinks')}</div></div>`}
       <div class="link-form">
         <input class="form-input" id="link-title" placeholder="${t('task.linkTitlePlaceholder')}" aria-label="${t('task.linkTitlePlaceholder')}"
@@ -817,7 +817,7 @@ function renderTaskRelations(task, relations) {
         <div class="relation-row">
           <span class="relation-type">${esc(relationTypeLabel(task, r))}</span>
           <button type="button" class="link-url relation-target" data-act="openTaskPanel" data-a0="${esc(otherId)}">${esc(otherTitle)}</button>
-          <button class="btn-icon" data-act="deleteRelation" data-a0="${esc(task.id)}" data-a1="${esc(r.id)}" aria-label="${t('task.deleteRelation')}" title="${t('task.deleteRelation')}">${icon('delete')}</button>
+          <button class="icon-btn" data-act="deleteRelation" data-a0="${esc(task.id)}" data-a1="${esc(r.id)}" aria-label="${t('task.deleteRelation')}" title="${t('task.deleteRelation')}">${icon('delete')}</button>
         </div>`;
       }).join('') : `<div class="empty"><div class="empty-title">${t('task.noRelations')}</div></div>`}
       <div class="link-form relation-form">
@@ -997,7 +997,7 @@ function attachmentRowHtml(task, a) {
       ${thumb}
       ${link}
       ${meta}
-      <button class="btn-icon" data-act="deleteAttachment" data-a0="${esc(task.id)}" data-a1="${esc(a.id)}" aria-label="${t('task.deleteAttachment')}" title="${t('task.deleteAttachment')}">${icon('delete')}</button>
+      <button class="icon-btn" data-act="deleteAttachment" data-a0="${esc(task.id)}" data-a1="${esc(a.id)}" aria-label="${t('task.deleteAttachment')}" title="${t('task.deleteAttachment')}">${icon('delete')}</button>
     </div>`;
 }
 
@@ -1210,7 +1210,7 @@ function renderTaskBranches(task, branches, suggestion) {
           ${b.prStatus ? prBadge(b.prStatus) : ''}
           ${b.prUrl ? `<a href="${esc(b.prUrl)}" target="_blank" rel="noopener" class="btn-text">${t('task.prNumber',{number:b.prNumber})}</a>`
                     : `<button class="btn-text" data-act="createPullRequest" data-a0="${esc(task.id)}" data-a1="${esc(b.id)}">${t('task.openPr')}</button>`}
-          <button class="btn-icon" data-act="deleteBranch" data-a0="${esc(task.id)}" data-a1="${esc(b.id)}" aria-label="${t('task.deleteBranch')}" title="${t('task.deleteBranch')}">${icon('delete')}</button>
+          <button class="icon-btn" data-act="deleteBranch" data-a0="${esc(task.id)}" data-a1="${esc(b.id)}" aria-label="${t('task.deleteBranch')}" title="${t('task.deleteBranch')}">${icon('delete')}</button>
         </div>`).join('')}
       ${S.repos.length ? `
       <div class="branch-form">
@@ -1883,7 +1883,7 @@ async function openTaskPreview(taskId) {
     <div class="preview-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title" tabindex="-1">
       <div class="preview-header">
         <h2 id="preview-title" class="preview-title">${esc(taskLabel(task) || task.title)}</h2>
-        <button class="btn-icon" data-act="closeTaskPreview" aria-label="${t('task.close')}" title="${t('task.close')}">${icon('close')}</button>
+        <button class="icon-btn" data-act="closeTaskPreview" aria-label="${t('task.close')}" title="${t('task.close')}">${icon('close')}</button>
       </div>
       <div class="preview-body">
         <div class="preview-description rt-render">${renderDescriptionHTML(task.description) || `<p class="text-muted">${t('task.noDescription')}</p>`}</div>
@@ -1944,10 +1944,10 @@ function renderLightbox() {
   const multi = _lightboxImages.length > 1;
   lb.innerHTML = `
     <div class="lightbox-inner" role="dialog" aria-modal="true" aria-label="${esc(img.alt || t('task.imagesTab'))}">
-      <button class="lightbox-close btn-icon" data-act="closeLightbox" aria-label="${t('task.close')}" title="${t('task.close')}">${icon('close')}</button>
-      ${multi ? `<button class="lightbox-nav lightbox-prev btn-icon" data-act="lightboxPrev" aria-label="${t('editor.prevImage')}" title="${t('editor.prevImage')}">${icon('chevron-left',{size:'md'})}</button>` : ''}
+      <button class="lightbox-close icon-btn" data-act="closeLightbox" aria-label="${t('task.close')}" title="${t('task.close')}">${icon('close')}</button>
+      ${multi ? `<button class="lightbox-nav lightbox-prev icon-btn" data-act="lightboxPrev" aria-label="${t('editor.prevImage')}" title="${t('editor.prevImage')}">${icon('chevron-left',{size:'md'})}</button>` : ''}
       <img class="lightbox-img" data-att-src="${esc(img.path)}" alt="${esc(img.alt)}">
-      ${multi ? `<button class="lightbox-nav lightbox-next btn-icon" data-act="lightboxNext" aria-label="${t('editor.nextImage')}" title="${t('editor.nextImage')}">${icon('chevron-right',{size:'md'})}</button>` : ''}
+      ${multi ? `<button class="lightbox-nav lightbox-next icon-btn" data-act="lightboxNext" aria-label="${t('editor.nextImage')}" title="${t('editor.nextImage')}">${icon('chevron-right',{size:'md'})}</button>` : ''}
     </div>`;
   hydrateAuthImages(lb);
 }

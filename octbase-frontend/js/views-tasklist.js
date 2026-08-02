@@ -307,7 +307,7 @@ function sortTaskView(col) {
 // data-act, so the delegation resolves it (not the row's openTaskListRow).
 function taskRowActions(task) {
   return `<span class="backlog-cell row-actions">` +
-    `<button type="button" class="btn-icon row-delete" data-act="deleteTask"` +
+    `<button type="button" class="icon-btn row-delete" data-act="deleteTask"` +
     ` data-a0="${esc(task.id)}" data-a1="${esc(task.title)}"` +
     ` aria-label="${t('task.deleteTaskTitled', { title: esc(task.title) })}"` +
     ` title="${t('form.delete')}">${icon('delete')}</button></span>`;

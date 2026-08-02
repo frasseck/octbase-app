@@ -14,7 +14,7 @@
   --md-primary:#006C4F; --md-on-primary:#FFFFFF; --md-primary-container:#B0EDD0; --md-on-primary-container:#002115;
   --md-secondary:#4A6455; --md-secondary-container:#CCE8D6; --md-on-secondary-container:#072015;
   --md-tertiary:#5E6440; --md-tertiary-container:#E3E9BE; --md-on-tertiary-container:#1B1E00;
-  --md-error:#BA1A1A; --md-error-container:#FFDAD6; --md-on-error-container:#410002;
+  --md-error:#BA1A1A; --md-on-error:#FFFFFF; --md-error-container:#FFDAD6; --md-on-error-container:#410002;
   --color-purple-container:#EDE7FF; --color-on-purple-container:#4527A0;
   --md-background:#F6FAF6; --md-on-surface:#191D19; --md-surface-variant:#D6E4D9; --md-on-surface-variant:#3E4940;
   --md-surface-cl:#FFFFFF; --md-surface-c-low:#F0F5F0; --md-surface-c:#EAF0EA; --md-surface-c-high:#E4EBE4; --md-surface-c-highest:#DFE5DF;
@@ -270,7 +270,7 @@ table.bp td:first-child{font-family:ui-monospace,monospace;color:var(--md-primar
 <!-- ╔══ COVER ══╗ -->
 <div class="cover">
   <div class="mark"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><use href="#i-board"/></svg></div>
-  <div class="overline">Design System · v1.7</div>
+  <div class="overline">Design System · v1.8</div>
   <h1>Octbase<br>UI Style Guide</h1>
   <div class="sub">A consistent, modern Material Design 3 language for the Octbase project-management application — shared tokens, a unified icon system, components, and the rules for both surfaces: the full desktop app and the phone companion.</div>
   <div class="meta">
@@ -607,16 +607,16 @@ table.bp td:first-child{font-family:ui-monospace,monospace;color:var(--md-primar
   something focusable and a screen-reader user needs it to say what is held back. So
   the sentinel <em>is</em> the button, and scrolling to it simply activates it.</p>
   <div class="demo" style="flex-direction:column;align-items:stretch;gap:12px;max-width:20rem">
-    <button type="button" style="display:block;width:100%;padding:8px 12px;border:1px dashed var(--md-outline);border-radius:var(--md-sm);background:transparent;color:var(--md-on-surface-variant);cursor:pointer;font-size:.8125rem;text-align:center">Load 51 more cards</button>
+    <button type="button" style="display:block;width:100%;padding:var(--space-2) var(--space-3);border:1px dashed var(--md-outline);border-radius:var(--md-sm);background:transparent;color:var(--md-on-surface-variant);cursor:pointer;font-size:.8125rem;text-align:center">Load 51 more cards</button>
   </div>
-  <table>
+  <table class="bp">
     <tr><th>Rule</th><th>Applies</th></tr>
     <tr><td>Dashed <code>1&nbsp;px --md-outline</code>, centred, full lane width</td><td>Reads as a boundary in the list rather than as another item in it — it is not a card and must not look like one.</td></tr>
     <tr><td>Names the remainder</td><td>&ldquo;Load 51 more cards&rdquo;, never a bare &ldquo;Show more&rdquo;: the number is the reader's only evidence that the count and the render disagree on purpose.</td></tr>
     <tr><td>Disappears when exhausted</td><td>Its absence is the signal that the list is whole. It is never shown disabled.</td></tr>
     <tr><td>Never hides a just-placed item</td><td>Something the reader created or dragged in is drawn wherever it lands, cap or no cap — otherwise the action appears to have done nothing.</td></tr>
   </table>
-  <div class="dos">
+  <div class="do-dont">
     <div class="do"><b>Do</b>Keep the container's count honest · say how many remain · let scrolling activate the same control a click would</div>
     <div class="dont"><b>Don't</b>Page the count along with the render · use an invisible scroll sentinel with no focusable equivalent · cap a list so hard that a new item lands out of sight</div>
   </div>
@@ -635,7 +635,7 @@ table.bp td:first-child{font-family:ui-monospace,monospace;color:var(--md-primar
       <button class="btn btn-primary" style="padding:4px 12px;font-size:.8125rem">Reload</button>
     </div>
   </div>
-  <table>
+  <table class="bp">
     <tr><th>Rule</th><th>Snackbar <code>.toast</code></th><th>Banner <code>.content-stale-bar</code></th></tr>
     <tr><td>Purpose</td><td>Confirms an action that is already done, or reports that it failed.</td><td>A background condition the reader must resolve — today: someone else changed what is on screen.</td></tr>
     <tr><td>Position</td><td>Bottom centre, stacked, <code>slideUp</code> 200 ms.</td><td>Below the top bar, centred, <code>z-index</code> under dialogs.</td></tr>
@@ -645,7 +645,7 @@ table.bp td:first-child{font-family:ui-monospace,monospace;color:var(--md-primar
     <tr><td>Shape</td><td colspan="2"><code>--md-xs</code> · 4 px and <code>--md-e3</code>. Deliberately the flattest radius in the system: these float over content and must not read as cards.</td></tr>
     <tr><td>Announcement</td><td colspan="2">The container is a live region. Errors are <code>aria-live="assertive"</code>, everything else <code>polite</code> (WCAG 4.1.3 Status Messages) — set per message, not once.</td></tr>
   </table>
-  <div class="dos">
+  <div class="do-dont">
     <div class="do"><b>Do</b>Say what happened in the user's words · keep it to one line · let a failure also show up where it happened</div>
     <div class="dont"><b>Don't</b>Put an action in a snackbar that vanishes in 3.5 s · use error red for a stale-content banner · stack more than one banner · report progress with either — that is what a spinner and <code>aria-busy</code> are for</div>
   </div>
@@ -692,7 +692,7 @@ table.bp td:first-child{font-family:ui-monospace,monospace;color:var(--md-primar
   the sibling cards fill the rest of the row instead. Both grids keep
   <code>align-items: start</code> so a tall chart never stretches its
   neighbours.</p>
-  <div class="note">This exception is <b>scoped to metrics pages</b>, and it is the reason the "no three-column grids" rule below says <em>card/box</em> views. It is not a licence to <code>auto-fit</code> anywhere a two-column grid feels tight — if a new view wants it, it belongs in this table first.</div>
+  <div class="note">This exception is <b>scoped to metrics pages</b>, and it is the reason the "no three-column grids" rule below says <em>card/box</em> views. It is not a licence to <code>auto-fit</code> anywhere a two-column grid feels tight — if a new view wants it, it belongs in this table first. The scope also covers the system's <b>one sub-1024 media query</b>: at <code>≤ 40rem</code> the distribution rows narrow their label column and the page tightens its padding (<code>.dist-row</code> / <code>.stats-page</code>) — a content tweak owned by this layout, not a chrome breakpoint, and the only place one is permitted.</div>
 
   <h3>Rules</h3>
   <div class="do-dont">
@@ -843,7 +843,7 @@ table.bp td:first-child{font-family:ui-monospace,monospace;color:var(--md-primar
 <!-- ╔══ RESPONSIVE ══╗ -->
 <section class="page-break">
   <h2>Responsive</h2>
-  <p>Routing is <b>device-based, decided server-side</b> at the desktop app's Caddy front door — not by a CSS breakpoint. A <b>phone</b> User-Agent hitting <code>/</code> gets a <code>302</code> to the mobile companion under <code>/m/</code>; everything else — desktops, laptops and <b>tablets incl. iPad</b> (their UA omits the <code>Mobile</code> token) — stays on the full desktop app. <code>/api/*</code> is never redirected, so both surfaces share the same origin + JWT cookies. Within the desktop app a single <code>1024px</code> (<code>64rem</code>) breakpoint is all the chrome needs; a narrowed window keeps the full app and never collapses into a phone layout.</p>
+  <p>Routing is <b>device-based, decided server-side</b> at the desktop app's Caddy front door — not by a CSS breakpoint. A <b>phone</b> User-Agent hitting <code>/</code> gets a <code>302</code> to the mobile companion under <code>/m/</code>; everything else — desktops, laptops and <b>tablets incl. iPad</b> (their UA omits the <code>Mobile</code> token) — stays on the full desktop app. <code>/api/*</code> is never redirected, so both surfaces share the same origin + JWT cookies. Within the desktop app a single <code>1024px</code> (<code>64rem</code>) breakpoint is all the chrome needs; a narrowed window keeps the full app and never collapses into a phone layout. (The metrics layout's <code>≤ 40rem</code> content tweak is the one documented exception — see <em>Metrics layout</em>.)</p>
   <table class="bp">
     <tr><th>Context</th><th>Surface</th><th>Layout</th></tr>
     <tr><td>Phone<br>UA matches iPhone / Android-mobile / …</td><td>Mobile companion (<code>/m/</code>)</td><td>Purpose-built one-handed app — bottom nav, FAB, bottom sheets, full-screen task detail (see <em>Mobile companion</em>).</td></tr>
@@ -863,7 +863,7 @@ table.bp td:first-child{font-family:ui-monospace,monospace;color:var(--md-primar
   </div>
 </section>
 
-<div class="footer">Octbase UI Style Guide · v1.7 · Built on Material Design 3 · Lucide icons · IBM Plex Sans · Desktop app + Mobile companion</div>
+<div class="footer">Octbase UI Style Guide · v1.8 · Built on Material Design 3 · Lucide icons · IBM Plex Sans · Desktop app + Mobile companion</div>
 
 <!-- The icon grid is generated from the shipped registry, not a copy of it. -->
 <script type="module" src="js/styleguide-icons.js"></script>

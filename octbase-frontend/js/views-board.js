@@ -495,17 +495,17 @@ function boardToolbar(board, canManage, atMax) {
           data-input="setSearchFilter" autocomplete="off">
         <div class="board-toolbar-actions">
           ${viewCreateButton()}
-          <button class="btn-icon ${S.showBacklog?'active':''}" data-act="toggleBacklogColumn" title="${t('board.toggleBacklog')}" aria-label="${t('board.toggleBacklog')}" aria-pressed="${S.showBacklog?'true':'false'}">
+          <button class="icon-btn ${S.showBacklog?'active':''}" data-act="toggleBacklogColumn" title="${t('board.toggleBacklog')}" aria-label="${t('board.toggleBacklog')}" aria-pressed="${S.showBacklog?'true':'false'}">
             ${icon('backlog')}
           </button>
           ${canManage ? `
-          <button class="btn-icon" ${atMax?'disabled':''} data-act="addLane" title="${t('board.addLane')}" aria-label="${t('board.addLane')}">
+          <button class="icon-btn" ${atMax?'disabled':''} data-act="addLane" title="${t('board.addLane')}" aria-label="${t('board.addLane')}">
             ${icon('add')}
           </button>
-          <button class="btn-icon" data-act="showAddExternalColumn" title="${t('board.addExternalColumn')}" aria-label="${t('board.addExternalColumn')}">
+          <button class="icon-btn" data-act="showAddExternalColumn" title="${t('board.addExternalColumn')}" aria-label="${t('board.addExternalColumn')}">
             ${icon('external')}
           </button>
-          <button class="btn-icon" data-act="showBoardSettings" title="${t('board.settings')}" aria-label="${t('board.settings')}">
+          <button class="icon-btn" data-act="showBoardSettings" title="${t('board.settings')}" aria-label="${t('board.settings')}">
             ${icon('sliders',{size:'md'})}
           </button>` : ''}
         </div>

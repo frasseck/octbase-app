@@ -412,7 +412,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
 .btn-sm { min-height: 2rem; padding: 0.375rem var(--space-4); font-size: 0.8125rem; }
 .btn-lg { min-height: 3rem; padding: 0.75rem var(--space-8); font-size: 0.9375rem; }
 .btn-add-repo { max-width: 16em; }
-/* .icon-btn / .btn-icon (and -sm variants) are defined once, canonically,
+/* .icon-btn (and the -sm variant) is defined once, canonically,
    in the icon-button section below. */
 .btn:disabled { opacity: .38; cursor: not-allowed; box-shadow: none; filter: none; }
 /* Icon size inside buttons is governed by the .icon-svg--* token class. */
@@ -564,9 +564,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
 .content-board .board-cols-scroll { height: calc(100vh - 12.5rem); }
 
 .board-col-actions { display: flex; gap: var(--space-1); }
-/* ── Icon button (canonical) — the single icon-only action component.
-   .btn-icon is kept as an alias so legacy markup keeps working. ── */
-.icon-btn, .btn-icon {
+/* ── Icon button (canonical) — the single icon-only action component. The
+   .btn-icon alias is gone: the 2026-08-02 sweep converted the last emitters. ── */
+.icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer; border-radius: var(--md-full);
   color: var(--md-on-surface-variant); line-height: 1;
@@ -576,11 +576,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
   min-width: 2.5rem; min-height: 2.5rem;
   padding: var(--space-2); transition: background .15s, color .15s;
 }
-.icon-btn:hover:not([disabled]):not(:disabled),
-.btn-icon:hover:not([disabled]):not(:disabled) { background: var(--state-hover); color: var(--md-on-surface); }
-.icon-btn[disabled], .icon-btn:disabled,
-.btn-icon[disabled], .btn-icon:disabled { opacity: .38; cursor: not-allowed; }
-.icon-btn-sm, .btn-icon-sm { padding: var(--space-1); }
+.icon-btn:hover:not([disabled]):not(:disabled) { background: var(--state-hover); color: var(--md-on-surface); }
+.icon-btn[disabled], .icon-btn:disabled { opacity: .38; cursor: not-allowed; }
+.icon-btn-sm { padding: var(--space-1); }
 /* Inline icon glyph: keeps icons from shrinking in flex rows and aligns them
    with adjacent text. Default/md/sm all render at 20px — plus a hero size
    (48px) reserved for empty-state illustrations. The size class wins over
@@ -845,7 +843,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
 .ts-level .type-badge { width: 1.5rem; height: 1.5rem; font-size: 0.75rem; }
 .ts-prio-builtins { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
 .ts-prio-row { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid var(--md-outline-variant); }
-.ts-prio-row .btn-icon { margin-left: auto; }
+.ts-prio-row .icon-btn { margin-left: auto; }
 .ts-prio-add { display: flex; gap: var(--space-2); margin-top: var(--space-4); align-items: center; }
 .ts-prio-add .form-input { flex: 1; }
 

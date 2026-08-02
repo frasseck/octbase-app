@@ -477,7 +477,7 @@ function renderAppShell() {
         <div class="sidebar-logo">
           <img class="logo-img" src="img/octbase_logo.svg" alt="Octbase">
           <button class="btn-hamburger sidebar-toggle-btn" data-act="toggleSidebar" title="${t('nav.toggleNavigation')}" aria-label="${t('nav.toggleNavigation')}" aria-controls="sidebar" aria-expanded="true">${icon('sidebar',{size:'md'})}</button>
-          <button class="btn-icon btn-icon-sm sidebar-close-btn" data-act="closeSidebar" title="${t('accessibility.close')}" aria-label="${t('accessibility.close')}">
+          <button class="icon-btn icon-btn-sm sidebar-close-btn" data-act="closeSidebar" title="${t('accessibility.close')}" aria-label="${t('accessibility.close')}">
             ${icon('close',{size:'md'})}
           </button>
         </div>
