@@ -567,6 +567,8 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
 <h2>Project activity</h2>
 <p>The project activity view shows a reverse-chronological event log for everything that has happened across the entire project — task changes, comments, page publishes, sprint transitions, and more.</p>
 <p>Each entry shows the event type, the actor, a human-readable description, and the timestamp (hover for the exact date and time). Entries that relate to a task are clickable and open that task panel directly.</p>
+<p>The view loads the <strong>50 most recent entries</strong>; <strong>Load older activity</strong> at the foot of the list fetches the next 50 and stops offering itself once you reach the end of the log.</p>
+<div class="tip"><strong>Deleting something does not erase its history.</strong> When a task, release, or sprint is deleted, the entries about it stay in the log — the event still happened — but they stop linking to it and are shown greyed out and marked <em>Deleted item</em>, so a click can no longer lead somewhere that is gone. Deleting the whole <a href="#projects">project</a> is the one exception: that removes its activity along with everything else, since there is no project left to read the log in.</div>
 <div class="card">
   <h3>Event types logged</h3>
   <ul>

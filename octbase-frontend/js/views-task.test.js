@@ -72,7 +72,11 @@ async function load(lang = 'en', extra = {}) {
 
 // ── The backend's activity vocabulary, read from the Go source ──────────────
 
-const WRITE_CALL = /(writeActivityTx|writeActivity|writeBulkActivity|activity\.Write)\(/;
+// writeReleaseActivity/writeSprintActivity are writeActivity's counterparts for
+// the two types that reference a release or sprint rather than a task; they are
+// separate functions only so the id reaches the row (see migration 039), and
+// their RELEASE_*/SPRINT_* literals belong in this vocabulary like any other.
+const WRITE_CALL = /(writeActivityTx|writeReleaseActivity|writeSprintActivity|writeActivity|writeBulkActivity|activity\.Write)\(/;
 // scmintegration picks its type into a local before the call, so the literal is
 // not on the call line: `event := "BRANCH_CREATED"` / `event = "BRANCH_LINKED"`.
 const TYPE_VAR = /\b(?:event|actType|activityType)\s*:?=\s*"([A-Z][A-Z_]{3,})"/g;

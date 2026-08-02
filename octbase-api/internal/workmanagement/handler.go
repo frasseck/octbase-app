@@ -85,6 +85,16 @@ type txActivityWriter interface {
 	WriteTx(tx *sql.Tx, projectID, taskID, actorID, actType string, params map[string]any) error
 }
 
+// planningActivityWriter records an entry against a release or a sprint rather
+// than a task. Declared here (like txActivityWriter) as an optional extension of
+// ActivityWriter, so a writer that only knows Write still satisfies the handler
+// — it just loses the reference, which costs the grey-out on delete, not the
+// entry.
+type planningActivityWriter interface {
+	WriteRelease(projectID, releaseID, actorID, actType string, params map[string]any) error
+	WriteSprint(projectID, sprintID, actorID, actType string, params map[string]any) error
+}
+
 // BoardEventPublisher pushes a project-scoped real-time event so that other
 // users viewing the same project (e.g. a Kanban board) see a co-worker's change
 // without a manual reload. It is satisfied structurally by *sse.Hub; declaring
@@ -356,6 +366,36 @@ func (h *Handler) writeActivity(projectID, taskID, actorID, actType string, para
 	err := h.activity.Write(projectID, taskID, actorID, actType, params)
 	if err == nil {
 		h.publishBoardEvent(projectID, taskID, actorID, actType)
+	}
+	return err
+}
+
+// writeReleaseActivity records a release-scoped entry, carrying the release id
+// so DeleteRelease can unlink it later. The board event is published with an
+// empty task id, exactly as the plain writeActivity call these replaced did.
+func (h *Handler) writeReleaseActivity(projectID, releaseID, actorID, actType string, params map[string]any) error {
+	var err error
+	if aw, ok := h.activity.(planningActivityWriter); ok {
+		err = aw.WriteRelease(projectID, releaseID, actorID, actType, params)
+	} else {
+		err = h.activity.Write(projectID, "", actorID, actType, params)
+	}
+	if err == nil {
+		h.publishBoardEvent(projectID, "", actorID, actType)
+	}
+	return err
+}
+
+// writeSprintActivity is writeReleaseActivity's sprint counterpart.
+func (h *Handler) writeSprintActivity(projectID, sprintID, actorID, actType string, params map[string]any) error {
+	var err error
+	if aw, ok := h.activity.(planningActivityWriter); ok {
+		err = aw.WriteSprint(projectID, sprintID, actorID, actType, params)
+	} else {
+		err = h.activity.Write(projectID, "", actorID, actType, params)
+	}
+	if err == nil {
+		h.publishBoardEvent(projectID, "", actorID, actType)
 	}
 	return err
 }

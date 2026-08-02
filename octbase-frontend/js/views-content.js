@@ -417,38 +417,93 @@ async function refreshRepoToken(id) {
 // ═══════════════════════════════════════════════════════════
 // ACTIVITY VIEW
 // ═══════════════════════════════════════════════════════════
+// The server's page size. Kept as a constant only to spot a short page (fewer
+// rows than asked for) and hide the load-more button — the request itself sends
+// no size, so the server default stays the one authority.
+const ACTIVITY_PAGE_SIZE = 50;
+
+const ACTIVITY_ICONS = {
+  TASK_CREATED:'add',TASK_UPDATED:'edit',TASK_STATUS_CHANGED:'refresh',TASK_MOVED:'sort',
+  TASK_COMMENT_ADDED:'comment',RELEASE_CLOSED:'milestone',MILESTONE_CLOSED:'milestone',PAGE_PUBLISHED:'page',BRANCH_CREATED:'branch',BRANCH_LINKED:'branch',
+};
+
+// activityItemHtml renders one entry. An entry is clickable only while its task
+// still exists: deleting a task (or a release or sprint) unlinks its entries
+// server-side and marks them targetDeleted, so the row keeps its message and
+// timestamp — the log is history — but renders as a muted, inert div with a
+// "deleted" note instead of a button that would open nothing. An entry that
+// never had a target (PAGE_PUBLISHED and friends) has no marker and renders
+// normally; that is the distinction targetDeleted exists to make.
+function activityItemHtml(e, taskMeta) {
+  const meta = e.taskId ? taskMeta.get(e.taskId) : null;
+  const clickable = Boolean(e.taskId);
+  const tag = clickable ? 'button' : 'div';
+  const attrs = clickable ? `type="button" data-act="openProjectTask" data-a0="${esc(e.taskId)}" data-a1="${esc(S.project.id)}"` : '';
+  const cls = ['activity-item', clickable ? 'activity-item-clickable' : '', e.targetDeleted ? 'activity-item-deleted' : ''].filter(Boolean).join(' ');
+  return `
+    <${tag} class="${cls}" ${attrs}>
+      <div class="activity-icon" aria-hidden="true">${icon(ACTIVITY_ICONS[e.type]||'time',{size:'md'})}</div>
+      <div class="activity-body">
+        ${meta ? `<div class="activity-task-label">${meta.seq ? `<span class="task-seq">${esc(meta.seq)}</span>` : ''}${esc(meta.title)}</div>` : ''}
+        ${e.targetDeleted ? `<div class="activity-task-label activity-deleted-label">${t('activity.targetDeleted')}</div>` : ''}
+        <div class="activity-msg">${esc(activityMessage(e))}</div>
+        <div class="activity-time">${fmtDateTime(e.createdAt)}</div>
+      </div>
+    </${tag}>`;
+}
+
+// renderActivity paints the first page. Entries run newest-first, which is what
+// lets loadMoreActivity append the next (older) page below and keep the feed in
+// one order — the pre-pagination view reversed its single page instead, which
+// only read correctly while there was nothing after it.
 async function renderActivity() {
-  const entries = await api.activity.project(S.project.id);
+  S.activityEntries = [];
+  S.activityPage = 0;
+  S.activityDone = false;
+  const entries = await api.activity.project(S.project.id, { page: 0 });
   // Every page: these resolve task ids to titles for the activity entries, and
   // an entry whose task fell outside the page renders without its title.
   const tasks = await api.tasks.listAll(S.project.id).catch(() => []);
-  const taskMeta = taskMetaById(tasks);
+  S.activityTaskMeta = taskMetaById(tasks);
+  S.activityEntries = entries;
+  S.activityDone = entries.length < ACTIVITY_PAGE_SIZE;
   const c = el('#content');
   if(!entries.length) {
     c.innerHTML=`<div class="empty"><div class="empty-icon">${icon('time',{size:'hero'})}</div><div class="empty-title">${t('activity.emptyTitle')}</div></div>`;
     return;
   }
-  const icons = {
-    TASK_CREATED:'add',TASK_UPDATED:'edit',TASK_STATUS_CHANGED:'refresh',TASK_MOVED:'sort',
-    TASK_COMMENT_ADDED:'comment',RELEASE_CLOSED:'milestone',MILESTONE_CLOSED:'milestone',PAGE_PUBLISHED:'page',BRANCH_CREATED:'branch',BRANCH_LINKED:'branch',
-  };
   c.innerHTML=`
     <div class="activity-wrap">
-      <div class="activity-box">
-        ${entries.slice().reverse().map(e=>{
-          const tag = e.taskId ? 'button' : 'div';
-          const attrs = e.taskId ? `type="button" data-act="openProjectTask" data-a0="${esc(e.taskId)}" data-a1="${esc(S.project.id)}"` : '';
-          return `
-        <${tag} class="activity-item ${e.taskId ? 'activity-item-clickable' : ''}" ${attrs}>
-            <div class="activity-icon" aria-hidden="true">${icon(icons[e.type]||'time',{size:'md'})}</div>
-            <div class="activity-body">
-            ${e.taskId && taskMeta.get(e.taskId) ? `<div class="activity-task-label">${taskMeta.get(e.taskId).seq ? `<span class="task-seq">${esc(taskMeta.get(e.taskId).seq)}</span>` : ''}${esc(taskMeta.get(e.taskId).title)}</div>` : ''}
-            <div class="activity-msg">${esc(activityMessage(e))}</div>
-            <div class="activity-time">${fmtDateTime(e.createdAt)}</div>
-          </div>
-          </${tag}>`;}).join('')}
-      </div>
+      <div class="activity-box" id="activity-box">${activityListHtml()}</div>
+      <div class="activity-more" id="activity-more">${activityMoreHtml()}</div>
     </div>`;
+}
+
+function activityListHtml() {
+  return S.activityEntries.map(e => activityItemHtml(e, S.activityTaskMeta)).join('');
+}
+
+function activityMoreHtml() {
+  if (S.activityDone) return '';
+  return `<button class="btn btn-secondary btn-sm" data-act="loadMoreActivity">${t('activity.loadMore')}</button>`;
+}
+
+// loadMoreActivity appends the next older page. It repaints only the list and
+// the button, so the reader's scroll position survives.
+async function loadMoreActivity() {
+  if (S.activityDone) return;
+  const page = S.activityPage + 1;
+  let entries;
+  try {
+    entries = await api.activity.project(S.project.id, { page });
+  } catch (e) { toast(apiErrorMessage(e),'error'); return; }
+  S.activityPage = page;
+  S.activityEntries = S.activityEntries.concat(entries);
+  S.activityDone = entries.length < ACTIVITY_PAGE_SIZE;
+  const box = el('#activity-box');
+  const more = el('#activity-more');
+  if (box) box.innerHTML = activityListHtml();
+  if (more) more.innerHTML = activityMoreHtml();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -548,7 +603,7 @@ Views.register('archive', {
 
 // ── Delegation registration: this file's handlers ───────────────────────────
 // (see js/README.md "Delegation registration".)
-registerActions([addRepo, showCreatePage, toggleCheatsheet, toggleEditorPreview], _A0);
+registerActions([addRepo, loadMoreActivity, showCreatePage, toggleCheatsheet, toggleEditorPreview], _A0);
 registerActions([
   openPage, publishPage, reopenFromArchive, savePageDraft, connectRepoOAuth, refreshRepoToken,
 ], _A1);
