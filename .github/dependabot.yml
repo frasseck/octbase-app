@@ -3,15 +3,27 @@
 # tree (vite, eslint, vitest, …) surface here instead of blocking CI.
 version: 2
 updates:
-  # npm workspaces. The root holds the shared dev toolchain; octbase-shared
-  # holds the two runtime browser deps (dompurify, qrcode-generator); the two
-  # SPAs have their own package.json files.
+  # npm workspaces — the ROOT ONLY, deliberately.
+  #
+  # octbase-shared, octbase-frontend and octbase-mobile are workspaces of the
+  # root package.json, so there is exactly one lockfile and it lives here.
+  # Dependabot understands that: the root entry edits the workspace manifests
+  # AND package-lock.json in one PR.
+  #
+  # Listing the workspaces individually as well produced a PR per manifest for
+  # any shared dependency, and the per-workspace ones were unmergeable by
+  # construction — they bumped a workspace package.json while leaving the root
+  # lockfile untouched, so `npm ci` refused them:
+  #
+  #   npm error `npm ci` can only install packages when your package.json and
+  #   npm error package-lock.json are in sync.
+  #   npm error Missing: qrcode-generator@2.0.4 from lock file
+  #
+  # That is what qrcode-generator 1.4.4 → 2.0.4 did on 2026-08-02: three PRs,
+  # of which only the root one (#6) was correct and complete; #9 and #10 were
+  # closed as superseded after burning CI on a failure they could never fix.
   - package-ecosystem: npm
-    directories:
-      - "/"
-      - "/octbase-shared"
-      - "/octbase-frontend"
-      - "/octbase-mobile"
+    directory: "/"
     schedule:
       interval: weekly
     ignore:
