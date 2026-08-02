@@ -117,7 +117,9 @@ func (h *Handler) WithEventPublisher(p BoardEventPublisher) *Handler {
 type Notifier interface {
 	NotifyTaskAssigned(taskID, taskTitle, projectID, assigneeID, actorID string)
 	NotifyReviewerSet(taskID, taskTitle, projectID, reviewerID, actorID string)
-	NotifyStatusChanged(taskID, taskTitle, projectID, reporterID, actorID, newStatus string)
+	// newStatusLabel is a display label (StatusLabel), never the raw enum: the
+	// message is stored as composed and rendered verbatim by the SPA.
+	NotifyStatusChanged(taskID, taskTitle, projectID, reporterID, actorID, newStatusLabel string)
 	NotifyTaskChanged(taskID, taskTitle, projectID string, reporterID, assigneeID *string, actorID string, changes []string)
 	NotifyMentions(text, projectID, taskID, actorID string)
 }

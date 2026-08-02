@@ -111,14 +111,21 @@ func (s *Service) NotifyReviewerSet(taskID, taskTitle, projectID, reviewerID, ac
 }
 
 // NotifyStatusChanged notifies the task reporter when status changes.
-func (s *Service) NotifyStatusChanged(taskID, taskTitle, projectID, reporterID, actorID, newStatus string) {
+//
+// newStatusLabel is the DISPLAY label, not the enum — the message is stored as
+// composed and the SPA renders it verbatim, so an enum handed in here reaches
+// the notification panel as "changed to IN_REVIEW". Callers pass it through
+// workmanagement.StatusLabel, which this package cannot call itself (modules do
+// not import each other; see docs/architecture.md) and which also leaves a
+// custom board-lane status alone.
+func (s *Service) NotifyStatusChanged(taskID, taskTitle, projectID, reporterID, actorID, newStatusLabel string) {
 	if reporterID == "" || reporterID == actorID {
 		return
 	}
 	pid := projectID
 	tid := taskID
 	s.Notify(reporterID, KindStatusChanged, &pid, &tid, nil,
-		"Task '"+taskTitle+"' status changed to "+newStatus)
+		"Task '"+taskTitle+"' status changed to "+newStatusLabel)
 }
 
 // NotifyTaskChanged sends a brief email to the task's reporter and assignee

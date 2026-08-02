@@ -109,6 +109,15 @@ All notable changes to Octbase are documented here.
 
 ### Fixed
 
+- **The notification panel no longer shows a raw status enum.** A status change
+  arrived in the bell as *"Task 'X' status changed to IN_REVIEW"* while the email
+  for the same event said *In Review* — `NotifyStatusChanged` was handed the raw
+  enum, and a notification's message is composed on the server, stored as
+  composed, and rendered verbatim by the SPA, so whatever the backend wrote is
+  what the user read. Both call sites (the task panel's status door and a board
+  move) now pass it through `StatusLabel`, exactly as the `NotifyTaskChanged`
+  line directly below each of them already did. A custom board-lane status still
+  passes through untouched — it is a name a human typed.
 - **The seeded demo activity entry shows the task's title instead of a raw
   `{{title}}`.** `internal/seed/seed.go` wrote its one `activity_entries` row
   with `payload_json` `'{}'`, but the `TASK_CREATED` translation is
