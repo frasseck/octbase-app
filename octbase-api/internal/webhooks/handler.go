@@ -23,17 +23,20 @@ type BranchPRUpdater interface {
 	UpdatePRStatus(branchName, prStatus, prURL string, prNumber int) error
 }
 
-// TaskStatusSetter transitions tasks to a new status, stamping done_at like
-// every other status-changing path. Satisfied by *workmanagement.TaskRepo.
-type TaskStatusSetter interface {
-	BulkSetStatus(projectID string, taskIDs []string, status, now string) ([]string, error)
+// TaskAutoCloser completes a task through the same rules as the interactive
+// status door — immutability, the BLOCKER completion guard, board realignment
+// and activity logging. Satisfied by *workmanagement.Handler. The webhook used
+// to write the status via the repo directly, which silently bypassed all four
+// of those invariants (2026-08-02 review).
+type TaskAutoCloser interface {
+	AutoCompleteTask(projectID, taskID string) (completed bool, reason string, err error)
 }
 
 // Handler handles incoming SCM webhooks.
 type Handler struct {
 	db       *sql.DB
 	branches BranchPRUpdater
-	tasks    TaskStatusSetter
+	tasks    TaskAutoCloser
 	hub      *sse.Hub
 }
 
@@ -41,7 +44,7 @@ type Handler struct {
 func NewHandler(
 	db *sql.DB,
 	branches BranchPRUpdater,
-	tasks TaskStatusSetter,
+	tasks TaskAutoCloser,
 	hub *sse.Hub,
 ) *Handler {
 	return &Handler{db: db, branches: branches, tasks: tasks, hub: hub}
@@ -225,11 +228,18 @@ func (h *Handler) autoCloseTaskByBranch(branchName string) {
 		return
 	}
 
-	// Route through TaskRepo.BulkSetStatus rather than a raw UPDATE so done_at
-	// gets stamped exactly like every other status-changing path — otherwise a
-	// task auto-closed via merge webhook would never qualify for auto-archive.
-	if _, err := h.tasks.BulkSetStatus(projectID, []string{taskID}, "DONE", shared.Now()); err != nil {
+	// Route through the workmanagement status door (AutoCompleteTask) so the
+	// merge webhook obeys the same rules as a user completing the task: it
+	// cannot revive a DONE/ARCHIVED task, cannot complete over an open BLOCKER
+	// descendant, moves the card into the Done lane, stamps done_at, and writes
+	// the activity entry the sprint burndown replays.
+	completed, reason, err := h.tasks.AutoCompleteTask(projectID, taskID)
+	if err != nil {
 		slog.Error("auto-close task failed", "taskId", taskID, "error", err)
+		return
+	}
+	if !completed {
+		slog.Info("auto-close skipped", "taskId", taskID, "reason", reason)
 		return
 	}
 

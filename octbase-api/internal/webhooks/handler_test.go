@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/octbase/octbase-api/internal/activity"
+	"github.com/octbase/octbase-api/internal/auditlog"
 	"github.com/octbase/octbase-api/internal/scmintegration"
 	"github.com/octbase/octbase-api/internal/shared"
 	"github.com/octbase/octbase-api/internal/sse"
@@ -56,6 +59,30 @@ func doWebhook(t *testing.T, srv *httptest.Server, path, secret string, payload 
 	return resp
 }
 
+// newWMHandler assembles the workmanagement handler the webhook auto-close
+// delegates to (AutoCompleteTask). Mirrors main.go's wiring; notifier and page
+// search stay nil because the auto-close path uses neither.
+func newWMHandler(sqlDB *sql.DB) *workmanagement.Handler {
+	taskRepo := workmanagement.NewTaskRepo(sqlDB)
+	commentRepo := workmanagement.NewTaskCommentRepo(sqlDB)
+	linkRepo := workmanagement.NewTaskLinkRepo(sqlDB)
+	attachmentRepo := workmanagement.NewTaskAttachmentRepo(sqlDB)
+	relationRepo := workmanagement.NewTaskRelationRepo(sqlDB)
+	boardRepo := workmanagement.NewBoardRepo(sqlDB)
+	columnRepo := workmanagement.NewBoardColumnRepo(sqlDB)
+	releaseRepo := workmanagement.NewReleaseRepo(sqlDB)
+	sprintRepo := workmanagement.NewSprintRepo(sqlDB)
+	templateRepo := workmanagement.NewTaskTemplateRepo(sqlDB)
+	svc := workmanagement.NewService(sqlDB, taskRepo, commentRepo, linkRepo, attachmentRepo,
+		relationRepo, releaseRepo, boardRepo, columnRepo, sprintRepo, templateRepo)
+	return workmanagement.NewHandler(
+		sqlDB, workmanagement.NewProjectRepo(sqlDB), taskRepo, commentRepo, linkRepo, attachmentRepo,
+		relationRepo, boardRepo, columnRepo, workmanagement.NewBoardExternalColumnRepo(sqlDB),
+		releaseRepo, sprintRepo, workmanagement.NewTaskCategoryRepo(sqlDB),
+		templateRepo, svc, activity.NewRepo(sqlDB), nil, nil, auditlog.NewRepo(sqlDB),
+	)
+}
+
 // buildWebhookServer sets up a real chi router with webhook routes and the required DB repos.
 func buildWebhookServer(t *testing.T) *httptest.Server {
 	t.Helper()
@@ -64,11 +91,10 @@ func buildWebhookServer(t *testing.T) *httptest.Server {
 		return nil
 	}
 	branchRepo := scmintegration.NewBranchReferenceRepo(sqlDB)
-	taskRepo := workmanagement.NewTaskRepo(sqlDB)
 	hub := sse.NewHub()
 	go hub.Run()
 
-	handler := webhooks.NewHandler(sqlDB, branchRepo, taskRepo, hub)
+	handler := webhooks.NewHandler(sqlDB, branchRepo, newWMHandler(sqlDB), hub)
 
 	r := chi.NewRouter()
 	r.Post("/api/v1/webhooks/bitbucket", handler.HandleBitbucket)
@@ -206,11 +232,10 @@ func TestHandleGitHub_AutoCloseTask(t *testing.T) {
 	t.Setenv("OCTBASE_WEBHOOK_SECRET_GITHUB", testGitHubSecret)
 
 	branchRepo := scmintegration.NewBranchReferenceRepo(sqlDB)
-	taskRepo := workmanagement.NewTaskRepo(sqlDB)
 	hub := sse.NewHub()
 	go hub.Run()
 
-	handler := webhooks.NewHandler(sqlDB, branchRepo, taskRepo, hub)
+	handler := webhooks.NewHandler(sqlDB, branchRepo, newWMHandler(sqlDB), hub)
 	r := chi.NewRouter()
 	r.Post("/api/v1/webhooks/github", handler.HandleGitHub)
 	srv := httptest.NewServer(r)

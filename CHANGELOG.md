@@ -42,3 +42,14 @@ All notable changes to Octbase are documented here.
   whose status change had already fully happened — the statuses are committed
   in one statement; the card pass is best-effort and self-heals on the next
   move.
+- **A merged PR closes its task by the same rules as a person would.** The
+  auto-close-on-merge webhook wrote `DONE` straight through the repository
+  layer, bypassing every rule the interactive doors share: it completed tasks
+  over an open **BLOCKER** descendant, left the card sitting in its old lane
+  while the task read *Done*, wrote no Activity entry (so the sprint burndown
+  replay never saw webhook completions), and could flip an `ARCHIVED` task back
+  to `DONE`. It now goes through the same status door as the task panel: the
+  blocker rule skips the close (the merge cannot answer a 422, so it is logged
+  and left for a person), finished tasks are left alone, the card moves to the
+  *Done* lane, `done_at` is stamped, and the Activity entry is written with the
+  empty actor of a system action — the same convention as auto-archive.

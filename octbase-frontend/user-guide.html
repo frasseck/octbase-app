@@ -786,7 +786,9 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
   <li><code>POST /api/v1/webhooks/bitbucket</code></li>
   <li><code>POST /api/v1/webhooks/github</code></li>
 </ul>
-<p>Both use <strong>HMAC-SHA256</strong> signature validation. Enter the shared secret in your provider's webhook settings and set the matching environment variables on the server (<code>OCTBASE_WEBHOOK_SECRET_BITBUCKET</code> / <code>OCTBASE_WEBHOOK_SECRET_GITHUB</code>). Ask your administrator to configure these.</p></section>
+<p>Both use <strong>HMAC-SHA256</strong> signature validation. Enter the shared secret in your provider's webhook settings and set the matching environment variables on the server (<code>OCTBASE_WEBHOOK_SECRET_BITBUCKET</code> / <code>OCTBASE_WEBHOOK_SECRET_GITHUB</code>). Ask your administrator to configure these.</p>
+<h3>Auto-close on merge</h3>
+<p>A repository connection with <strong>auto-close on merge</strong> enabled completes the linked task when its pull request is merged. The completion follows the same rules as closing the task yourself: a task with an open <strong>BLOCKER</strong> task below it is left open (resolve the blocker, then complete the task by hand), an already finished task is never reopened or re-closed, the card moves into the board's <em>Done</em> lane, and the change appears in the project's <strong>Activity</strong> view without an actor — it was the merge, not a person.</p></section>
 
 <section id="import">
 <h2>Import &amp; export</h2>

@@ -14,7 +14,6 @@ import (
 	"github.com/octbase/octbase-api/internal/sse"
 	"github.com/octbase/octbase-api/internal/testutil"
 	"github.com/octbase/octbase-api/internal/webhooks"
-	"github.com/octbase/octbase-api/internal/workmanagement"
 )
 
 // bitbucketPR builds a minimal Bitbucket pullrequest payload for branchName.
@@ -278,10 +277,9 @@ func autoCloseServer(t *testing.T, sqlDB *sql.DB, provider string) (*httptest.Se
 	}
 
 	branchRepo := scmintegration.NewBranchReferenceRepo(sqlDB)
-	taskRepo := workmanagement.NewTaskRepo(sqlDB)
 	hub := sse.NewHub()
 	go hub.Run()
-	handler := webhooks.NewHandler(sqlDB, branchRepo, taskRepo, hub)
+	handler := webhooks.NewHandler(sqlDB, branchRepo, newWMHandler(sqlDB), hub)
 
 	r := chi.NewRouter()
 	r.Post("/api/v1/webhooks/bitbucket", handler.HandleBitbucket)

@@ -371,7 +371,10 @@ func main() {
 	notifHandler := notifications.NewHandler(db, notifRepo)
 	dashboardHandler := dashboard.NewHandler(dashboardRepo)
 	mfaHandler := mfa.NewHandler(db, mfaRepo, auditRepo)
-	webhookHandler := webhooks.NewHandler(db, branchRepo, taskRepo, sseHub)
+	// The webhook auto-close goes through wmHandler.AutoCompleteTask, not the
+	// task repo, so a merge webhook is bound by the same completion rules as a
+	// user (immutability, BLOCKER guard, board realignment, activity).
+	webhookHandler := webhooks.NewHandler(db, branchRepo, wmHandler, sseHub)
 	auditHandler := auditlog.NewHandler(auditRepo)
 	usermgmtHandler := usermgmt.NewHandler(db, usermgmtRepo, auditRepo, mailQueue).WithUserLimit(maxUsers)
 
