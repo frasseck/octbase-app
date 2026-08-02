@@ -6,6 +6,57 @@ All notable changes to Octbase are documented here.
 
 ### Changed
 
+- **The activity log outlives what it describes, without pretending it is still
+  there.** `activity_entries` had no foreign keys, so deleting a task left its
+  entries behind carrying a dead `taskId` — rows the Activity view still drew as
+  buttons that opened nothing. The entries now stay (the event happened; the log
+  is history) but the reference is nulled and a new `targetDeleted` flag is set,
+  and the UI renders those rows greyed out, unlinked, and labelled *Deleted
+  item*. Releases and sprints get the same treatment via two new columns,
+  `releaseId` and `sprintId`: `RELEASE_CLOSED` and friends only ever carried the
+  name in their payload, so a deleted release had been indistinguishable from a
+  live one. Deleting the whole **project** still removes its entries — there is
+  no feed left to read them in. Migration `039` adds the columns, cleans up the
+  orphans that had already accumulated, and adds plain FKs so a future deletion
+  path that forgets to unlink fails loudly instead of orphaning silently.
+  Entries written before the migration keep a null release/sprint reference and
+  are never greyed; there is nothing left to resolve them against.
+- **The activity feeds are paginated, 50 per page.** Both
+  `GET /projects/{id}/activity` and `GET /tasks/{taskId}/activity` accept
+  `?page`/`?size` and default to 50 (the task endpoint took no paging at all and
+  returned the task's entire history). The Activity view and the task panel's
+  Activity tab load the first page and offer **Load older activity**. Both lists
+  now render **newest first**; they used to reverse their single page, which
+  only read correctly while there was nothing after it.
+- **The front door stops overriding the mobile SPA's cache headers.** The
+  `@unhashed` matcher in `octbase-frontend/caddy/Caddyfile` (and its `.tls`
+  twin) matched `*.js` outside `/assets/*`, but the mobile bundles arrive there
+  as `/m/assets/index-<hash>.js` — before `handle_path` strips the prefix — so
+  the front door stamped `max-age=3600` alongside the year-long `immutable` the
+  mobile container had already set, and clients saw two `Cache-Control` headers.
+  `not path /m/*` hands everything under `/m/` back to the mobile config that
+  already answers it. Perf only, no staleness risk; it had been verified
+  container-direct, which is exactly where the collision is invisible.
+- **1.9 MB of unreferenced images left the build.** `img/octopus_original.png`
+  (1.7 MB) and `img/octopus.png` (176 KB) were copied verbatim into `dist/` and
+  shipped in the image with nothing referencing them — 60% of a 3.2 MB build.
+  `octopus_small.png` (the mascot) and `octopus_small_original.png` (the source
+  the Octopus palette was sampled from, documented in the style guide) stay.
+- **The mobile SPA no longer carries 49 dead translation fallbacks.** Call sites
+  written as `t('common.back') !== 'common.back' ? t('common.back') : 'Back'`
+  became unreachable when `scripts/check-i18n-keys.mjs` (commit `e290adb`)
+  started proving every literal key exists in every locale — the guard was built
+  to kill exactly this pattern. The condition is now always true, so the
+  ternaries are gone and the hardcoded English with them.
+- **Test-side follow-ups to the above.** The retention fixture now inserts its
+  project before the activity rows that reference it (migration `039`'s FK made
+  the old order invalid); `views-task.test.js` learned the two new
+  `writeReleaseActivity`/`writeSprintActivity` helpers so its
+  every-activity-type-is-translated guard keeps seeing the `RELEASE_*`/`SPRINT_*`
+  vocabulary; and `tests/KNOWN_FAILURES.md` gains an entry for a load-dependent
+  `test_search.py` flake that lands on a different node each run — reproduced on
+  an unmodified build, so it is not a regression and should not be bisected as
+  one.
 - **The compose stack forwards the environment variables the runbook says to
   set.** `podman-compose.yml`'s API `environment:` block is an allowlist, and
   a dozen documented tunables were missing from it — setting
