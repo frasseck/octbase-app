@@ -1,6 +1,7 @@
 package seed_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/octbase/octbase-api/internal/seed"
@@ -47,5 +48,57 @@ func TestSeedSeedsTaskCounter(t *testing.T) {
 	if next != maxSeed+1 {
 		t.Fatalf("first allocated seq = %d; want %d (maxSeed %d + 1) — counter not seeded, would duplicate an existing DP-%d",
 			next, maxSeed+1, maxSeed, next)
+	}
+}
+
+// TestSeedActivityCarriesTranslationParams guards the raw-placeholder regression:
+// the Activity view renders an entry by interpolating its payload into the
+// type's translation ("Created task \"{{title}}\""), so a TASK_CREATED row
+// seeded with an empty payload displays the literal {{title}} on every fresh
+// demo stack. The frontend unit test that checks for {{ feeds synthetic params
+// and cannot see the seed row, so the contract is asserted here instead.
+func TestSeedActivityCarriesTranslationParams(t *testing.T) {
+	db := testutil.NewTestDB(t)
+
+	if err := seed.Run(db); err != nil {
+		t.Fatalf("seed.Run: %v", err)
+	}
+
+	rows, err := db.Query(
+		`SELECT a.id, a.type, a.payload_json, t.title
+		   FROM activity_entries a
+		   JOIN tasks t ON t.id = a.task_id
+		  WHERE a.project_id = $1 AND a.type = 'TASK_CREATED'`, seed.ProjectID)
+	if err != nil {
+		t.Fatalf("query seeded activity: %v", err)
+	}
+	defer rows.Close()
+
+	seen := 0
+	for rows.Next() {
+		var id, entryType, payload, taskTitle string
+		if err := rows.Scan(&id, &entryType, &payload, &taskTitle); err != nil {
+			t.Fatalf("scan activity row: %v", err)
+		}
+		seen++
+
+		var params map[string]any
+		if err := json.Unmarshal([]byte(payload), &params); err != nil {
+			t.Fatalf("activity %s: payload_json is not an object: %v (%q)", id, err, payload)
+		}
+		title, ok := params["title"].(string)
+		if !ok || title == "" {
+			t.Fatalf("activity %s (%s): payload %q carries no title param — the Activity view renders the literal {{title}}",
+				id, entryType, payload)
+		}
+		if title != taskTitle {
+			t.Fatalf("activity %s: payload title %q does not match its task's title %q", id, title, taskTitle)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate activity rows: %v", err)
+	}
+	if seen == 0 {
+		t.Fatal("seed produced no TASK_CREATED activity row; the demo Activity view would be empty")
 	}
 }
