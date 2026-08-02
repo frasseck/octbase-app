@@ -9,7 +9,7 @@
 | `OCTBASE_DB_MAX_OPEN_CONNS` | int | `25` | No | Max open DB connections per API instance. Lower when many instances share one Postgres — see hosting-concept.md §4 |
 | `OCTBASE_DB_MAX_IDLE_CONNS` | int | `5` | No | Max idle DB connections per API instance (clamped to max-open) |
 | `OCTBASE_DB_STATEMENT_TIMEOUT` | duration | `30s` | No | Per-statement Postgres timeout on the runtime pool (a runaway query otherwise exhausts the pool); `0` disables; not applied to the migration connection |
-| `OCTBASE_JWT_SECRET` | string | `dev-secret-…` | **Yes** (prod) | 32+ random bytes, base64. Rotate causes all users to re-login |
+| `OCTBASE_JWT_SECRET` | string | `dev-secret-…` (demo mode only) | **Yes** (prod) | 32+ random bytes, base64. The dev default exists **only** when `OCTBASE_DEMO_MODE=true`; outside demo mode the API refuses to start without a 32+-byte secret. Rotate causes all users to re-login |
 | `OCTBASE_JWT_ACCESS_TTL` | duration | `15m` | No | Access token lifetime |
 | `OCTBASE_JWT_REFRESH_TTL` | duration | `1h` | No | Refresh-token / sliding session lifetime (rotated on each use) |
 | `OCTBASE_CORS_ORIGIN` | string | `http://localhost:8080` | **Yes** (prod) | Allowed CORS origin |
@@ -26,7 +26,7 @@
 | `OCTBASE_SMTP_PASS` | string | *(empty)* | No | SMTP password |
 | `OCTBASE_WEBHOOK_SECRET_BITBUCKET` | string | *(empty)* | No | HMAC secret for Bitbucket webhooks |
 | `OCTBASE_WEBHOOK_SECRET_GITHUB` | string | *(empty)* | No | HMAC secret for GitHub webhooks |
-| `OCTBASE_APP_URL` | string | `http://localhost:8080` | No | Used in invitation emails |
+| `OCTBASE_APP_URL` | string | `http://localhost:8080` | **Yes** (prod) | The real frontend origin. Embedded in invitation and password-reset email links and notification deep-links, and the OAuth callback redirects back to it. Outside demo mode the API refuses to start without it (the localhost fallback would email dead links) |
 | `OCTBASE_APP_VERSION` | string | `beta` (build default) | No | App version string surfaced at `/health`, `/api/v1/version`, `/api/v1/config`, and the desktop app's version tag. Unstamped builds show `beta`; stamp the real release version per deployment |
 | `OCTBASE_SCM_ENC_KEY` | string | *(empty)* | For SCM | 32-byte AES-256 key (base64/hex) encrypting stored SCM access tokens — required before any repository connection can be saved |
 | `OCTBASE_MFA_ENC_KEY` | string | *(empty)* | For MFA | 32-byte AES-256 key (base64/hex) encrypting users' TOTP secrets — required before any user can enroll in MFA. Deliberately separate from `OCTBASE_SCM_ENC_KEY` |
@@ -579,8 +579,31 @@ natural option only for a future multi-instance deployment.
 ## TLS Certificates
 
 **Caddy** (the `octbase-frontend` container) terminates TLS and reverse-proxies the
-API. To serve HTTPS, run Caddy with `octbase-frontend/caddy/Caddyfile.tls` (it
-redirects `:8080` → HTTPS and listens on `:8443`) and mount the cert files at:
+API. `octbase-frontend/caddy/Caddyfile.tls` redirects `:8080` → HTTPS and listens
+on `:8443` — but note two things the defaults do **not** give you:
+
+- The frontend image ships **only** `caddy/Caddyfile` (plus the `auth-*.caddy`
+  snippets) — `Caddyfile.tls` is *not* baked in (see
+  `octbase-frontend/Containerfile`). Bind-mount it in, or rebuild the image with
+  it copied to `/etc/caddy/Caddyfile`.
+- `podman-compose.yml` publishes only port 8080 (`${FRONTEND_PORT:-8080}:8080`);
+  8443 is not published by default.
+
+The practical route is a compose override, e.g. `podman-compose.tls.yml`:
+
+```yaml
+services:
+  octbase-frontend:
+    ports:
+      - "${FRONTEND_BIND_ADDR:-0.0.0.0}:8443:8443"
+    volumes:
+      - ./octbase-frontend/caddy/Caddyfile.tls:/etc/caddy/Caddyfile:ro,Z
+      - ./tls/tls.crt:/etc/caddy/tls/tls.crt:ro,Z
+      - ./tls/tls.key:/etc/caddy/tls/tls.key:ro,Z
+```
+
+layered with `podman-compose -f podman-compose.yml -f podman-compose.tls.yml up -d`
+(or the equivalent `podman run -v …` mounts). The cert files must land at:
 - `/etc/caddy/tls/tls.crt`
 - `/etc/caddy/tls/tls.key`
 
@@ -601,8 +624,11 @@ Caddy afterwards:
 
 ```bash
 certbot renew --quiet
-# copy/renew the cert+key into the path Caddy mounts, then:
-podman exec octbase-frontend caddy reload --config /etc/caddy/Caddyfile.tls
+# copy/renew the cert+key into the path Caddy mounts, then reload the config
+# Caddy is actually running (with the mount above, Caddyfile.tls is mounted AT
+# /etc/caddy/Caddyfile). The container name is compose-generated —
+# <project>_octbase-frontend_1, e.g. octbase_octbase-frontend_1; check `podman ps`:
+podman exec octbase_octbase-frontend_1 caddy reload --config /etc/caddy/Caddyfile
 ```
 
 > Caddy can also obtain and renew Let's Encrypt certificates automatically when
@@ -691,13 +717,20 @@ podman-compose -f podman-compose.yml -f podman-compose.dev.yml up -d
 ```
 
 - Local UI: `http://localhost:8025/mailpit/` (bound to `127.0.0.1` only), or
-  `/mailpit/` on the dev (non-TLS) frontend Caddyfile. The production
-  `Caddyfile.tls` intentionally does **not** proxy it.
+  `/mailpit/` through the frontend Caddy. Note: the shipped `caddy/Caddyfile` —
+  which **is** the config the image deploys (see `octbase-frontend/Containerfile`),
+  not a dev-only variant — proxies `/mailpit` unconditionally to the `mailpit`
+  service; the TLS variant `Caddyfile.tls` has no such route.
 - Basic auth is on by default (`octbase:octbase`); override with
   `MAILPIT_UI_AUTH=user:strong-pass`.
 - Verify a deployment is Mailpit-free:
   `podman ps --format '{{.Names}}' | grep -i mailpit` must return nothing, and
-  `https://<app-domain>/mailpit/` must 404.
+  `https://<app-domain>/mailpit/` must **not** serve the Mailpit UI. Expect a
+  **502** on a stack running the shipped `Caddyfile` (the proxy target
+  `mailpit:8025` does not exist without the dev overlay — the route is always
+  there, its backend is not); under `Caddyfile.tls` the path falls through to
+  the SPA shell instead. A **200 showing the Mailpit UI is the failure signal**:
+  it means the dev overlay (and captured mail) is exposed on a deployed stack.
 
 ---
 

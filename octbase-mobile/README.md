@@ -104,8 +104,10 @@ for, since a browser refuses `import` from a `file://` origin. The Playwright mo
 that artifact, because `file://` is the code path it exists to exercise.
 
 > ⚠️ The `data-act` event dispatch keys handlers by `fn.name` — identifier **mangling must stay
-> OFF**. `vite.config.js` sets `esbuild: { keepNames: true }` for exactly this reason; removing
-> that line is not a size optimization, it silently kills every delegated tap in the app.
+> OFF**. `vite.config.js` sets `rollupOptions.output: { keepNames: true }` for exactly this
+> reason; removing that line is not a size optimization, it silently kills every delegated tap in
+> the app. It must sit on the rolldown **output** options: Vite 8 no longer uses esbuild, so the
+> older `esbuild: { keepNames: true }` is a silent no-op (see the config's comment).
 
 ## Local development
 

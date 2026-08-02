@@ -362,7 +362,7 @@ kbd {
 <section id="board">
 <h2>Kanban board</h2>
 <p>The board is the primary task view. Tasks are organised into columns (lanes) that map to a workflow status. Press <kbd>B</kbd> from inside any project to jump here.</p>
-<p>A card's lane and its status are two views of the same thing and stay aligned both ways: dragging a card to another lane sets the task's status to that lane's status, and changing a task's status elsewhere (for example from the task panel) moves the card into the matching lane. A task not on the board, or one whose board has no lane for the new status, keeps its place.</p>
+<p>A card's lane and its status are two views of the same thing and stay aligned both ways: dragging a card to another lane sets the task's status to that lane's status, and changing a task's status elsewhere (for example from the task panel) moves the card into the matching lane. A task not on the board yet <em>joins</em> it when its new status says work has started (<strong>In Progress</strong> or <strong>Review</strong>) — started work belongs on the board, not in the backlog. Setting <strong>Planned</strong> keeps a backlog task in the backlog (that is the backlog's own status), a finished status does not pull a task onto a board it never visited, and a board that has no lane for the new status places or moves nothing.</p>
 
 <h3>Creating a board</h3>
 <p>A <strong>PROJECT_OWNER</strong> or <strong>PROJECT_ADMIN</strong> can create a board pre-filled with a default set of lanes. Choose a template:</p>
@@ -485,9 +485,9 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
 <p>These settings belong to the project: they travel with a project <a href="#import">export/import</a>, and they do not affect any other project.</p>
 
 <h3 id="board-lane-paging">How many cards a lane shows</h3>
-<p>A board lane shows the first <strong>20</strong> cards and loads the rest as you scroll down. A lane that is holding more than it shows ends in a <strong>Load N&nbsp;more cards</strong> button saying exactly how many are waiting; scrolling towards it loads the next page on its own, and clicking it does the same without a mouse wheel. This keeps a board with a few hundred finished tasks in its Done lane quick to open and quick to drag on.</p>
+<p>A board lane shows a first batch of cards — the project's <strong>Cards per lane</strong> setting, <strong>20</strong> unless changed — and loads the rest as you scroll down. A lane that is holding more than it shows ends in a <strong>Load N&nbsp;more cards</strong> button saying exactly how many are waiting; scrolling towards it loads the next page on its own, and clicking it does the same without a mouse wheel. This keeps a board with a few hundred finished tasks in its Done lane quick to open and quick to drag on.</p>
 <p><strong>Nothing is hidden from the counts.</strong> The number beside a lane's name is always the whole lane, not the part currently drawn — so a lane reading <em>71</em> while showing twenty cards is behaving correctly. Nothing has left the lane, and searching, filtering and dragging still see every card.</p>
-<p>A card you have just created or dragged into a lane is always shown, even when it lands past the point the lane had drawn to. Owners and admins can change the number under <strong>Task types &amp; priorities → Board lanes</strong>, and setting it to <strong>0</strong> turns paging off and draws every card as before.</p>
+<p>A card you have just created or dragged into a lane is always shown, even when it lands past the point the lane had drawn to. Owners and admins can change the number under <strong>Task types &amp; priorities → Board lanes</strong> (up to <strong>500</strong> — the server caps it there), and setting it to <strong>0</strong> turns paging off and draws every card as before.</p>
 
 <h3 id="estimation">Effort estimation</h3>
 <p>A project can give its tasks an <strong>effort estimate</strong>, measured either in <strong>story points</strong> or in <strong>hours</strong>. It is <strong>off by default</strong>: until an owner or admin picks a unit under <strong>Task types &amp; priorities → Effort estimation</strong>, no estimate field appears anywhere in the project — no box on the task, no badge on the cards. A team that does not estimate never has to look at one.</p>
@@ -505,11 +505,11 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
 
 <section id="bulk-actions">
 <h2>Bulk actions</h2>
-<p>Select multiple tasks using the checkboxes on the board or task list, then use the bulk action bar that appears at the bottom to apply a change to all selected tasks at once.</p>
-<p>Available bulk operations: set <strong>status</strong>, <strong>priority</strong>, or <strong>assignee</strong>; <strong>move</strong> the selection onto a board column or back to the backlog; <strong>archive</strong>; and <strong>delete</strong> (delete is only offered if your role permits it). Both archive and delete ask for confirmation first. Setting a status in bulk places the selection the same way the task panel does — each task lands in the column carrying that status.</p>
+<p>Select multiple tasks using the checkboxes in the <a href="#backlog">Backlog</a> and the task list — board cards carry no checkboxes, so selection lives in the list views, not on the board. A bulk action bar appears at the bottom to apply a change to all selected tasks at once.</p>
+<p>Available bulk operations: set <strong>status</strong>, <strong>priority</strong>, or <strong>assignee</strong>; <strong>Add to board</strong>, a single button offered in the Backlog that puts the selection onto the board's <em>Planned</em> lane (there is no per-column picker and no bulk move back to the backlog); <strong>archive</strong>; and <strong>delete</strong> (delete is only offered if your role permits it). Both archive and delete ask for confirmation first. Setting a status in bulk places the selection the same way the task panel does — each task lands in the column carrying that status.</p>
 <p>Finished work is skipped: a <strong>DONE</strong> or <strong>ARCHIVED</strong> task in the selection keeps its status when you set a status in bulk, exactly as the task panel refuses to change it. Reopen a finished task individually (its <strong>Reopen</strong> button) if you really want it back in play. The other bulk operations — priority, assignee, archive — still apply to finished tasks, matching what the task panel allows on them.</p>
 <p>The <strong>Assign to</strong> list offers the same people the task panel does: the project's members plus your instance's global admins, marked <em>(admin)</em>.</p>
-<div class="tip">Shift-click a second checkbox to select a range of tasks in one action.</div>
+<div class="tip">The checkbox in the list's header row selects or clears every task currently listed in one click; it shows a partial mark while only some rows are selected.</div>
 </section>
 
 <section id="tasklist">
@@ -560,7 +560,7 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
 <h2>Archive</h2>
 <p>The <strong>Archive</strong> view lists every task in the project that has the <span class="badge badge-gray">ARCHIVED</span> status — both tasks you archived by hand and tasks Octbase archived automatically. Open it from the <strong>Archive</strong> entry in the project sidebar.</p>
 <div class="tip"><strong>Auto-archiving keeps the board clear.</strong> A task is archived automatically <strong>30 days after it is marked DONE</strong>. Auto-archived tasks disappear from the board, backlog, and task list, but they are never deleted — they remain here, fully readable, and the auto-archive is recorded in the <a href="#activity">project activity</a> log.</div>
-<p>Click a task's title to open its panel. Use <strong>Reopen</strong> on any row to bring a task back to the <strong>PLANNED</strong> status and onto the board again.</p>
+<p>Click a task's title to open its panel. Use <strong>Reopen</strong> on any row to bring a task back to the <strong>PLANNED</strong> status. Where it reappears depends on where it was archived from: a task that still held a board card returns to the board's <em>Planned</em> lane, while a task archived out of the backlog reopens into the backlog — Planned work is never placed onto a board by itself.</p>
 </section>
 
 <section id="activity">
@@ -618,7 +618,7 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
 <p>While a sprint is <strong>PLANNED</strong>, open its board and turn on the <strong>backlog column</strong> (toolbar toggle), then drag tasks from the backlog onto a lane. Dragging a task onto the sprint board adds it to the sprint. Plan all the work you intend to commit to before you start.</p>
 
 <h3>Starting and completing a sprint</h3>
-<p>Click <strong>Start Sprint</strong> on any PLANNED sprint to activate it. Once a sprint is <strong>ACTIVE</strong> its <strong>scope is locked</strong>: you can no longer drag new tasks onto its board (you'll see a "scope is locked" message), but tasks already in the sprint move freely between lanes. At the end of the iteration click <strong>Complete Sprint</strong> — a confirmation dialog warns that any unfinished tasks will be moved back to the backlog. They return as <strong>Planned</strong>, ready to be picked up again in a later sprint; the sprint's own result is recorded before that happens, so the numbers below are unaffected.</p>
+<p>Click <strong>Start Sprint</strong> on any PLANNED sprint to activate it. Once a sprint is <strong>ACTIVE</strong> its <strong>scope is locked against additions</strong>: you can no longer drag new tasks onto its board (you'll see a "scope is locked" message), but tasks already in the sprint move freely between lanes. Removals stay possible: taking a card off a running sprint's board un-commits the task from the sprint and resets it to <strong>Planned</strong>, back in the backlog. At the end of the iteration click <strong>Complete Sprint</strong> — a confirmation dialog warns that any unfinished tasks will be moved back to the backlog. They return as <strong>Planned</strong>, ready to be picked up again in a later sprint; the sprint's own result is recorded before that happens, so the numbers below are unaffected.</p>
 <p>Completing a sprint records its result as <em>done / committed</em> — for example <strong>2/5</strong> means 5 tasks were on the board and 2 were DONE. The count reflects what was on the board, and the completed sprint card keeps showing it even after the unfinished tasks return to the backlog.</p>
 
 <h3>Assigning tasks to a sprint</h3>
@@ -1056,10 +1056,16 @@ Priorities: <strong>LOW · MEDIUM · HIGH · CRITICAL · BLOCKER</strong> (a pro
     <li><code>/#/projects/ID/board</code> — board view</li>
     <li><code>/#/projects/ID/board?priority=HIGH</code> — board filtered to HIGH priority</li>
     <li><code>/#/projects/ID/board?task=TASK_ID</code> — board with task panel open</li>
+    <li><code>/#/projects/ID/sprintBoard</code> — the current sprint's board (while a sprint is planned or active)</li>
     <li><code>/#/projects/ID/backlog</code> — backlog</li>
+    <li><code>/#/projects/ID/tasks</code> — task list</li>
     <li><code>/#/projects/ID/releases</code> — releases</li>
     <li><code>/#/projects/ID/sprints</code> — sprints</li>
     <li><code>/#/projects/ID/pages</code> — wiki pages</li>
+    <li><code>/#/projects/ID/mindmap</code> — mindmap</li>
+    <li><code>/#/projects/ID/statistics</code> — project statistics</li>
+    <li><code>/#/projects/ID/members</code> — project members</li>
+    <li><code>/#/projects/ID/repos</code> — repository connections</li>
     <li><code>/#/projects/ID/activity</code> — project activity log</li>
     <li><code>/#/projects/ID/archive</code> — archived tasks</li>
     <li><code>/#/search?q=TERM</code> — global search</li>

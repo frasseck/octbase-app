@@ -225,8 +225,11 @@ registerChanges({                                     // bespoke: raw (el, ev)
   It used to do nothing at all, and that silence cost a full session: Vite's
   minifier renamed the top-level functions the registry is keyed by, which
   unregistered every array-form handler at once and surfaced only as dead
-  buttons. (The rename itself is prevented by `esbuild: { keepNames: true }` in
-  the Vite config — see its comment.)
+  buttons. (The rename itself is prevented by `rollupOptions.output:
+  { keepNames: true }` in the Vite config — it must sit on the rolldown output
+  options, because Vite 8 no longer uses esbuild and the older
+  `esbuild: { keepNames: true }` is a silent no-op there; see the config's
+  comment.)
 - **`delegation.js` must not grow an import.** It was split out of
   `framework.js` precisely so it depends on nothing: the `_A*` adapters are
   `const` arrows that seven view modules read *at load time*, and `framework.js`

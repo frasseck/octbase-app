@@ -116,7 +116,7 @@ production.
 
 - **Go standard library** + chi router
 - **pgx** PostgreSQL driver (`database/sql` via `pgx/v5/stdlib`)
-- **JWT authentication** — every `/api/v1` route (except `auth/login`, `auth/refresh`, `auth/mfa/verify`, `auth/forgot-password`, `auth/reset-password`, `config`, invitation inspect/accept, and webhook receivers) requires a `Bearer` token
+- **JWT authentication** — every `/api/v1` route (except `auth/login`, `auth/refresh`, `auth/logout`, `auth/mfa/verify`, `auth/forgot-password`, `auth/reset-password`, `health`, `version`, `meta/enums`, `config`, invitation inspect/accept, the OAuth callback `GET /api/v1/oauth/{provider}/callback`, and the HMAC webhook receivers) requires a `Bearer` token
 - **Modular monolith** organised by bounded context:
   - `auth` — JWT issue/validate, bcrypt, refresh tokens, invitation flow, change-password, `JWTMiddleware`, `LoadUserGlobalRole`
   - `bootstrap` — creates the first `SUPER_ADMIN` from `OCTBASE_BOOTSTRAP_ADMIN_*` while the users table is empty
@@ -198,8 +198,8 @@ scenario that drives the whole product end to end.
 Integration-style tests that run the real HTTP handlers against a real
 PostgreSQL. They require `TEST_DATABASE_URL`; each test applies the real
 migrations into its own schema and drops it afterwards for isolation, and the
-whole suite **skips** if the variable is not set. There are ~90 `*_test.go`
-files across the bounded contexts.
+whole suite **skips** if the variable is not set. There are well over a hundred
+`*_test.go` files across the bounded contexts (117 as of 2026-08-02).
 
 ```bash
 cd octbase-api

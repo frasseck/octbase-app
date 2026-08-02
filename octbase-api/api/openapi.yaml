@@ -1429,7 +1429,12 @@ paths:
         the single-task status route (reopening is POST /tasks/{taskId}/reopen,
         per task) — and archive skips already-ARCHIVED tasks. set_status to DONE
         is refused entirely (422 TASK_HAS_BLOCKER) while any selected task has an
-        open BLOCKER descendant.
+        open BLOCKER descendant. Values are validated like the single-task
+        doors: unknown status/priority answer 422 INVALID_STATUS /
+        INVALID_PRIORITY, set_assignee requires an assignable user (422
+        ASSIGNEE_INVALID), set_release a release of this project (422
+        RELEASE_NOT_FOUND); an empty assignee/release value clears the link
+        (stored as null).
       operationId: bulkTasks
       requestBody:
         required: true
@@ -1451,6 +1456,8 @@ paths:
                 type: object
                 properties:
                   updated: { type: integer }
+        # BAD_REQUEST (invalid JSON) or INVALID_ACTION (unknown bulk action).
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         # VALIDATION_ERROR (empty taskIds) or BULK_TOO_MANY_TASKS (over maxItems).
         '422': { $ref: '#/components/responses/Unprocessable' }
@@ -1528,7 +1535,7 @@ paths:
         Sending null or an empty string clears the field and is always allowed.
       operationId: assignTask
       requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { assigneeId: { type: string, format: uuid, nullable: true }, reviewerId: { type: string, format: uuid, nullable: true }, version: { type: integer, description: Optional task version the change is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
-      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
   /api/v1/tasks/{taskId}/status:
     parameters: [ { $ref: '#/components/parameters/taskId' } ]
     post:
@@ -1536,7 +1543,7 @@ paths:
       summary: Change task status (fails with TASK_HAS_BLOCKER when moving to DONE while a child task has BLOCKER priority)
       operationId: setTaskStatus
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [status], properties: { status: { $ref: '#/components/schemas/TaskStatus' }, version: { type: integer, description: Optional task version the change is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
-      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
   /api/v1/tasks/{taskId}/priority:
     parameters: [ { $ref: '#/components/parameters/taskId' } ]
     post:
@@ -1544,7 +1551,9 @@ paths:
       summary: Change task priority
       operationId: setTaskPriority
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [priority], properties: { priority: { $ref: '#/components/schemas/Priority' }, version: { type: integer, description: Optional task version the change is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
-      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
+      # 422 is INVALID_PRIORITY: a value that is neither a built-in nor one of
+      # the project's custom priorities.
+      responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
   /api/v1/tasks/{taskId}/activity:
     parameters: [ { $ref: '#/components/parameters/taskId' } ]
     get: { tags: [Tasks], summary: Task activity feed, operationId: getTaskActivity, responses: { '200': { description: Activity entries }, '404': { $ref: '#/components/responses/NotFound' } } }
@@ -1641,6 +1650,14 @@ paths:
       tags: [Tasks]
       summary: Add a relation
       operationId: addRelation
+      description: >-
+        Creates the relation and its symmetric inverse. The target task must
+        exist in the same project as the source; a missing and a cross-project
+        targetTaskId both answer 422 TASK_NOT_FOUND (details.field
+        targetTaskId) — deliberately indistinguishable, so the response cannot
+        probe other projects' task IDs. Other 422s: TASK_SELF_RELATION,
+        TASK_RELATION_TYPE_INVALID, TASK_RELATION_DUPLICATE,
+        TASK_RELATION_CYCLE.
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [targetTaskId, relationType], properties: { targetTaskId: { type: string, format: uuid }, relationType: { $ref: '#/components/schemas/RelationType' } } } } } }
       responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/TaskRelation' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
   /api/v1/tasks/{taskId}/relations/{relationId}:
@@ -1721,7 +1738,9 @@ paths:
       operationId: updateColumn
       requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { name: { type: string }, status: { type: string, description: 'Task status this lane represents; changing it retags the lane''s non-DONE/ARCHIVED tasks to the new status. Unique per board.' }, position: { type: integer }, version: { type: integer, description: Optional column version the edit is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
       responses: { '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/BoardColumn' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } }
-    delete: { tags: [Boards], summary: Delete a column. The lane's tasks are detached back to the backlog (they keep their status)., operationId: deleteColumn, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } } }
+    # 409 is BOARD_MIN_LANES: deleting the lane would drop the board below its
+    # configured minimum lane count.
+    delete: { tags: [Boards], summary: Delete a column. The lane's tasks are detached back to the backlog and reset to PLANNED (OCT-304); DONE and ARCHIVED tasks keep their status., operationId: deleteColumn, responses: { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } } }
   /api/v1/boards/{boardId}/external-columns:
     parameters: [ { $ref: '#/components/parameters/boardId' } ]
     get: { tags: [Boards], summary: List external columns, operationId: listExternalColumns, responses: { '200': { description: External columns, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/BoardExternalColumn' } } } } } } }
@@ -1750,15 +1769,21 @@ paths:
         the sprint may still be moved between lanes.
       operationId: moveTask
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [taskId, boardColumnId], properties: { taskId: { type: string, format: uuid }, boardColumnId: { type: string, format: uuid }, boardRank: { type: integer }, version: { type: integer, description: Optional task version the move is based on; a stale version is rejected with 409 VERSION_CONFLICT } } } } } }
-      responses: { '200': { description: Moved }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/Unprocessable' } }
+      responses: { '200': { description: Moved — the updated task, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' }, '422': { $ref: '#/components/responses/Unprocessable' } }
   /api/v1/boards/{boardId}/remove-task:
     parameters: [ { $ref: '#/components/parameters/boardId' } ]
     post:
       tags: [Boards]
       summary: Remove a task from the board
+      description: >-
+        Detaches the task's card, returning the task to the backlog: a
+        non-DONE/ARCHIVED task is reset to PLANNED (OCT-304), so it cannot sit
+        in the backlog wearing an in-flight status. Removing a task from its
+        sprint's board also un-commits it from that sprint — the inverse of
+        move-task's enrollment.
       operationId: removeTaskFromBoard
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [taskId], properties: { taskId: { type: string, format: uuid } } } } } }
-      responses: { '200': { description: Removed }, '404': { $ref: '#/components/responses/NotFound' } }
+      responses: { '200': { description: Removed — the updated task, content: { application/json: { schema: { $ref: '#/components/schemas/Task' } } } }, '404': { $ref: '#/components/responses/NotFound' } }
 
   # ───────────────────── Releases & sprints ─────────────────────
   /api/v1/projects/{projectId}/releases:
@@ -1802,7 +1827,7 @@ paths:
       summary: Create a sprint
       operationId: createSprint
       requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name], properties: { name: { type: string }, goal: { type: string }, startDate: { type: string, format: date }, endDate: { type: string, format: date }, releaseId: { type: string, format: uuid, nullable: true } } } } } }
-      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Sprint' } } } }, '422': { $ref: '#/components/responses/Unprocessable' } }
+      responses: { '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Sprint' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '422': { $ref: '#/components/responses/Unprocessable' } }
   /api/v1/sprints/{sprintId}:
     parameters: [ { name: sprintId, in: path, required: true, schema: { type: string, format: uuid } } ]
     get: { tags: [Planning], summary: Get a sprint, operationId: getSprint, responses: { '200': { description: Sprint, content: { application/json: { schema: { $ref: '#/components/schemas/Sprint' } } } }, '404': { $ref: '#/components/responses/NotFound' } } }

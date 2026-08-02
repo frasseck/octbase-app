@@ -80,6 +80,26 @@ All notable changes to Octbase are documented here.
   and left for a person), finished tasks are left alone, the card moves to the
   *Done* lane, `done_at` is stamped, and the Activity entry is written with the
   empty actor of a system action — the same convention as auto-archive.
+- **The documentation tells the truth again where it had drifted behind the
+  code.** The four passages still prescribing `esbuild: { keepNames: true }`
+  (architecture, technical documentation, both frontend READMEs) now name the
+  real setting — `rollupOptions.output: { keepNames: true }` — because under
+  Vite 8's rolldown the esbuild form is a silent no-op, and following the old
+  docs verbatim reproduces the exact green-build-dead-buttons failure the
+  project already paid a debugging session for. The operations runbook was
+  reconciled with the shipped stack: `OCTBASE_APP_URL` is marked required
+  (the API refuses to start without it outside demo mode), the TLS steps say
+  how `Caddyfile.tls` actually reaches the container (it is not in the
+  image), and the Mailpit verification expects the 502 a healthy production
+  stack really answers, not a 404. The user guide's bulk-actions section now
+  describes the selection that exists (backlog and task list — board cards
+  carry no checkboxes, there is no per-column bulk move and no Shift-range
+  select), its status-change and sprint-scope passages match the OCT-303/304
+  board rules in both directions, and `openapi.yaml`'s `deleteColumn` no
+  longer asserts the opposite of the code (detached tasks reset to PLANNED);
+  the move/remove-task 200s declare the Task body both SPAs rely on, and the
+  409 `VERSION_CONFLICT` responses the prose promised are declared on the
+  status/assign/priority/move operations.
 - **A task relation's target must now exist — in the same project.** The
   create side of relations accepted any UUID: a nonexistent `targetTaskId`
   rode the foreign key into a raw `500 INTERNAL_ERROR` (a cross-project

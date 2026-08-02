@@ -59,7 +59,7 @@ convention regressions.
 | `octbase-shared/` | The `@octbase/shared` workspace package — JS imported by both SPAs (`i18n.js`, `meta.js`, `richtext.js`). One copy since 37b stage 3, so the old byte-identical sync + drift guard are gone; the two vendored libraries that used to live here became the pinned `dompurify` / `qrcode-generator` npm deps at stage 4 |
 | `octbase-operations/` | Health-observation layer: `check-health.sh` (whole-stack probe) + reaction runbook |
 | `testdata/` | Case tables shared by the Go and JS test suites — today `url-guard-cases.json`, the contract between `sanitize.go`'s URL guards and their `octbase-shared/richtext.js` mirror |
-| `scripts/` | Repo-level tooling: the TDZ/innerHTML/vendor-integrity guards, asset stamping, DB reset, the end-to-end agile API scenario |
+| `scripts/` | Repo-level tooling: the TDZ/innerHTML/vendor-integrity guards, classic-asset filename hashing (`vite-hash-classic-assets.mjs` — the `?v=` stamping retired at 37b stage 5), DB reset, the end-to-end agile API scenario |
 | `podman-compose.yml` | Full stack: Postgres + API + frontend + mobile (no Mailpit — deployable) |
 | `podman-compose.dev.yml` | Dev-only overlay adding Mailpit mail capture; layer with `-f` for local stacks |
 | `docs/architecture.md` | **Normative** architecture decisions (style, concurrency model, scaling stance) |

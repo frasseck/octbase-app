@@ -210,10 +210,14 @@ place.** Delegated dispatch keys handlers by `fn.name` (`_dispatch` in
 functions silently unregisters every delegated click, change, input, keydown and
 submit in the app — no exception, no console output, just dead buttons. The
 esbuild minify stage never mangled; Vite's minifier would, so
-`esbuild: { keepNames: true }` in the Vite config is not a size trade-off but a
-correctness requirement. It cost a full session's debugging to learn once
-(13 e2e failures whose only symptom was dead buttons); `_dispatch` now logs the
-missing handler name so it cannot be silent again.
+`rollupOptions.output: { keepNames: true }` in the Vite config is not a size
+trade-off but a correctness requirement. The option **must live on the rolldown
+output options**: Vite 8 bundles with rolldown and no longer uses esbuild at
+all, so the earlier `esbuild: { keepNames: true }` became a silent no-op on
+upgrade — a green build that shipped mangled action names (see the comment in
+`octbase-frontend/vite.config.js`). It cost a full session's debugging to learn
+once (13 e2e failures whose only symptom was dead buttons); `_dispatch` now
+logs the missing handler name so it cannot be silent again.
 
 Within the desktop SPA, the shell (core) holds no per-view knowledge: view
 modules self-register in a view registry (`octbase-frontend/js/registry.js`)
