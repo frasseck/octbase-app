@@ -78,6 +78,13 @@ func (r *ReleaseRepo) Delete(id string) error {
 	if _, err := tx.Exec(`UPDATE tasks SET release_id=NULL WHERE release_id=$1`, id); err != nil {
 		return err
 	}
+	// The activity entries about this release stay — RELEASE_CLOSED happened
+	// whether or not the release still exists — but stop pointing at it, and
+	// carry the marker the UI greys them out by. Tasks lose the link the same
+	// way one line above; only the reader-facing consequence differs.
+	if _, err := tx.Exec(`UPDATE activity_entries SET release_id=NULL, target_deleted=TRUE WHERE release_id=$1`, id); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(`DELETE FROM releases WHERE id=$1`, id); err != nil {
 		return err
 	}
@@ -315,6 +322,11 @@ func (r *SprintRepo) Delete(id string) error {
 	return shared.WithTx(r.db, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`UPDATE tasks SET sprint_id=NULL WHERE sprint_id=$1`, id); err != nil {
 			return fmt.Errorf("clear task sprint: %w", err)
+		}
+		// Same rule as ReleaseRepo.Delete: the entries survive the sprint,
+		// unlinked and marked so the UI can grey them.
+		if _, err := tx.Exec(`UPDATE activity_entries SET sprint_id=NULL, target_deleted=TRUE WHERE sprint_id=$1`, id); err != nil {
+			return fmt.Errorf("unlink sprint activity: %w", err)
 		}
 		if _, err := tx.Exec(`DELETE FROM sprints WHERE id=$1`, id); err != nil {
 			return fmt.Errorf("delete sprint: %w", err)

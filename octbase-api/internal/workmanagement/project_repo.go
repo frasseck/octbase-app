@@ -95,6 +95,14 @@ func (r *ProjectRepo) Update(p *Project) error {
 
 func (r *ProjectRepo) Delete(id string) error {
 	stmts := []string{
+		// Activity goes first, and unlike every other delete it is the whole
+		// project's log rather than a per-task cascade: a deleted project has no
+		// activity feed left to read its history in, so the entries go with it
+		// (the one case where the log does not outlive its subject — elsewhere
+		// deletion only unlinks; see migration 039). It must precede the tasks,
+		// sprints and releases below because activity_entries now carries an FK
+		// to each of them.
+		`DELETE FROM activity_entries WHERE project_id=$1`,
 		`DELETE FROM branch_references WHERE task_id IN (SELECT id FROM tasks WHERE project_id=$1)`,
 		`DELETE FROM branch_references WHERE repository_id IN (SELECT id FROM repository_connections WHERE project_id=$1)`,
 		`DELETE FROM page_task_references WHERE page_id IN (SELECT id FROM pages WHERE project_id=$1)`,
@@ -114,7 +122,6 @@ func (r *ProjectRepo) Delete(id string) error {
 		`DELETE FROM project_priorities WHERE project_id=$1`,
 		`DELETE FROM repository_connections WHERE project_id=$1`,
 		`DELETE FROM memberships WHERE project_id=$1`,
-		`DELETE FROM activity_entries WHERE project_id=$1`,
 		`DELETE FROM projects WHERE id=$1`,
 	}
 	return shared.WithTx(r.db, func(tx *sql.Tx) error {

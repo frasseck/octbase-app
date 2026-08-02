@@ -547,7 +547,7 @@ GET    /api/v1/projects/{id}/memberships
 POST   /api/v1/projects/{id}/memberships          # add member (role validated via CanAssignRole)
 PATCH  /api/v1/projects/{id}/memberships/{userId} # change role (escalation + last-owner checks)
 DELETE /api/v1/projects/{id}/memberships/{userId} # remove member (last-owner check)
-GET    /api/v1/projects/{id}/activity
+GET    /api/v1/projects/{id}/activity             # newest first; ?page/?size, 50 per page by default
 GET    /api/v1/projects/{id}/relations            # every task relation in the project in one call
 GET    /api/v1/projects/{id}/events               # SSE stream
 GET    /api/v1/projects/{id}/presence
@@ -563,7 +563,7 @@ GET    /api/v1/tasks/{taskId}
 PATCH  /api/v1/tasks/{taskId}
 DELETE /api/v1/tasks/{taskId}
 POST   /api/v1/tasks/{taskId}/assign | /status | /priority | /pin | /copy | /archive | /reopen
-GET    /api/v1/tasks/{taskId}/activity
+GET    /api/v1/tasks/{taskId}/activity            # same paging; entries survive their task, unlinked
 # comments · links · attachments · relations · branches
 POST   /api/v1/tasks/{taskId}/comments        GET … PATCH/DELETE …/{commentId}
 POST   /api/v1/tasks/{taskId}/links           GET … DELETE …/{linkId}

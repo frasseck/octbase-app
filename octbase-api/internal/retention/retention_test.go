@@ -30,6 +30,10 @@ func seedRetentionRows(t *testing.T, db *sql.DB) {
 	}{
 		{"old audit row", `INSERT INTO audit_logs (id, action, created_at) VALUES ('a-old','LOGIN_SUCCESS',$1)`, []interface{}{old}},
 		{"fresh audit row", `INSERT INTO audit_logs (id, action, created_at) VALUES ('a-new','LOGIN_SUCCESS',$1)`, []interface{}{now}},
+		// The project comes before the activity rows that reference it:
+		// activity_entries.project_id has carried an FK since migration 039.
+		{"project for activity and repo connection", `INSERT INTO projects (id, name, slug, created_at, updated_at)
+			VALUES ('p1','Retention P','retention-p',$1,$1)`, []interface{}{now.Format(time.RFC3339)}},
 		{"old activity row", `INSERT INTO activity_entries (id, project_id, actor_user_id, type, message, created_at)
 			VALUES ('act-old','p1','u1','TASK_CREATED','m',$1)`, []interface{}{old.Format(time.RFC3339)}},
 		{"fresh activity row", `INSERT INTO activity_entries (id, project_id, actor_user_id, type, message, created_at)
@@ -48,8 +52,6 @@ func seedRetentionRows(t *testing.T, db *sql.DB) {
 			VALUES ('inv-grace','grace@test.dev','PROJECT_MEMBER','t2',$1,$2)`, []interface{}{testutil.DemoUserID, now.AddDate(0, 0, -1)}},
 		{"accepted old invitation", `INSERT INTO invitations (id, email, role, token_hash, invited_by, expires_at, accepted_at)
 			VALUES ('inv-done','done@test.dev','PROJECT_MEMBER','t3',$1,$2,$2)`, []interface{}{testutil.DemoUserID, now.AddDate(0, 0, -40)}},
-		{"project for repo connection", `INSERT INTO projects (id, name, slug, created_at, updated_at)
-			VALUES ('p1','Retention P','retention-p',$1,$1)`, []interface{}{now.Format(time.RFC3339)}},
 		{"repo connection", `INSERT INTO repository_connections (id, project_id, display_name, repository_url, created_at, updated_at)
 			VALUES ('rc1','p1','Repo','https://example.test/repo.git',$1,$1)`, []interface{}{now.Format(time.RFC3339)}},
 		{"expired oauth state", `INSERT INTO oauth_states (state, provider, repository_id, user_id, created_at, expires_at)

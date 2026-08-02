@@ -6,6 +6,37 @@ All notable changes to Octbase are documented here.
 
 ### Changed
 
+- **The activity log outlives what it describes, without pretending it is still
+  there.** `activity_entries` had no foreign keys, so deleting a task left its
+  entries behind carrying a dead `taskId` — rows the Activity view still drew as
+  buttons that opened nothing. The entries now stay (the event happened; the log
+  is history) but the reference is nulled and a new `targetDeleted` flag is set,
+  and the UI renders those rows greyed out, unlinked, and labelled *Deleted
+  item*. Releases and sprints get the same treatment via two new columns,
+  `releaseId` and `sprintId`: `RELEASE_CLOSED` and friends only ever carried the
+  name in their payload, so a deleted release had been indistinguishable from a
+  live one. Deleting the whole **project** still removes its entries — there is
+  no feed left to read them in. Migration `039` adds the columns, cleans up the
+  orphans that had already accumulated, and adds plain FKs so a future deletion
+  path that forgets to unlink fails loudly instead of orphaning silently.
+  Entries written before the migration keep a null release/sprint reference and
+  are never greyed; there is nothing left to resolve them against.
+- **The activity feeds are paginated, 50 per page.** Both
+  `GET /projects/{id}/activity` and `GET /tasks/{taskId}/activity` accept
+  `?page`/`?size` and default to 50 (the task endpoint took no paging at all and
+  returned the task's entire history). The Activity view and the task panel's
+  Activity tab load the first page and offer **Load older activity**. Both lists
+  now render **newest first**; they used to reverse their single page, which
+  only read correctly while there was nothing after it.
+- **Test-side follow-ups to the above.** The retention fixture now inserts its
+  project before the activity rows that reference it (migration `039`'s FK made
+  the old order invalid); `views-task.test.js` learned the two new
+  `writeReleaseActivity`/`writeSprintActivity` helpers so its
+  every-activity-type-is-translated guard keeps seeing the `RELEASE_*`/`SPRINT_*`
+  vocabulary; and `tests/KNOWN_FAILURES.md` gains an entry for a load-dependent
+  `test_search.py` flake that lands on a different node each run — reproduced on
+  an unmodified build, so it is not a regression and should not be bisected as
+  one.
 - **The compose stack forwards the environment variables the runbook says to
   set.** `podman-compose.yml`'s API `environment:` block is an allowlist, and
   a dozen documented tunables were missing from it — setting

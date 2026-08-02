@@ -29,6 +29,7 @@ export type BoardColumn = Schemas['BoardColumn'];
 export type Release = Schemas['Release'];
 export type Sprint = Schemas['Sprint'];
 export type Page = Schemas['Page'];
+export type ActivityEntry = Schemas['ActivityEntry'];
 export type Error = Schemas['Error'];
 
 // Every field in the generated schemas is optional, because the spec marks few
