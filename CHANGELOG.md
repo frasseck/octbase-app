@@ -6,6 +6,22 @@ All notable changes to Octbase are documented here.
 
 ### Changed
 
+- **The e2e suite navigates through one helper that says why a route never
+  rendered.** `test_search.py` and the `demo_board` fixture drove the SPA with
+  `page.evaluate("() => window.router && window.router.go(path)")`, which can
+  fail three ways that all surface as the same bare `wait_for_selector`
+  timeout — the `&&` silently no-ops before `router.js` has run; `go()` only
+  assigns `window.location.hash`, so re-assigning the current value fires no
+  `hashchange` and nothing routes (`router.navigate()` exists to cover exactly
+  that); and `handleRoute` bounces to `/login` whenever `Auth.isAuthenticated()`
+  is false, which is also the normal state while a token refresh is in flight.
+  The new `goto_route()` in `conftest.py` waits for the router, calls
+  `navigate()`, and on timeout reports the hash, whether the login page is
+  showing, and what `#content` holds. Also new: `OCTBASE_TEST_TIMEOUT_SCALE`
+  (default `1`) multiplies `TIMEOUT`/`SHORT` for a loaded box, and
+  `KNOWN_FAILURES.md` records both the ruled-out hypothesis — `renderSearchPage`
+  paints `#sp-input` synchronously, so "slow to paint" was never possible — and
+  a fresh `401 passed, 22 skipped, 0 failed` measurement at `15d82c2`.
 - **The activity log outlives what it describes, without pretending it is still
   there.** `activity_entries` had no foreign keys, so deleting a task left its
   entries behind carrying a dead `taskId` — rows the Activity view still drew as
@@ -93,6 +109,18 @@ All notable changes to Octbase are documented here.
 
 ### Fixed
 
+- **The seeded demo activity entry shows the task's title instead of a raw
+  `{{title}}`.** `internal/seed/seed.go` wrote its one `activity_entries` row
+  with `payload_json` `'{}'`, but the `TASK_CREATED` translation is
+  `Created task "{{title}}"` — with no params to interpolate, the Activity view
+  rendered the placeholder verbatim, on every fresh demo stack, in one of the
+  first screens a visitor opens after the board. The payload now carries the
+  title of the task it describes, and the statement's `ON CONFLICT` clause
+  refreshes `payload_json` too, so an already-seeded stack repairs itself on the
+  next boot rather than keeping the broken row. The desktop unit test that
+  guards this class asserts on synthetic params and so could never see the seed
+  row; the contract is now pinned in Go instead
+  (`TestSeedActivityCarriesTranslationParams`, which fails on the old payload).
 - **The style guide's two newest sections render styled again, and its PDF is
   current.** The Progressive-disclosure and Transient-messages sections used a
   `dos` class the page never defines and two tables missing the page's `bp`

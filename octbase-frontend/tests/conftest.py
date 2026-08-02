@@ -15,6 +15,7 @@ import time
 
 import pytest
 import requests
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 # ── Constants ──────────────────────────────────────────────────────────────────
@@ -80,8 +81,23 @@ DEMO_TASK2_ID    = "00000000-0000-0000-0000-000000000202"
 DEMO_MILESTONE_ID = "00000000-0000-0000-0000-000000000401"
 DEMO_PAGE_TITLE  = "Getting Started"
 
-TIMEOUT = 8_000   # ms — for API-backed waits
-SHORT   = 2_000   # ms — for UI-only transitions
+# OCTBASE_TEST_TIMEOUT_SCALE multiplies both waits for runs on a box that is
+# doing other work. The suite is load-sensitive — a Go API, a `vite preview` and
+# the podman stacks competing for one machine push API-backed waits far past
+# what they need when idle — and the failure that produces is a bare
+# `wait_for_selector` timeout on a different test each run, which reads as a
+# regression and costs a bisect (KNOWN_FAILURES.md, entry 3). Scaling beats
+# raising the constants: an idle run keeps failing fast.
+def _scaled(ms: int) -> int:
+    try:
+        scale = float(os.getenv("OCTBASE_TEST_TIMEOUT_SCALE", "1"))
+    except ValueError:
+        scale = 1.0
+    return int(ms * max(scale, 1.0))
+
+
+TIMEOUT = _scaled(8_000)   # ms — for API-backed waits
+SHORT   = _scaled(2_000)   # ms — for UI-only transitions
 
 
 # ── API client ─────────────────────────────────────────────────────────────────
@@ -600,8 +616,7 @@ def demo_board(app):
     projects, and the seeded Demo Project (oldest by createdAt) can be pushed
     out of that list once enough other projects exist.
     """
-    app.evaluate(f"() => router.go('/projects/{DEMO_PROJECT_ID}/board')")
-    app.wait_for_selector(".board-col", timeout=TIMEOUT)
+    goto_route(app, f"/projects/{DEMO_PROJECT_ID}/board", ".board-col")
     return app
 
 
@@ -618,6 +633,54 @@ def task_panel(demo_board):
 def navigate_to(page, view_label: str):
     """Click a sidebar nav item by its visible label and wait for the view."""
     page.click(f".sidebar-item:has-text('{view_label}')")
+    settle(page)
+
+
+def goto_route(page, path: str, wait_for: str, timeout: int = None):
+    """Route the SPA to ``path`` and wait for ``wait_for`` to appear.
+
+    Replaces ``page.evaluate("() => window.router && window.router.go(p)")``,
+    which fails three ways that all present as an unexplained
+    ``wait_for_selector`` timeout on a different test each run:
+
+    1. **The ``&&`` guard silently does nothing.** Before ``router.js`` has run,
+       ``window.router`` is undefined, the expression short-circuits to
+       ``undefined``, and the caller then waits out its whole timeout for a view
+       nothing ever asked for. Waiting for the router turns that into a wait of
+       a few ms, or a named failure.
+    2. **``go()`` is the wrong entry point.** It only assigns
+       ``window.location.hash``, and assigning the value the hash *already*
+       holds fires no ``hashchange``, so nothing routes — the app's own comment
+       on ``router.navigate`` says so, and ``navigate`` exists to cover both
+       cases. Tests that poke ``go()`` are relying on never being on the target
+       route already.
+    3. **The route can resolve somewhere else.** ``handleRoute`` bounces to
+       ``/login`` whenever ``Auth.isAuthenticated()`` is false, which is also
+       the normal state while a token refresh is in flight, so a navigation
+       landing in that window renders the login page instead.
+
+    On timeout it reports which of those happened — the hash, whether the login
+    page is showing, what ``#content`` holds — instead of leaving the next
+    person to bisect a red run to conclude nothing.
+    """
+    timeout = TIMEOUT if timeout is None else timeout
+    page.wait_for_function("() => typeof window.router !== 'undefined'", timeout=timeout)
+    page.evaluate("p => window.router.navigate(p)", path)
+    try:
+        page.wait_for_selector(wait_for, timeout=timeout)
+    except PlaywrightTimeoutError:
+        state = page.evaluate("""() => ({
+            hash: window.location.hash,
+            onLogin: !!document.querySelector('#login-form'),
+            content: (document.querySelector('#content') || {}).innerHTML || '',
+        })""")
+        raise AssertionError(
+            f"routing to {path!r} never rendered {wait_for!r} within {timeout}ms.\n"
+            f"  location.hash: {state['hash']!r} (expected {'#' + path!r})\n"
+            f"  login page showing: {state['onLogin']} "
+            f"(true means the session was gone or a refresh was in flight)\n"
+            f"  #content starts: {state['content'][:200]!r}"
+        ) from None
     settle(page)
 
 
