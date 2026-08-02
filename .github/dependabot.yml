@@ -14,6 +14,23 @@ updates:
       - "/octbase-mobile"
     schedule:
       interval: weekly
+    ignore:
+      # TypeScript majors are held back until openapi-typescript can take one.
+      # `npm run types:generate` runs openapi-typescript, whose every published
+      # release (7.13.0 is latest as of 2026-08-02) declares
+      # `peer typescript: "^5.x"`. A TS 7 bump therefore fails `npm ci` outright
+      # with ERESOLVE — that is what PR #8 did — and forcing it past the peer
+      # would risk the types-generation guard itself, since TS 7 is the rewritten
+      # compiler and openapi-typescript drives the compiler API.
+      #
+      # TypeScript here is dev-only and narrow: openapi-typescript, plus
+      # `tsc --noEmit` over the three `// @ts-check` files. There is nothing to
+      # gain from 7 until upstream moves.
+      #
+      # REVISIT when openapi-typescript publishes a release whose peer range
+      # admits TypeScript 7, then drop this block and let the bump through.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # Go backend.
   - package-ecosystem: gomod
