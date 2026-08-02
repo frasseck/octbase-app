@@ -30,11 +30,20 @@ const LOCALE_FILES = [
 ];
 const EXEMPT = new Set(['VALIDATION_ERROR', 'TEST_CODE']);
 
-// The two ways a stable code reaches a response: a shared.Write*Error call and
-// a DomainError literal (which the handlers map onto one).
+// The three ways a stable code reaches a response: a shared.Write*Error call
+// with the code as a literal, a DomainError literal (which the handlers map
+// onto one), and a Go constant named Code<Something> whose value travels to a
+// Write*Error call as an identifier. The third pattern exists because the
+// first two only see literals at the call site — the SCM provider codes
+// (scmintegration/provider.go, `CodeRepoNotFound = "SCM_REPO_NOT_FOUND"` etc.)
+// shipped untranslated for weeks while this guard printed clean (2026-08-02
+// review). Convention this encodes: name error-code constants Code*, and this
+// guard will see them; a code smuggled through a differently-named constant or
+// a variable still gets past it.
 const PATTERNS = [
   /Write(?:Error|ValidationError|UpdateError)\([^)]*?"([A-Z][A-Z0-9_]{2,})"/g,
   /Code:\s*"([A-Z][A-Z0-9_]{2,})"/g,
+  /\bCode[A-Z]\w*\s*=\s*"([A-Z][A-Z0-9_]{2,})"/g,
 ];
 
 function goFiles(dir, out = []) {

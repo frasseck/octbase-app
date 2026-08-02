@@ -53,3 +53,15 @@ All notable changes to Octbase are documented here.
   and left for a person), finished tasks are left alone, the card moves to the
   *Done* lane, `done_at` is stamped, and the Activity entry is written with the
   empty actor of a system action — the same convention as auto-archive.
+- **The five SCM provider errors now speak the user's language — and the guard
+  that swore they did has learned why it missed them.** `SCM_REPO_NOT_FOUND`,
+  `SCM_AUTH_FAILED`, `SCM_BRANCH_EXISTS`, `SCM_PROVIDER_ERROR` and
+  `SCM_NOT_CONFIGURED` had no `errors.*` translation in any locale file of
+  either SPA, so a German user got the raw English provider message — while
+  `check-error-translations.mjs` printed clean, because it only recognizes
+  codes written as string literals at the `Write*Error` call site and these
+  five travel through Go constants (`CodeRepoNotFound = "SCM_REPO_NOT_FOUND"`,
+  …). The guard now also reads `Code*`-named constant declarations (109 → 114
+  codes covered), and the five keys exist in English and German in both SPAs.
+  The convention the guard encodes: name error-code constants `Code*` and it
+  sees them.
