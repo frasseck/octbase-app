@@ -27,6 +27,10 @@
 //
 // Both SPAs render the same way and are both scanned: each has its own copy of
 // the esc()/html``/raw() helpers, so an unguarded app is an unguarded sink.
+// The scan recurses into subdirectories (skipping node_modules, dist*, tests)
+// so a future js/ restructure can't silently drop files out of the guard, and
+// it also covers octbase-shared's top-level modules: @octbase/shared code is
+// imported by both SPAs, so a sink there is a sink in both apps at once.
 //
 // Exit non-zero on any violation. Run: node scripts/check-innerhtml.mjs
 
@@ -96,11 +100,29 @@ function report(file, idx, text, msg) {
   violations.push(`${file}:${line}: ${msg}`);
 }
 
+// Directories never scanned: third-party trees, build output, test harnesses.
+const SKIP_DIRS = new Set(['node_modules', 'tests']);
+const skipDir = (name) => SKIP_DIRS.has(name) || name.startsWith('dist');
+
+// Recursively collect .js files (excluding *.test.js) under absDir, reporting
+// paths relative to relDir.
+function collect(absDir, relDir, out) {
+  for (const ent of readdirSync(absDir, { withFileTypes: true })) {
+    if (ent.isDirectory()) {
+      if (!skipDir(ent.name)) collect(join(absDir, ent.name), `${relDir}/${ent.name}`, out);
+    } else if (ent.name.endsWith('.js') && !ent.name.endsWith('.test.js')) {
+      out.push({ path: `${relDir}/${ent.name}`, abs: join(absDir, ent.name) });
+    }
+  }
+}
+
 const jsFiles = [];
-for (const app of APPS) {
-  const dir = join(REPO, app, 'js');
-  for (const n of readdirSync(dir).filter(n => n.endsWith('.js') && !n.endsWith('.test.js'))) {
-    jsFiles.push({ path: `${app}/js/${n}`, abs: join(dir, n) });
+for (const app of APPS) collect(join(REPO, app, 'js'), `${app}/js`, jsFiles);
+// octbase-shared keeps its modules at the package top level; anything nested
+// there today is tooling, so only the top-level files are runtime surface.
+for (const ent of readdirSync(join(REPO, 'octbase-shared'), { withFileTypes: true })) {
+  if (ent.isFile() && ent.name.endsWith('.js') && !ent.name.endsWith('.test.js')) {
+    jsFiles.push({ path: `octbase-shared/${ent.name}`, abs: join(REPO, 'octbase-shared', ent.name) });
   }
 }
 

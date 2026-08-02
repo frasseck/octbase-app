@@ -1,0 +1,28 @@
+# Dependabot — closes the gap called out in ci.yml's dependency-audit step:
+# `npm audit --omit=dev` gates only runtime deps, so advisories against the dev
+# tree (vite, eslint, vitest, …) surface here instead of blocking CI.
+version: 2
+updates:
+  # npm workspaces. The root holds the shared dev toolchain; octbase-shared
+  # holds the two runtime browser deps (dompurify, qrcode-generator); the two
+  # SPAs have their own package.json files.
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/octbase-shared"
+      - "/octbase-frontend"
+      - "/octbase-mobile"
+    schedule:
+      interval: weekly
+
+  # Go backend.
+  - package-ecosystem: gomod
+    directory: "/octbase-api"
+    schedule:
+      interval: weekly
+
+  # CI workflow actions.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

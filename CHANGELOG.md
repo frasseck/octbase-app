@@ -6,6 +6,22 @@ All notable changes to Octbase are documented here.
 
 ### Changed
 
+- **The guard scripts are hardened against silent decay.** The pre-commit
+  security sweep now fails loudly when a path it greps has been renamed away —
+  previously a moved directory made every backend check vacuously pass. The
+  metrics-not-proxied guard discovers all Caddyfiles and fails on *any*
+  non-comment, non-negated mention of `/metrics`, closing the
+  `path /metrics*`, `handle /metrics {` and `path_regexp` evasions the old
+  token-bounded regex missed (the one sanctioned shape is a `not path`
+  matcher, which cannot route what it refuses to match). The HTML-injection
+  guard now recurses into subdirectories and scans `octbase-shared` — a sink
+  there is a sink in both SPAs at once. `scripts/release.sh` no longer merges
+  to main blind: it waits for the pushed branch's CI run via `gh` and aborts
+  on failure (override with the new `--no-ci-gate`), and stages only tracked
+  files instead of `git add -A`, which in a shared checkout could sweep a
+  neighbour's scratch files into a release commit. A new
+  `.github/dependabot.yml` (weekly npm/gomod/github-actions) covers the
+  dev-tree advisory gap the runtime-only `npm audit` deliberately leaves open.
 - **One icon-button class, for real.** The `.btn-icon` alias survived the
   styleguide's icon-button consolidation as a legacy escape hatch, and 27
   emitters across eight desktop modules were still using it. Every icon button

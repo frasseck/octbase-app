@@ -28,6 +28,10 @@ skip() { printf '  \033[90m- skipped: %s\033[0m\n' "$1"; }
 ok()   { printf '  \033[32m✓ %s\033[0m\n' "$1"; }
 
 # grep_forbid <label> <cmd...>  — HARD-fail if the pipeline prints anything.
+# NOTE: the `|| true` swallows grep's exit code on purpose (grep exits 1 on
+# no-match, which is the PASS case here) — which also means a grep pointed at a
+# path that no longer exists would silently "pass". The swept-paths check below
+# closes that hole; keep the two lists in sync when a grep gains a new target.
 grep_forbid() {
   local label="$1"; shift
   local hits; hits="$("$@" 2>/dev/null)" || true
@@ -38,6 +42,36 @@ grep_forbid() {
     ok "$label"
   fi
 }
+
+echo "── sweep-target existence (guard the guards) ──────────────"
+# Every path (or glob) the checks below scan. If one goes missing — a rename,
+# a directory restructure — the greps would exit 2, grep_forbid's `|| true`
+# would eat it, and the whole sweep would go green while scanning nothing.
+# Fail loudly instead, naming the path, the same way
+# scripts/check-metrics-not-proxied.sh fails on a missing listed config.
+swept_paths=(
+  octbase-frontend/js
+  octbase-mobile/js
+  octbase-shared
+  "octbase-frontend/*.html"
+  "octbase-mobile/*.html"
+  octbase-api/internal
+  octbase-api/cmd
+  octbase-api/internal/workmanagement/attachment_handler.go
+  scripts/check-innerhtml.mjs
+  scripts/check-tdz.mjs
+  scripts/check-vendor-integrity.sh
+)
+paths_ok=1
+for p in "${swept_paths[@]}"; do
+  # compgen -G handles both literal paths and globs (a glob that matches
+  # nothing would reach grep as a literal, nonexistent filename).
+  if ! compgen -G "$p" >/dev/null; then
+    hard "sweep target missing: $p — a rename/move here makes every grep on it vacuously pass; update swept_paths and the greps together"
+    paths_ok=0
+  fi
+done
+[ "$paths_ok" -eq 1 ] && ok "all swept paths exist"
 
 echo "── frontend integrity guards ──────────────────────────────"
 if command -v node >/dev/null 2>&1; then
