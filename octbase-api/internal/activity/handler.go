@@ -28,12 +28,18 @@ func (h *Handler) memberGuard(w http.ResponseWriter, r *http.Request, projectID 
 	return ok
 }
 
+// PageSize is the default number of activity entries per page. An activity row
+// is one line, so a screenful is far more than the 20 a task list defaults to;
+// 50 is a page a reader actually scrolls rather than one they immediately have
+// to click past. ?size= overrides it up to shared.MaxPageSize.
+const PageSize = 50
+
 func (h *Handler) ListProjectActivity(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "projectId")
 	if !h.memberGuard(w, r, projectID) {
 		return
 	}
-	pg := shared.ParsePagination(r)
+	pg := shared.ParsePaginationSize(r, PageSize)
 	entries, err := h.repo.ListByProject(projectID, pg.Page, pg.Size)
 	if err != nil {
 		shared.WriteServerError(w, r, err)
@@ -58,7 +64,8 @@ func (h *Handler) ListTaskActivity(w http.ResponseWriter, r *http.Request) {
 	if !h.memberGuard(w, r, projectID) {
 		return
 	}
-	entries, err := h.repo.ListByTask(taskID)
+	pg := shared.ParsePaginationSize(r, PageSize)
+	entries, err := h.repo.ListByTask(taskID, pg.Page, pg.Size)
 	if err != nil {
 		shared.WriteServerError(w, r, err)
 		return

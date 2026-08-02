@@ -95,7 +95,7 @@ const api = {
     del:     (id)       => http.del(`${V}/tasks/${id}`),
     search:  (pid,q)    => http.get(`${V}/projects/${pid}/search/tasks?q=${encodeURIComponent(q)}`),
     bulk:    (pid,d)    => http.post(`${V}/projects/${pid}/tasks/bulk`, d),
-    activity:(id)       => http.get(`${V}/tasks/${id}/activity`),
+    activity:(id,p={})  => http.get(`${V}/tasks/${id}/activity${qs(p)}`),
   },
   comments: {
     list:   (tid)       => http.get(`${V}/tasks/${tid}/comments`),
@@ -195,9 +195,12 @@ const api = {
     preview:  (id,c)   => http.post(`${V}/pages/${id}/render-preview`, {content:c}),
     search:   (pid,q)  => http.get(`${V}/projects/${pid}/search/pages?q=${encodeURIComponent(q)}`),
   },
+  // Both feeds are newest-first and paged (50 per page server-side). Callers
+  // pass `page` and read a short page as "that was the last one", the same
+  // no-X-Total-Count contract tasks.listAll relies on.
   activity: {
-    project:(pid) => http.get(`${V}/projects/${pid}/activity`),
-    task:   (tid) => http.get(`${V}/tasks/${tid}/activity`),
+    project:(pid, p={}) => http.get(`${V}/projects/${pid}/activity${qs(p)}`),
+    task:   (tid, p={}) => http.get(`${V}/tasks/${tid}/activity${qs(p)}`),
   },
   members: {
     list:   (pid)    => http.get(`${V}/projects/${pid}/members`),

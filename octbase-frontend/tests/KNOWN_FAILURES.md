@@ -97,6 +97,31 @@ they need a non-default configuration to surface at all.
 With `OCTBASE_ACCESS_*` pointed at a served stack, `test_accessibility.py` is
 therefore **12 passed / 1 failed** (or 11/2 when the flake fires).
 
+### 3. `test_search.py::TestSearchResults::*` — flake, load-dependent (2026-08-02)
+
+- **Symptom is always the same, the test is never the same**: an 8s
+  `wait_for_selector` timeout on `#sp-input`, the search view's input. Across
+  five runs it landed on `test_search_known_title_shows_result`,
+  `test_search_input_accepts_text`, `test_search_result_appears_after_enter_key`,
+  `test_search_result_click_navigates`, `test_search_returns_task_result` and
+  `test_empty_query_does_not_submit` — a different one almost every time.
+- **Not a regression, and not caused by whatever you are working on.**
+  Reproduced on an unmodified build of `74c631a` served from its own worktree
+  against the same API: **2, 1 and 3 failures in three consecutive runs** of
+  `test_search.py` alone, versus 1 on the working tree. Rule this out before
+  reading a red search test as a code change.
+- **Not the auth rate limit** — the API log for the full run carried **zero**
+  429s, so the `120/min` explanation the `frontend-testing` skill offers for
+  fixture timeouts does not apply here. It tracks machine load: it fires far
+  more often with a Go API, a `vite preview` and the podman stacks competing for
+  the same box than on an idle one.
+- The same load sensitivity moves failures around the rest of the suite too. Two
+  full runs of the same commit on the same day gave **3 failed / 3 errors (all
+  `test_mobile.py`)** and then **2 failed / 1 error (`test_rbac`, `test_search`,
+  `test_projects`)**, with the mobile file green the second time and 31/31 when
+  run alone. A failure set that changes completely between runs is a load
+  symptom; take a stable node ID across runs as the signal instead.
+
 ## Explicitly NOT baseline failures
 
 Claims that were folded into earlier prompts as expected failures and **did not

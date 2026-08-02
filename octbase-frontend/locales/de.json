@@ -995,7 +995,9 @@
   "activity": {
     "empty": "Keine Aktivität",
     "emptyTitle": "Noch keine Aktivität",
-    "projectTitle": "Projektaktivität"
+    "loadMore": "Ältere Aktivitäten laden",
+    "projectTitle": "Projektaktivität",
+    "targetDeleted": "Gelöschtes Element"
   },
   "mindmap": {
     "hint": "Die Hierarchie folgt den übergeordneten Aufgaben: Epics, Stories, Aufgaben und Unteraufgaben. Ein Klick öffnet die Aufgabe; ein Doppelklick klappt die Unteraufgaben ein oder aus.",

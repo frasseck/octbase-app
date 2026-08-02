@@ -995,7 +995,9 @@
   "activity": {
     "empty": "No activity",
     "emptyTitle": "No activity yet",
-    "projectTitle": "Project Activity"
+    "loadMore": "Load older activity",
+    "projectTitle": "Project Activity",
+    "targetDeleted": "Deleted item"
   },
   "mindmap": {
     "hint": "The hierarchy follows the task parents: epics, stories, tasks and subtasks. Click a node to open the task; double-click one to fold or unfold its children.",

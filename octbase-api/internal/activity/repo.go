@@ -16,23 +16,42 @@ func NewRepo(db *sql.DB) *Repo { return &Repo{db: db} }
 // params is interpolated by the frontend into the notifications.activity.<type>
 // translation string; it may be nil for events with no variable parts.
 func (r *Repo) Write(projectID, taskID, actorID, actType string, params map[string]any) error {
-	return r.write(r.db, projectID, taskID, actorID, actType, params)
+	return r.write(r.db, projectID, ref{task: taskID}, actorID, actType, params)
 }
 
 // WriteTx inserts an activity entry inside an existing transaction.
 func (r *Repo) WriteTx(tx *sql.Tx, projectID, taskID, actorID, actType string, params map[string]any) error {
-	return r.write(tx, projectID, taskID, actorID, actType, params)
+	return r.write(tx, projectID, ref{task: taskID}, actorID, actType, params)
+}
+
+// WriteRelease inserts a release-scoped entry (RELEASE_CLOSED, RELEASE_REOPENED).
+// Recording the id, not just the name in params, is what lets DeleteRelease
+// unlink the entry instead of leaving it pointing at a release that is gone.
+func (r *Repo) WriteRelease(projectID, releaseID, actorID, actType string, params map[string]any) error {
+	return r.write(r.db, projectID, ref{release: releaseID}, actorID, actType, params)
+}
+
+// WriteSprint is WriteRelease's counterpart for SPRINT_STARTED/SPRINT_COMPLETED.
+func (r *Repo) WriteSprint(projectID, sprintID, actorID, actType string, params map[string]any) error {
+	return r.write(r.db, projectID, ref{sprint: sprintID}, actorID, actType, params)
 }
 
 type execer interface {
 	Exec(query string, args ...any) (sql.Result, error)
 }
 
-func (r *Repo) write(db execer, projectID, taskID, actorID, actType string, params map[string]any) error {
-	var taskIDPtr *string
-	if taskID != "" {
-		taskIDPtr = &taskID
+// ref is the entry's reference to what it describes. At most one field is set;
+// "" means "no reference of this kind", which the insert stores as NULL.
+type ref struct{ task, release, sprint string }
+
+func nullable(s string) *string {
+	if s == "" {
+		return nil
 	}
+	return &s
+}
+
+func (r *Repo) write(db execer, projectID string, rf ref, actorID, actType string, params map[string]any) error {
 	if params == nil {
 		params = map[string]any{}
 	}
@@ -43,14 +62,16 @@ func (r *Repo) write(db execer, projectID, taskID, actorID, actType string, para
 	entry := &ActivityEntry{
 		ID:          shared.NewUUID(),
 		ProjectID:   projectID,
-		TaskID:      taskIDPtr,
+		TaskID:      nullable(rf.task),
+		ReleaseID:   nullable(rf.release),
+		SprintID:    nullable(rf.sprint),
 		ActorUserID: actorID,
 		Type:        actType,
 		PayloadJSON: string(payload),
 		CreatedAt:   shared.Now(),
 	}
-	_, err = db.Exec(`INSERT INTO activity_entries (id,project_id,task_id,actor_user_id,type,message,payload_json,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		entry.ID, entry.ProjectID, entry.TaskID, entry.ActorUserID, entry.Type, "", entry.PayloadJSON, entry.CreatedAt)
+	_, err = db.Exec(`INSERT INTO activity_entries (id,project_id,task_id,release_id,sprint_id,actor_user_id,type,message,payload_json,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		entry.ID, entry.ProjectID, entry.TaskID, entry.ReleaseID, entry.SprintID, entry.ActorUserID, entry.Type, "", entry.PayloadJSON, entry.CreatedAt)
 	return err
 }
 
@@ -83,8 +104,12 @@ func (r *Repo) WriteBatch(projectID string, taskIDs []string, actorID, actType s
 	return err
 }
 
+// entryColumns is the read projection, kept in one place because both list
+// queries and scanEntries have to agree on the order.
+const entryColumns = `id,project_id,task_id,release_id,sprint_id,target_deleted,actor_user_id,type,message,payload_json,created_at`
+
 func (r *Repo) ListByProject(projectID string, page, size int) ([]ActivityEntry, error) {
-	rows, err := r.db.Query(`SELECT id,project_id,task_id,actor_user_id,type,message,payload_json,created_at FROM activity_entries WHERE project_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+	rows, err := r.db.Query(`SELECT `+entryColumns+` FROM activity_entries WHERE project_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
 		projectID, size, page*size)
 	if err != nil {
 		return nil, err
@@ -93,8 +118,9 @@ func (r *Repo) ListByProject(projectID string, page, size int) ([]ActivityEntry,
 	return scanEntries(rows)
 }
 
-func (r *Repo) ListByTask(taskID string) ([]ActivityEntry, error) {
-	rows, err := r.db.Query(`SELECT id,project_id,task_id,actor_user_id,type,message,payload_json,created_at FROM activity_entries WHERE task_id=$1 ORDER BY created_at DESC`, taskID)
+func (r *Repo) ListByTask(taskID string, page, size int) ([]ActivityEntry, error) {
+	rows, err := r.db.Query(`SELECT `+entryColumns+` FROM activity_entries WHERE task_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+		taskID, size, page*size)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +133,7 @@ func scanEntries(rows *sql.Rows) ([]ActivityEntry, error) {
 	for rows.Next() {
 		var e ActivityEntry
 		var message string
-		if err := rows.Scan(&e.ID, &e.ProjectID, &e.TaskID, &e.ActorUserID, &e.Type, &message, &e.PayloadJSON, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.ProjectID, &e.TaskID, &e.ReleaseID, &e.SprintID, &e.TargetDeleted, &e.ActorUserID, &e.Type, &message, &e.PayloadJSON, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		e.Params = map[string]any{}

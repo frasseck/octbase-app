@@ -1203,6 +1203,23 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
 .activity-msg { font-size: 0.8125rem; line-height: 1.4; }
 .activity-time { font-size: 0.6875rem; color: var(--md-on-surface-variant); margin-top: var(--space-1); }
 
+/* An entry whose task, release or sprint has been deleted. It keeps its place
+   in the log — the event still happened — but nothing about it is actionable
+   any more, so it is muted and never carries .activity-item-clickable. The
+   dimming is deliberately partial (not, say, opacity 0.4): the text still has
+   to be readable, because reading the history is the only thing left to do
+   with the row. .activity-deleted-label states the reason in words rather than
+   leaving the grey to be guessed at — colour alone is not an accessible
+   signal (WCAG 1.4.1). */
+.activity-item-deleted .activity-msg,
+.activity-item-deleted .activity-icon { color: var(--md-on-surface-variant); }
+.activity-item-deleted .activity-icon { opacity: 0.6; }
+.activity-deleted-label { color: var(--md-on-surface-variant); font-style: italic; font-weight: 400; }
+
+/* The Activity view's load-more control, below the entry box. */
+.activity-more { margin-top: var(--space-3); display: flex; justify-content: center; }
+.activity-more:empty { display: none; }
+
 /* The task panel's Activity tab (.activity-list) lays the entry and its
    timestamp side by side, unlike the project Activity view where they stack
    under an icon. Side by side they must share a line: the stacked layout's
