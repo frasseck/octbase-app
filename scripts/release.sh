@@ -3,11 +3,12 @@
 # release.sh — release the current branch and redeploy the live demo.
 #
 # Steps (run from the octbase repo, i.e. frasseck/octbase.git):
-#   1. Commit any working-tree changes on the current branch.
-#   2. Push the current branch to origin.
-#   3. Merge the current branch into main (--no-ff) and push main.
-#   4. Switch back to the original branch.
-#   5. If a local demo checkout exists (DEMO_DIR), check out main, pull, and
+#   1. Commit the release flow's own edits (CHANGELOG.md) on the current branch.
+#   2. Push the current branch to origin and wait for CI on that exact commit.
+#   3. Merge the CI-verified commit into main (--no-ff) and push main — done in
+#      a TEMPORARY git worktree, so this (shared) checkout never switches
+#      branches and concurrent sessions are never disturbed.
+#   4. If a local demo checkout exists (DEMO_DIR), check out main, pull, and
 #      rebuild its containers (podman-compose up -d --build).
 #
 # Since 2026-07-13 the public demo is platform-managed under its own
@@ -34,6 +35,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEMO_DIR="${DEMO_DIR:-/home/claude/demo.ocete.ch}"
 MAIN_BRANCH="main"
 
+# The files the release flow itself edits. Since 37b stage 5 the changelog
+# release entry is the ONLY in-repo edit a release makes: the version stamp
+# lives in the deployment .env / octbase-service ledger, and asset
+# cache-busting is handled by the Vite build (see the release skill). Extend
+# this list deliberately if the flow ever edits more files.
+RELEASE_PATHS=( CHANGELOG.md )
+
 MSG=""
 ASSUME_YES=0
 NO_CI_GATE=0
@@ -42,7 +50,9 @@ while [[ $# -gt 0 ]]; do
     -m|--message) MSG="${2:-}"; shift 2 ;;
     -y|--yes) ASSUME_YES=1; shift ;;
     --no-ci-gate) NO_CI_GATE=1; shift ;;
-    -h|--help) sed -n '2,34p' "$0"; exit 0 ;;
+    # Print the comment header (from line 2 up to the first non-comment line)
+    # rather than a hard-coded line range, which drifted into the code below.
+    -h|--help) awk 'NR>1 && !/^#/{exit} NR>1{sub(/^# ?/,""); print}' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -55,10 +65,14 @@ if [[ "$BRANCH" == "$MAIN_BRANCH" ]]; then
   exit 1
 fi
 
+# Only the release-owned files count as "dirty": this checkout is shared by
+# concurrent sessions, and a repo-wide dirtiness check would let THEIR
+# in-progress edits gate — and previously enter — the release commit.
 DIRTY=0
-git diff --quiet && git diff --cached --quiet || DIRTY=1
+git diff --quiet -- "${RELEASE_PATHS[@]}" \
+  && git diff --cached --quiet -- "${RELEASE_PATHS[@]}" || DIRTY=1
 if [[ "$DIRTY" -eq 1 && -z "$MSG" ]]; then
-  echo "Working tree has changes but no commit message given. Use -m \"message\"." >&2
+  echo "Release files (${RELEASE_PATHS[*]}) have changes but no commit message given. Use -m \"message\"." >&2
   exit 1
 fi
 
@@ -76,18 +90,20 @@ if [[ "$ASSUME_YES" -ne 1 ]]; then
 fi
 
 if [[ "$DIRTY" -eq 1 ]]; then
-  echo "==> committing changes on $BRANCH"
-  # This checkout is shared by concurrent sessions, so a blanket `git add -A`
-  # could sweep a neighbour's untracked scratch files (or worse, secrets) into
-  # the release commit. `-u` stages modifications to TRACKED files only; the
-  # release flow's own edits (the changelog entry, the stamped index.html
-  # assets) are all tracked, so nothing legitimate is lost. CHANGELOG.md is
-  # named explicitly as the one file every release must carry.
-  git add -u
-  git add -- CHANGELOG.md
-  git commit -m "$MSG"
+  echo "==> committing release edits on $BRANCH (${RELEASE_PATHS[*]})"
+  # This checkout is shared by concurrent sessions, so nothing may be staged
+  # repo-wide: `git add -A` would sweep a neighbour's untracked scratch files
+  # (or worse, secrets) into the release commit, and `git add -u` their
+  # in-progress edits to tracked files. Committing with an explicit pathspec
+  # records ONLY the release-owned files — and, because a pathspec commit
+  # takes those paths' working-tree content directly, it also ignores
+  # whatever a concurrent session may have left in the shared index.
+  git commit -m "$MSG" -- "${RELEASE_PATHS[@]}"
 else
-  echo "==> working tree clean; nothing to commit"
+  echo "==> release files unchanged; nothing to commit"
+fi
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "    note: unrelated working-tree changes exist (likely a concurrent session's) — they are NOT part of this release."
 fi
 
 echo "==> pushing $BRANCH"
@@ -126,14 +142,31 @@ else
   exit 1
 fi
 
-echo "==> merging $BRANCH into $MAIN_BRANCH"
-git checkout "$MAIN_BRANCH"
-git pull --ff-only origin "$MAIN_BRANCH"
-git merge --no-ff "$BRANCH" -m "Merge $BRANCH into $MAIN_BRANCH"
-git push origin "$MAIN_BRANCH"
-
-echo "==> returning to $BRANCH"
-git checkout "$BRANCH"
+echo "==> merging $BRANCH @ ${HEAD_SHA:0:12} into $MAIN_BRANCH (temporary worktree)"
+# The merge must never run in THIS checkout: it is shared by concurrent
+# sessions, and even a brief `git checkout main` here yanks every file out
+# from under them. A disposable worktree gives the merge its own directory
+# and index while the shared tree stays parked on $BRANCH throughout.
+# Merging $HEAD_SHA — not the branch NAME — closes a time-of-check/time-of-use
+# hole: CI was verified for exactly that commit above, and anything pushed to
+# the branch since must not ride along unverified.
+MERGE_WT="$(mktemp -d "${TMPDIR:-/tmp}/octbase-release-merge.XXXXXX")"
+cleanup_merge_worktree() {
+  # `worktree remove` unregisters AND deletes the directory; if it refuses
+  # (e.g. a conflicted merge left the tree dirty), fall back to rm + prune so
+  # no stale worktree registration lingers in the shared repo.
+  git worktree remove --force "$MERGE_WT" >/dev/null 2>&1 \
+    || { rm -rf "$MERGE_WT"; git worktree prune >/dev/null 2>&1 || true; }
+}
+# Remove the worktree on ANY exit — success, merge conflict, or a failing
+# push under `set -e` — so an aborted release never strands a checkout.
+trap cleanup_merge_worktree EXIT
+git worktree add "$MERGE_WT" "$MAIN_BRANCH"
+git -C "$MERGE_WT" pull --ff-only origin "$MAIN_BRANCH"
+git -C "$MERGE_WT" merge --no-ff "$HEAD_SHA" -m "Merge $BRANCH into $MAIN_BRANCH"
+git -C "$MERGE_WT" push origin "$MAIN_BRANCH"
+cleanup_merge_worktree
+trap - EXIT
 
 if [[ ! -d "$DEMO_DIR/.git" ]]; then
   cat <<EOF

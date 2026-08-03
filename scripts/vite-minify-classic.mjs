@@ -16,13 +16,17 @@
 // contain either. There is no pattern that gets this right, so this runs the
 // real parser instead.
 //
-// WHY mangle AND compress ARE OFF. Comment removal is what was asked for; the
-// rest of minification is a behaviour change these files do not need. Keeping
-// mangle off in particular is deliberate house policy — the SPAs' event
-// delegation keys on `Function.prototype.name` (see the keepNames notes in both
-// vite.config.js), so renaming identifiers in shipped code is a trap this repo
-// has already fallen into once. The output is the same program with the same
-// names, minus the comments and the slack whitespace.
+// WHY mangle AND compress ARE OFF — and treeshake TOO. Comment removal is what
+// was asked for; the rest of minification is a behaviour change these files do
+// not need. Keeping mangle off in particular is deliberate house policy — the
+// SPAs' event delegation keys on `Function.prototype.name` (see the keepNames
+// notes in both vite.config.js), so renaming identifiers in shipped code is a
+// trap this repo has already fallen into once. Tree-shaking is off for the same
+// reason: rolldown otherwise deletes top-level bindings nothing in the file
+// references, and in a classic script "unreferenced" proves nothing — a
+// handler wired up by name, a hook a later script calls. The output is the
+// same program with the same names, minus the comments and the slack
+// whitespace.
 import { rolldown } from 'rolldown';
 
 /**
@@ -46,6 +50,11 @@ export async function minifyClassicScript(code, name = 'classic') {
     // localStorage) and import nothing. A resolver warning here would mean the
     // file grew an import and needs to join the module graph properly instead.
     logLevel: 'warn',
+    // "Same program, same names" includes bindings nothing here references —
+    // without this, rolldown tree-shakes unreferenced top-level functions and
+    // vars out of the output (verified by probe: `function orphan(){}`
+    // vanished).
+    treeshake: false,
   });
   const { output } = await bundle.generate({
     // IIFE, matching how a classic <script> already behaves: these files declare

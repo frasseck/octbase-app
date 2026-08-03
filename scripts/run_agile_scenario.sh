@@ -13,7 +13,8 @@
 # still runs).
 #
 # Usage:
-#   scripts/run_agile_scenario.sh
+#   scripts/run_agile_scenario.sh           # prompts before wiping the database
+#   scripts/run_agile_scenario.sh --yes     # no prompt (for automation)
 #
 # The API base is read from .env (API_PORT) like reset_db.sh does, and can be
 # overridden with OCTBASE_API_BASE.
@@ -22,9 +23,34 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+ASSUME_YES=0
+for arg in "$@"; do
+  case "$arg" in
+    -y|--yes) ASSUME_YES=1 ;;
+    # Print the comment header (line 2 up to the first non-comment line).
+    -h|--help) awk 'NR>1 && !/^#/{exit} NR>1{sub(/^# ?/,""); print}' "$0"; exit 0 ;;
+    *) echo "unknown argument: $arg" >&2; exit 2 ;;
+  esac
+done
+
 envval() { grep -E "^$1=" "$ROOT/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'; }
 API_PORT="$(envval API_PORT)"; API_PORT="${API_PORT:-8000}"
 BASE="${OCTBASE_API_BASE:-http://127.0.0.1:${API_PORT}}"
+
+# This run wipes the database TWICE (before and after the scenario) via
+# reset_db.sh --yes — and on this host that database belongs to the live,
+# SHARED dev stack, which concurrent sessions may be using right now. So the
+# destruction must be acknowledged HERE, out loud, before the first reset;
+# the --yes passed down to reset_db.sh only suppresses its inner re-prompt.
+PGDB="$(envval POSTGRES_DB)";             PGDB="${PGDB:-octbase}"
+PROJECT="$(envval COMPOSE_PROJECT_NAME)"; PROJECT="${PROJECT:-$(basename "$ROOT")}"
+if [[ "$ASSUME_YES" -ne 1 ]]; then
+  echo "About to DESTROY and reseed database '$PGDB' (compose project '$PROJECT') TWICE:"
+  echo "once before and once after the scenario. All current data in it — including"
+  echo "anything a concurrent session is working with — will be lost both times."
+  read -r -p "Type 'yes' to continue (or re-run with --yes): " reply
+  [[ "$reply" == "yes" ]] || { echo "aborted."; exit 1; }
+fi
 
 # Pick a Python that has `requests` (prefer the frontend test venv).
 PY="python3"

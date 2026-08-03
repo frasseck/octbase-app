@@ -25,6 +25,14 @@
 // Conditional comments (`<!--[if IE]>`) are not a consideration: they are a
 // dead feature no supported browser honours, and nothing in either SPA uses one.
 
+// Inline <script>/<style> bodies are carved out before stripping: inside them
+// `<!--` is not an HTML comment (it is JS/CSS text), so eating it would change
+// the program. Nothing in either SPA writes one today — Vite has extracted the
+// module scripts before this runs, and theme-init is external — but the carve-
+// out is what makes that a fact about the input rather than a load-bearing
+// assumption of this file.
+const RAW_TEXT_BLOCK = /(<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>)/i;
+
 /** The transform itself. Exported because the two `file://` standalone builds
  *  cannot use the plugin below: they are `lib` builds with no HTML entry, so
  *  Vite never runs transformIndexHtml for them — their configs derive
@@ -33,7 +41,9 @@
  *  suite loads from disk, so leaving them out would have left the comments in
  *  the one artifact nobody re-reads. */
 export function stripComments(html) {
-  return html
+  // split() with a capturing group keeps the raw-text blocks in the result at
+  // odd indices; only the even (outside) slices are stripped.
+  return html.split(RAW_TEXT_BLOCK).map((part, i) => (i % 2 ? part : part
     // A comment that occupies whole lines takes those lines with it, leading
     // indentation and closing newline included. Deleting only the comment text
     // leaves the blank line and the indent that led up to it, which is what the
@@ -44,10 +54,12 @@ export function stripComments(html) {
     .replace(/^[ \t]*<!--[\s\S]*?-->[ \t]*\r?\n/gm, '')
     // Whatever is left is inline: drop the comment, keep the line.
     .replace(/<!--[\s\S]*?-->/g, '')
-    // Two comments separated by a blank line collapse into a run of blanks that
-    // was never in the source. Runs only — a single blank line the author wrote
-    // between sections is theirs and survives.
-    .replace(/(\r?\n)[ \t]*(?:\r?\n)+/g, '$1$1');
+    // EVERY run of consecutive blank lines collapses to a single blank line —
+    // not only the runs the comment removal created. That flattens an
+    // author-written double blank too, which is accepted: the built page is
+    // for visitors, and one blank line separates sections just as well. A
+    // single blank line survives as itself.
+    .replace(/(\r?\n)[ \t]*(?:\r?\n)+/g, '$1$1'))).join('');
 }
 
 // Vite emits the tags it injects — the module entry, its modulepreloads, the

@@ -12,9 +12,16 @@
 # Missing optional tooling / DB is a loud WARN-and-skip, not a hard block, so a
 # push never wedges on a laptop without the full toolchain — CI is the real gate.
 # A tool that IS present and FAILS blocks the push.
-set -uo pipefail
-root="$(git rev-parse --show-toplevel)"
-cd "$root/octbase-api"
+# -e so an environment error aborts loudly; the check runners themselves are
+# if-guarded (`run_hard`, the command -v probes), so a FAILING check still
+# reports and blocks via $fail instead of dying mid-run.
+set -euo pipefail
+# Outside a git repo, rev-parse prints nothing — the cd would then resolve
+# against the cwd. Fail with a message naming the actual problem instead.
+root="$(git rev-parse --show-toplevel 2>/dev/null)" \
+  || { echo "security-heavy.sh: not inside a git repository" >&2; exit 1; }
+cd "$root/octbase-api" \
+  || { echo "security-heavy.sh: $root/octbase-api not found — wrong repo?" >&2; exit 1; }
 
 fail=0
 run_hard() { printf '\033[36m▶ %s\033[0m\n' "$1"; shift; if "$@"; then printf '\033[32m✓ passed\033[0m\n\n'; else printf '\033[31m✗ FAILED\033[0m\n\n'; fail=1; fi; }
@@ -30,12 +37,16 @@ fi
 
 # Prefer an installed binary; else fall back to `go run` (needs network the first
 # time). If neither can run (offline, no cache), warn-skip rather than block.
+# The fallback is PINNED, not @latest: a push-time hook must not fetch and run
+# whatever x/vuln published a minute ago. Bump the pin deliberately (check
+# https://pkg.go.dev/golang.org/x/vuln — v1.6.0 was current 2026-08).
+GOVULNCHECK_VERSION=v1.6.0
 if command -v govulncheck >/dev/null 2>&1; then
   run_hard "govulncheck ./..." govulncheck ./...
-elif go run golang.org/x/vuln/cmd/govulncheck@latest -version >/dev/null 2>&1; then
-  run_hard "govulncheck ./... (via go run)" go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+elif go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" -version >/dev/null 2>&1; then
+  run_hard "govulncheck ./... (via go run, ${GOVULNCHECK_VERSION})" go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
 else
-  skip "govulncheck unavailable (install: go install golang.org/x/vuln/cmd/govulncheck@latest)"
+  skip "govulncheck unavailable (install: go install golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION})"
 fi
 
 if [ -n "${TEST_DATABASE_URL:-}" ]; then

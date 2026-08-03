@@ -18,8 +18,11 @@
 #   ./check-health.sh [--project NAME] [--json] [--quiet] [--no-deep]
 #
 #   --project NAME   compose project prefix (default: $OCTBASE_PROJECT or "octbase").
-#                    Containers are <project>_<service>_1. The live dev stack in
-#                    this environment is "octbase_dev"; the default stack is "octbase".
+#                    Containers are <project>_<service>_1. "octbase" is the
+#                    project name on the platform-managed client accounts (the
+#                    fleet monitor passes --project octbase explicitly); under
+#                    the dev account only "octbase_dev" runs, so pass
+#                    --project octbase_dev there — a bare run finds no containers.
 #   --json           emit a single machine-readable JSON object (for monitors/cron).
 #   --quiet          only print the final summary line.
 #   --no-deep        skip exec-based probes (Postgres pg_isready);
@@ -46,7 +49,9 @@ while [ $# -gt 0 ]; do
     --json) JSON=1; shift ;;
     --quiet) QUIET=1; shift ;;
     --no-deep) DEEP=0; shift ;;
-    -h|--help) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # Print the comment header (from line 2 up to the first non-comment line)
+    # rather than a hard-coded line range, which drifted into the code below.
+    -h|--help) awk 'NR>1 && !/^#/{exit} NR>1{sub(/^# ?/,""); print}' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 3 ;;
   esac
 done
@@ -218,13 +223,33 @@ for line in "${RESULTS[@]}"; do
   esac
 done
 
+# When not a single container of the project exists, "every service DOWN" is
+# almost never four separate outages — it is a wrong --project (e.g. a bare
+# run under the dev account, whose stack is "octbase_dev"). Detect that shape
+# and say so explicitly instead of letting the operator chase four ghosts.
+NONE_FOUND=1
+for line in "${RESULTS[@]}"; do
+  case "$line" in
+    *"|DOWN|container missing") ;;
+    *) NONE_FOUND=0 ;;
+  esac
+done
+NONE_HINT="no containers found for project '$PROJECT' — wrong --project?"
+
 if [ "$JSON" -eq 1 ]; then
-  printf '{"project":"%s","overall":"%s","ts":"%s","services":{' \
+  printf '{"project":"%s","overall":"%s","ts":"%s",' \
     "$PROJECT" "$OVERALL" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  [ "$NONE_FOUND" -eq 1 ] && printf '"hint":"%s",' "$NONE_HINT"
+  printf '"services":{'
   first=1
   for line in "${RESULTS[@]}"; do
     n="${line%%|*}"; rest="${line#*|}"; s="${rest%%|*}"; d="${rest#*|}"
-    d="${d//\"/\'}"
+    # JSON-escape the detail (a probed body can contain anything): backslashes
+    # FIRST — or the escapes added next would themselves be doubled — then
+    # double quotes; control characters are stripped, they carry no signal here.
+    d="${d//\\/\\\\}"
+    d="${d//\"/\\\"}"
+    d="$(printf '%s' "$d" | tr -d '\000-\037\177')"
     [ $first -eq 0 ] && printf ','
     printf '"%s":{"state":"%s","detail":"%s"}' "$n" "$s" "$d"
     first=0
@@ -244,6 +269,10 @@ if [ "$QUIET" -eq 0 ]; then
     esac
     printf '  %s[%s]%s %-9s %s%s%s\n' "$col" "$mark" "$C_RST" "$n" "$C_DIM" "$d" "$C_RST"
   done
+fi
+
+if [ "$NONE_FOUND" -eq 1 ]; then
+  printf '%s==> %s%s\n' "$C_BAD" "$NONE_HINT" "$C_RST"
 fi
 
 case "$OVERALL" in

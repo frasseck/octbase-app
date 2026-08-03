@@ -13,16 +13,29 @@
 -- unset, so this is opt-in. It is intended for external/managed databases; the
 -- bundled single-container Postgres can keep one role.
 --
--- USAGE. Run as the owner/superuser against the Octbase database, substituting a
--- real password (or use \set / a managed-database console):
+-- USAGE. Run as the owner/superuser against the Octbase database. Generate the
+-- password into a shell variable FIRST — command-substituting it straight into
+-- the psql invocation would discard it (the role exists, but nobody knows its
+-- password) — and record it in your secret store before running psql. Use hex,
+-- not base64: base64 emits '+' and '/', which break the connection URL below
+-- (hex needs no percent-encoding):
 --
+--   APP_PW="$(openssl rand -hex 24)"
+--   printf 'octbase_app password: %s\n' "$APP_PW"    # record this NOW
 --   psql "$OWNER_DATABASE_URL" \
---     -v app_password="'"$(openssl rand -base64 24)"'" \
+--     -v app_password="'$APP_PW'" \
 --     -f scripts/db-least-privilege.sql
 --
--- Then point the API at both roles (see .env.example and docs/hosting-concept.md §8):
+-- Caveats: the password appears in psql's argv (visible in /proc/*/cmdline on
+-- the machine running psql) and, if the server logs DDL (log_statement = 'ddl'
+-- or 'all'), in the server's statement log via the ALTER ROLE below. Fine for
+-- a provisioning one-off on a trusted host; otherwise \set the variable inside
+-- an interactive psql session, or use the managed-database console.
 --
---   OCTBASE_DATABASE_URL=postgres://octbase_app:<app_password>@host:5432/octbase?sslmode=require
+-- Then point the API at both roles (see .env.example and docs/hosting-concept.md §8);
+-- if you used a password that is not URL-safe after all, percent-encode it here:
+--
+--   OCTBASE_DATABASE_URL=postgres://octbase_app:${APP_PW}@host:5432/octbase?sslmode=require
 --   OCTBASE_MIGRATE_DATABASE_URL=postgres://octbase:<owner_password>@host:5432/octbase?sslmode=require
 --
 -- The script is idempotent and safe to re-run: it grants on tables that exist
@@ -44,7 +57,8 @@
 \else
   \echo '---'
   \echo 'ERROR: app_password is required, as a quoted SQL literal. For example:'
-  \echo '  psql "$OWNER_DATABASE_URL" -v app_password="''$(openssl rand -base64 24)''" -f scripts/db-least-privilege.sql'
+  \echo '  APP_PW="$(openssl rand -hex 24)"    # record it — you need it for OCTBASE_DATABASE_URL'
+  \echo '  psql "$OWNER_DATABASE_URL" -v app_password="''$APP_PW''" -f scripts/db-least-privilege.sql'
   \echo '---'
   DO $$ BEGIN RAISE EXCEPTION 'app_password not set'; END $$;
 \endif

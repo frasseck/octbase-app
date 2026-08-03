@@ -40,7 +40,8 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APPS = ['octbase-frontend', 'octbase-mobile'];
-const SINK = /\.(innerHTML|outerHTML)\s*(\+)?=\s*/g;
+// The (?!=) keeps comparisons (`el.innerHTML === x`) from matching as sinks.
+const SINK = /\.(innerHTML|outerHTML)\s*(\+)?=(?!=)\s*/g;
 
 // User-content fields that must never be spliced into HTML unescaped. Limited
 // to fields that hold free-form, attacker-influenceable text.
@@ -65,12 +66,60 @@ const STRICT_FILES = new Set([
 // An interpolation is REJECTED when it reads a known user-content field but is
 // not routed through esc() or an html`` tagged template. String-literal
 // contents are stripped first so i18n keys like t('form.title') don't match.
+// Calls whose ARGUMENTS are their own responsibility: the escaping/trusted
+// producers from the header (esc, t, icon, raw, sanitizeRichText, and the
+// fooHtml()/fooInner() render-helper convention). A user-content field passed
+// INTO one of these is not an unescaped splice, so the argument list is
+// dropped before the field check. Applied twice to cover one nesting level.
+const TRUSTED_CALL = /\b(?:esc|t|icon|raw|sanitizeRichText|\w+(?:Html|HTML|Inner))\s*\([^()]*\)/g;
+
 function interpolationAllowed(expr) {
-  const e = expr.trim().replace(/'[^']*'|"[^"]*"/g, "''"); // drop string contents
+  let e = expr.trim().replace(/'[^']*'|"[^"]*"/g, "''"); // drop string contents
+  e = e.replace(TRUSTED_CALL, "''").replace(TRUSTED_CALL, "''");
   if (!USER_FIELDS.test(e)) return true;        // not a high-risk field access
   if (/\besc\s*\(/.test(e)) return true;        // explicitly escaped
-  if (/`/.test(e)) return true;                 // contains a tagged/nested template
+  // Only a TAGGED nested template proves anything: html`` escapes its own
+  // interpolations by construction. A bare backtick — an untagged nested
+  // template like `${item.title || `—`}` — must not blanket-allow the read.
+  if (/\bhtml\s*`/.test(e)) return true;
   return false;
+}
+
+// Index of the closing backtick of a template literal whose body starts at
+// src[0] (the opening backtick already consumed), respecting escapes and
+// ${...} brace nesting — the same fidelity as interpolations() below.
+function templateEnd(src) {
+  for (let i = 0; i < src.length; i++) {
+    if (src[i] === '\\') { i++; continue; }
+    if (src[i] === '`') return i;
+    if (src[i] === '$' && src[i + 1] === '{') {
+      let depth = 1, j = i + 2;
+      for (; j < src.length && depth > 0; j++) {
+        if (src[j] === '{') depth++;
+        else if (src[j] === '}') depth--;
+      }
+      i = j - 1;
+    }
+  }
+  return src.length;
+}
+
+// Blank the BODIES of template literals (keeping the backticks) so the
+// concatenation scan sees `x + `…`` without tripping over a harmless
+// `${a + 'b'}` inside a template.
+function blankTemplateBodies(s) {
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '`') {
+      const end = templateEnd(s.slice(i + 1));
+      out += '`' + ' '.repeat(end);
+      if (i + 1 + end < s.length) out += '`';
+      i = i + 1 + end;
+    } else {
+      out += s[i];
+    }
+  }
+  return out;
 }
 
 // Extract ${...} interpolations from a template literal body, respecting nested
@@ -148,12 +197,25 @@ for (const { path: f, abs } of jsFiles) {
           report(f, rhsStart, text, `unescaped interpolation in innerHTML: \${${expr.trim()}} — wrap in esc() or use html\`\``);
         }
       }
-    } else {
-      // Non-template RHS: scan to the statement end for string concatenation.
-      const stmt = rest.slice(0, rest.search(/;\s*(\n|$)/) + 1 || rest.indexOf(';') + 1);
-      if (/['"]\s*\+|\+\s*['"]/.test(stmt)) {
-        report(f, rhsStart, text, 'string concatenation into innerHTML — use esc()/html``');
-      }
+    }
+
+    // The concatenation rule applies regardless of what the RHS starts with:
+    // `` el.innerHTML = `<b>` + userText `` is the same antipattern with the
+    // string literal spelled as a template, so the branch above is no
+    // exemption. Template bodies are blanked first (a `${a + 'b'}` inside a
+    // template is not concatenation into the sink, and a multi-line template
+    // collapses to one line), and the blanked text is what the statement end
+    // is found in, so a `;` inside a template body (say, an entity like
+    // &nbsp;) cannot truncate the scan. A statement without a semicolon (ASI)
+    // extends past a newline only while each line ends in a continuation
+    // token — requiring the `;` meant such a statement was never scanned at
+    // all, while stopping at any newline would miss a multi-line concat.
+    const blanked = blankTemplateBodies(rest.slice(0, 1000));
+    const ext = (blanked.match(/^(?:[^\n]*[+,(=?:&|][ \t]*\n)*[^\n]*/) || [''])[0];
+    const semi = ext.indexOf(';');
+    const stmt = semi >= 0 ? ext.slice(0, semi + 1) : ext;
+    if (/['"`]\s*\+|\+\s*['"`]/.test(stmt)) {
+      report(f, rhsStart, text, 'string concatenation into innerHTML — use esc()/html``');
     }
   }
 }

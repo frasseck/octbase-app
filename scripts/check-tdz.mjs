@@ -133,12 +133,19 @@ function blankModuleSyntax(code, ast) {
 function moduleShape(ast) {
   const imports = new Map();   // local name -> source specifier ('./framework.js')
   const exports = new Set();
+  // Every specifier that creates a graph edge — including side-effect-only
+  // imports (`import './x.js'`) and re-exports (`export … from './x.js'`),
+  // which bind no local name and so never appear in `imports`, but still
+  // evaluate their target and therefore still close cycles.
+  const sources = new Set();
   let importCount = 0;
   for (const node of ast.body) {
     if (node.type === 'ImportDeclaration') {
       importCount++;
+      sources.add(node.source.value);
       for (const s of node.specifiers) imports.set(s.local.name, node.source.value);
     } else if (node.type === 'ExportNamedDeclaration') {
+      if (node.source) sources.add(node.source.value);
       for (const s of node.specifiers) exports.add(s.exported.name);
       const d = node.declaration;
       if (d) {
@@ -152,14 +159,21 @@ function moduleShape(ast) {
       }
     } else if (node.type === 'ExportDefaultDeclaration') {
       exports.add('default');
+    } else if (node.type === 'ExportAllDeclaration') {
+      sources.add(node.source.value);
     }
   }
-  return { imports, exports, importCount };
+  return { imports, exports, sources, importCount };
 }
 
 function checkApp(appName, { verbose }) {
   const jsDir = join(REPO, appName, 'js');
-  if (!existsSync(jsDir)) return { hazards: [], files: 0, edges: 0, skipped: true };
+  if (!existsSync(jsDir)) {
+    // A missing scan target must fail loudly: "clean ✓" over a tree that was
+    // never read is the guard silently turning itself off.
+    console.error(`check-tdz: ${relative(REPO, jsDir)} does not exist — nothing was scanned`);
+    process.exit(1);
+  }
 
   const files = spaFiles(jsDir);
   const info = new Map();
@@ -177,13 +191,13 @@ function checkApp(appName, { verbose }) {
     const a = analyze(acorn.parse(bare, { ecmaVersion: 'latest', sourceType: 'script' }), bare);
     const shape = moduleShape(ast);
     info.set(key, { ...shape, a, dir: dirname(path) });
-    for (const spec of new Set(shape.imports.values())) {
+    for (const spec of shape.sources) {
       const r = resolveSpec(spec, dirname(path));
       if (r && existsSync(r.path)) load(r.path);
     }
     return key;
   };
-  const appKey = new Map(files.map((f) => [f, load(join(jsDir, f))]));
+  for (const f of files) load(join(jsDir, f));
 
   // reaches — can `from` get back to `to` through its imports? That is exactly
   // the cycle question, and the only thing that can leave a binding in its TDZ.
@@ -193,18 +207,20 @@ function checkApp(appName, { verbose }) {
     seen.add(from);
     const m = info.get(from);
     if (!m) return false;
-    for (const spec of new Set(m.imports.values())) {
+    for (const spec of m.sources) {
       const r = resolveSpec(spec, m.dir);
       if (r && reaches(r.key, to, seen)) return true;
     }
     return false;
   };
 
-  // Every load-time read of an imported binding is an edge to classify.
+  // Every load-time read of an imported binding is an edge to classify — in
+  // EVERY module of the graph, not only the app's top-level files: a module
+  // that arrives via imports (@octbase/shared, a js/ subdirectory) runs its
+  // own top level the same way and can throw the same ReferenceError at boot.
   const hazards = [];
   let edges = 0;
-  for (const f of files) {
-    const me = info.get(appKey.get(f));
+  for (const [key, me] of info) {
     for (const [name, meta] of me.a.freeRefs) {
       if (!meta.loadTime) continue;              // function bodies are always fine
       if (ambient.has(name)) continue;           // browser or shared-module global
@@ -217,22 +233,22 @@ function checkApp(appName, { verbose }) {
       if (!src) continue;                        // unreadable / not on disk
       edges++;
       const kind = src.a.topLevelDecls.get(name);
-      const cyclic = reaches(from, appKey.get(f));
+      const cyclic = reaches(from, key);
       if (!cyclic || kind === 'function') {
         if (verbose) {
           const why = !cyclic
             ? (src.importCount === 0 ? 'source imports nothing' : 'no import cycle back to the reader')
             : 'hoisted function declaration';
-          console.log(`  ok   ${f} reads ${name} from ${from} (${why})`);
+          console.log(`  ok   ${key} reads ${name} from ${from} (${why})`);
         }
         continue;
       }
-      hazards.push({ file: f, name, from, kind: kind || 'unknown', line: meta.line });
+      hazards.push({ file: key, name, from, kind: kind || 'unknown', line: meta.line });
     }
   }
 
-  console.log(`${appName}: ${files.length} modules (+${info.size - files.length} imported ` +
-              `from @octbase/shared), ${edges} load-time cross-module read(s)`);
+  console.log(`${appName}: ${files.length} modules (+${info.size - files.length} reached ` +
+              `via imports), ${edges} load-time cross-module read(s)`);
   if (hazards.length) {
     console.log(`  !! ${hazards.length} TDZ hazard(s) — a ReferenceError at boot:`);
     for (const h of hazards) {
@@ -250,10 +266,20 @@ const verbose = args.includes('--verbose');
 const only = args.includes('--app') ? args[args.indexOf('--app') + 1] : null;
 
 let total = 0;
+let scanned = 0;
 for (const app of APPS) {
   if (only && app !== only) continue;
-  if (!existsSync(join(REPO, app))) continue;
+  if (!existsSync(join(REPO, app))) {
+    // Loud, not "clean ✓": a guard that skips a missing target is off, not green.
+    console.error(`check-tdz: app directory ${app} does not exist — nothing was scanned`);
+    process.exit(1);
+  }
   total += checkApp(app, { verbose }).hazards.length;
+  scanned++;
+}
+if (scanned === 0) {
+  console.error(`check-tdz: no app matched --app ${only} (known: ${APPS.join(', ')})`);
+  process.exit(1);
 }
 
 if (total) {

@@ -41,7 +41,12 @@ const EXEMPT = new Set(['VALIDATION_ERROR', 'TEST_CODE']);
 // guard will see them; a code smuggled through a differently-named constant or
 // a variable still gets past it.
 const PATTERNS = [
-  /Write(?:Error|ValidationError|UpdateError)\([^)]*?"([A-Z][A-Z0-9_]{2,})"/g,
+  // The argument scan tolerates ONE level of nested parens — a call like
+  // WriteError(w, statusFor(x), "CODE", …) escaped a plain [^)]*? because the
+  // scan stopped at statusFor's ")". Bounded ({0,300} chars, lazy, and the two
+  // alternatives cannot match the same character) so it cannot backtrack
+  // catastrophically; a second nesting level is out of scope on purpose.
+  /Write(?:Error|ValidationError|UpdateError)\((?:[^()]|\([^()]*\)){0,300}?"([A-Z][A-Z0-9_]{2,})"/g,
   /Code:\s*"([A-Z][A-Z0-9_]{2,})"/g,
   /\bCode[A-Z]\w*\s*=\s*"([A-Z][A-Z0-9_]{2,})"/g,
 ];

@@ -16,7 +16,7 @@
 #   4. Waits until /health reports ok at the freshly migrated version.
 #
 # The target is whatever podman-compose.yml + .env in THIS repo describe. With
-# the checked-in dev .env that is the "octbase_dev" stack (API on :8001). It does
+# the checked-in dev .env that is the "octbase_dev" stack (API on :8101). It does
 # NOT touch the separate live demo install in demo.ocete.ch.
 #
 # Usage:
@@ -31,7 +31,9 @@ ASSUME_YES=0
 for arg in "$@"; do
   case "$arg" in
     -y|--yes) ASSUME_YES=1 ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    # Print the comment header (from line 2 up to the first non-comment line)
+    # rather than a hard-coded line range, which drifted into the code below.
+    -h|--help) awk 'NR>1 && !/^#/{exit} NR>1{sub(/^# ?/,""); print}' "$0"; exit 0 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -68,7 +70,24 @@ CREATE DATABASE "$PGDB" OWNER "$PGUSER";
 SQL
 
 echo "==> restarting API to re-run migrations + demo seed"
-podman-compose restart octbase-api >/dev/null
+# From here on the database exists but is EMPTY — only the API's startup
+# (migrations + demo seed) makes it usable again. If the restart fails, say
+# exactly that instead of dying silently under `set -e`, and tell the operator
+# how to bring the API up by hand. NB the dev stack runs with the Mailpit
+# overlay (podman-compose.dev.yml sets SMTP env on octbase-api), so a manual
+# `up` must layer both files or it would recreate the API without that env;
+# `restart` alone keeps the existing container config either way.
+if ! podman-compose restart octbase-api >/dev/null; then
+  cat >&2 <<EOF
+ERROR: API restart failed AFTER the database was dropped and recreated.
+Database '$PGDB' now exists but is EMPTY (no migrations, no seed) until the
+API starts once. Bring it up manually, then re-check /health:
+  podman-compose -f podman-compose.yml -f podman-compose.dev.yml up -d octbase-api
+  curl -fsS http://localhost:${API_PORT}/health
+If that fails too: podman-compose logs octbase-api
+EOF
+  exit 1
+fi
 
 echo "==> waiting for API /health on :$API_PORT"
 for i in $(seq 1 60); do

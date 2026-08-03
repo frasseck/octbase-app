@@ -72,13 +72,18 @@ whatever is committed is what gets fingerprinted.
 ## 5. Merge: `scripts/release.sh`
 
 ```bash
-scripts/release.sh -m "commit message" --yes   # commit dirty tree + release
-scripts/release.sh --yes                        # tree must already be clean
+scripts/release.sh -m "commit message" --yes   # commit changelog edit + release
+scripts/release.sh --yes                        # release files already committed
 ```
 
-It: commits any working-tree changes (**`git add -A`** — check `git status`
-first so you don't ship strays), pushes the branch, merges `--no-ff` into
-`main`, pushes `main`, and returns to your branch. Without `--yes` it prompts
+It: commits **only the release-owned files** (a pathspec commit of
+`RELEASE_PATHS` — today just `CHANGELOG.md`; anything else in the shared
+working tree or index stays out, so a concurrent session's edits cannot ship
+as strays), pushes the branch, waits for CI on **that exact commit**
+(`HEAD_SHA`), then merges the verified SHA `--no-ff` into `main` **in a
+disposable git worktree** and pushes `main`. The shared checkout never
+switches branches — it stays parked on `release_vN` throughout, and the
+worktree is trap-removed on any exit. Without `--yes` it prompts
 interactively — always pass `--yes` when driving it from an agent.
 
 ## 6. Demo deploy — platform-managed, runs from the ADMIN machine

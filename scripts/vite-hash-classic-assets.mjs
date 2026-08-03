@@ -92,12 +92,21 @@ export function hashClassicAssets(entries) {
       // after it means the URLs we write are final and never re-resolved.
       order: 'post',
       handler(html) {
+        // The `rewritten` bookkeeping scans a comment-stripped copy: a
+        // commented-out <script src> is not a live reference, and counting it
+        // would mask the "nothing referenced" warning in closeBundle. Scan
+        // only — the emitted HTML is not altered here (the comment-strip
+        // plugin owns comment removal, and a rewrite inside a comment goes
+        // away with the comment).
+        for (const [, src] of html.replace(/<!--[\s\S]*?-->/g, '')
+            .matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)) {
+          if (emitted.has(src)) rewritten.add(src);
+        }
         return html.replace(
           /(<script\b[^>]*\bsrc=")([^"]+)(")/g,
           (whole, before, src, after) => {
             const hashed = emitted.get(src);
             if (!hashed) return whole;
-            rewritten.add(src);
             return `${before}./${hashed}${after}`;
           },
         );

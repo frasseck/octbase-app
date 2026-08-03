@@ -227,8 +227,10 @@ def run(base: str) -> None:
         },
         expect=(201,),
     )
-    pid = proj["id"]
-    check("Alice created the project", bool(pid) and proj["visibility"] == "PRIVATE", str(proj))
+    pid = proj.get("id")
+    if not pid:
+        raise Fatal(f"project create returned 201 but no id: {proj}")
+    check("Alice created the project", proj.get("visibility") == "PRIVATE", str(proj))
 
     # Creator is auto PROJECT_ADMIN; Super Admin promotes her to PROJECT_OWNER.
     super_.patch(f"{API}/projects/{pid}/memberships/{users['alice']['id']}",
@@ -272,12 +274,23 @@ def run(base: str) -> None:
                    {"name": cname, "color": color}, expect=(200, 201))
     cats = as_list(alice.get(f"{API}/projects/{pid}/task-categories"))
     check("5 task categories created", len(cats) >= 5, f"got {len(cats)}")
+    # The API is known to answer 200/201 for writes it silently drops — read
+    # written fields back instead of trusting the status code (same pattern as
+    # the status read-back in Phase 6).
+    backend_cat = next((c for c in cats if c.get("name") == "Backend"), {})
+    check("category color survived the write (read-back)",
+          backend_cat.get("color") == "blue", str(backend_cat))
 
     release = alice.post(f"{API}/projects/{pid}/releases",
                          {"name": "v1.0 — MVP", "goal": "First shippable release",
                           "dueDate": "2026-09-30"}, expect=(200, 201))
     rid = release["id"]
     check("release v1.0 created (PLANNED)", release.get("status") == "PLANNED", str(release))
+    rel_back = alice.get(f"{API}/releases/{rid}")
+    check("release goal and dueDate survived the write (read-back)",
+          rel_back.get("goal") == "First shippable release"
+          and str(rel_back.get("dueDate") or "").startswith("2026-09-30"),
+          str({k: rel_back.get(k) for k in ("goal", "dueDate")}))
 
     bob = clients["bob"]
     sprint1 = bob.post(f"{API}/projects/{pid}/sprints",
@@ -291,6 +304,9 @@ def run(base: str) -> None:
     check("Sprint 1 created (PLANNED)", sprint1.get("status") == "PLANNED", str(sprint1))
     check("Sprint 2 created (PLANNED)", sprint2.get("status") == "PLANNED", str(sprint2))
     s1, s2 = sprint1["id"], sprint2["id"]
+    s1_back = bob.get(f"{API}/sprints/{s1}")
+    check("sprint releaseId survived the write (read-back)",
+          s1_back.get("releaseId") == rid, str(s1_back.get("releaseId")))
 
     # ---- Phase 4: fill the product backlog ------------------------------- #
     section("Phase 4 · Fill the product backlog")
@@ -335,7 +351,9 @@ def run(base: str) -> None:
     check("all 15 backlog items created", len(tasks) == 15, f"got {len(tasks)}")
     check("every task starts PLANNED",
           all(t["status"] == "PLANNED" for t in tasks.values()))
-    seq_numbers = [t["seqNumber"] for t in tasks.values()]  # in creation order
+    no_seq = [k for k, t in tasks.items() if "seqNumber" not in t]
+    check("every created task carries a seqNumber", not no_seq, f"missing on {no_seq}")
+    seq_numbers = [t["seqNumber"] for t in tasks.values() if "seqNumber" in t]  # in creation order
     check("tasks get monotonic seq numbers",
           seq_numbers == sorted(seq_numbers) and len(set(seq_numbers)) == len(seq_numbers),
           str(seq_numbers))
@@ -343,6 +361,10 @@ def run(base: str) -> None:
           tasks["jwt"].get("assigneeId") == A("carol"), str(tasks["jwt"].get("assigneeId")))
     check("sprint scope planned on create",
           tasks["jwt"].get("sprintId") == s1, str(tasks["jwt"].get("sprintId")))
+    jwt_back = alice.get(f"{API}/tasks/{tasks['jwt']['id']}")
+    check("task dueDate survived the write (read-back)",
+          str(jwt_back.get("dueDate") or "").startswith("2026-07-07"),
+          str(jwt_back.get("dueDate")))
     backlog = as_list(alice.get(f"{API}/projects/{pid}/backlog"))
     check("backlog endpoint lists the unscheduled/unboarded work", len(backlog) >= 15,
           f"got {len(backlog)}")
@@ -365,6 +387,8 @@ def run(base: str) -> None:
                 "title": "Board design in Figma"}, expect=(201,))
     links = as_list(alice.get(f"{API}/tasks/{tasks['kanban']['id']}/links"))
     check("external design link attached", len(links) >= 1, str(links))
+    check("link title survived the write (read-back)",
+          any(l.get("title") == "Board design in Figma" for l in links), str(links))
 
     c1 = alice.post(f"{API}/tasks/{tasks['jwt']['id']}/comments",
                     {"text": "<p>AC: access + refresh tokens, 15-min access TTL.</p>"}, expect=(201,))
@@ -389,9 +413,17 @@ def run(base: str) -> None:
         raise Fatal("no sprint board; cannot continue Phase 6")
     # The board list omits columns; fetch the full board to get its lanes.
     sboard = bob.get(f"{API}/boards/{sboard['id']}")
-    col = {c["status"]: c["id"] for c in sboard["columns"]}
+    if not isinstance(sboard.get("columns"), list):
+        raise Fatal(f"board response carries no columns list: {sboard}")
+    col = {c.get("status"): c.get("id") for c in sboard["columns"]}
     check("sprint board copied the workflow columns",
           {"PLANNED", "IN_PROGRESS", "DONE"} <= set(col), str(list(col)))
+    # Everything Phase 6 does below indexes these lanes directly; a template
+    # change that drops one should die with a diagnosis, not a KeyError.
+    needed = {"PLANNED", "IN_PROGRESS", "IN_REVIEW", "DONE"}
+    if not needed <= set(col):
+        raise Fatal(f"sprint board is missing workflow column(s) "
+                    f"{sorted(needed - set(col))} (has {sorted(col)}); cannot run Phase 6")
 
     sprint1_keys = ["jwt", "invite", "kanban", "taskcrud", "ci", "bug_reorder"]
 
@@ -455,7 +487,12 @@ def run(base: str) -> None:
     check("Sprint 2 board provisioned", sboard2 is not None)
     if sboard2:
         sboard2 = bob.get(f"{API}/boards/{sboard2['id']}")
-        col2 = {c["status"]: c["id"] for c in sboard2["columns"]}
+        if not isinstance(sboard2.get("columns"), list):
+            raise Fatal(f"sprint 2 board response carries no columns list: {sboard2}")
+        col2 = {c.get("status"): c.get("id") for c in sboard2["columns"]}
+        if not {"PLANNED", "DONE"} <= set(col2):
+            raise Fatal(f"sprint 2 board is missing PLANNED/DONE column(s) "
+                        f"(has {sorted(col2)}); cannot finish Phase 7")
         for key in ("lifecycle", "ordering", "search"):
             bob.post(f"{API}/boards/{sboard2['id']}/move-task",
                      {"taskId": tasks[key]["id"], "boardColumnId": col2["PLANNED"], "boardRank": 1000})

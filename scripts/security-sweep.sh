@@ -16,9 +16,16 @@
 #
 # Usage: scripts/security-sweep.sh          # run the sweep
 # Exit:  0 = clean, 1 = a HARD check failed (blocks the commit).
-set -uo pipefail
+# -e so an unexpected error (a missing tool, an unreadable tree) aborts the
+# sweep loudly instead of degrading into a partial — and green-looking — run.
+# Every grep whose no-match exit is a PASS is already `|| true`-guarded (see
+# grep_forbid) or sits in an if/&&-|| context that -e ignores.
+set -euo pipefail
 
-root="$(git rev-parse --show-toplevel)"
+# Outside a git repo, rev-parse prints nothing — an empty $root would make the
+# `cd` below a no-op and the sweep would silently scan whatever the cwd is.
+root="$(git rev-parse --show-toplevel 2>/dev/null)" \
+  || { echo "security-sweep.sh: not inside a git repository — refusing to scan the cwd" >&2; exit 1; }
 cd "$root"
 
 fail=0
@@ -71,7 +78,9 @@ for p in "${swept_paths[@]}"; do
     paths_ok=0
   fi
 done
-[ "$paths_ok" -eq 1 ] && ok "all swept paths exist"
+# (a full if — a bare `[ … ] && ok` would return 1 and trip `set -e` when a
+# path is missing, aborting before the failure summary prints)
+if [ "$paths_ok" -eq 1 ]; then ok "all swept paths exist"; fi
 
 echo "── frontend integrity guards ──────────────────────────────"
 if command -v node >/dev/null 2>&1; then
@@ -130,8 +139,11 @@ fi
 echo "── frontend security greps ────────────────────────────────"
 grep_forbid "no eval / new Function / document.write" \
   bash -c 'grep -rn "eval(\|new Function\|document\.write" octbase-frontend/js octbase-mobile/js octbase-shared --include="*.js" | grep -v test'
+# Any <script…> tag WITHOUT a src= attribute is inline, wherever it sits on the
+# line and whatever attributes it carries (<script type="module"> included) —
+# the old anchor "^<script>" missed indented and attributed tags entirely.
 grep_forbid "no inline <script> in SPA HTML (edge CSP is script-src '\''self'\'')" \
-  bash -c 'grep -rn "^<script>" octbase-frontend/*.html octbase-mobile/*.html'
+  bash -c 'grep -rnE "^[[:space:]]*<script[^>]*>" octbase-frontend/*.html octbase-mobile/*.html | grep -vE "<script[^>]*[[:space:]]src[[:space:]]*="'
 grep_forbid "no ?token= outside realtime.js (SSE is the only token-in-URL)" \
   bash -c 'grep -rn "?token=" octbase-frontend/js octbase-mobile/js --include="*.js" | grep -v realtime'
 grep_forbid "shared modules stay sink-free (innerHTML only in richtext)" \
@@ -141,17 +153,21 @@ grep_forbid "no secrets in localStorage/sessionStorage" \
 
 echo "── go formatting ──────────────────────────────────────────"
 if command -v gofmt >/dev/null 2>&1; then
-  unformatted="$(gofmt -l octbase-api 2>/dev/null)"
+  # `|| true`: gofmt -l exits non-zero on an unparsable file; the sweep must
+  # still report (go vet / the build own syntax errors), not abort under -e.
+  unformatted="$(gofmt -l octbase-api 2>/dev/null || true)"
   [ -z "$unformatted" ] && ok "gofmt" || hard "gofmt (run: gofmt -w octbase-api):"$'\n'"$(printf '%s' "$unformatted" | sed 's/^/      /')"
 else
   skip "gofmt not found"
 fi
 
 echo "── informational (not blocking — eyeball on review) ───────"
-sql_sprintf="$(grep -rn 'fmt.Sprintf' --include='*.go' octbase-api/internal octbase-api/cmd 2>/dev/null | grep -iE 'select|insert|update|delete|where' | grep -v _test.go)"
-[ -n "$sql_sprintf" ] && { warn "fmt.Sprintf near SQL keywords — confirm whitelist/placeholder-only, never a value:"; printf '%s\n' "$sql_sprintf" | sed 's/^/      /'; }
-blank_noopener="$(grep -rn '_blank' octbase-frontend/js octbase-mobile/js --include='*.js' 2>/dev/null | grep -v noopener)"
-[ -n "$blank_noopener" ] && { warn "target=_blank without noopener on the same line — confirm rel is set (blob viewer / richtext hook are known-safe):"; printf '%s\n' "$blank_noopener" | sed 's/^/      /'; }
+# `|| true` on the captures and full `if`s on the reports: a no-match grep
+# (the CLEAN case) exits 1, which under -e/pipefail would abort the sweep.
+sql_sprintf="$(grep -rn 'fmt.Sprintf' --include='*.go' octbase-api/internal octbase-api/cmd 2>/dev/null | grep -iE 'select|insert|update|delete|where' | grep -v _test.go || true)"
+if [ -n "$sql_sprintf" ]; then warn "fmt.Sprintf near SQL keywords — confirm whitelist/placeholder-only, never a value:"; printf '%s\n' "$sql_sprintf" | sed 's/^/      /'; fi
+blank_noopener="$(grep -rn '_blank' octbase-frontend/js octbase-mobile/js --include='*.js' 2>/dev/null | grep -v noopener || true)"
+if [ -n "$blank_noopener" ]; then warn "target=_blank without noopener on the same line — confirm rel is set (blob viewer / richtext hook are known-safe):"; printf '%s\n' "$blank_noopener" | sed 's/^/      /'; fi
 
 echo "───────────────────────────────────────────────────────────"
 if [ "$fail" -ne 0 ]; then

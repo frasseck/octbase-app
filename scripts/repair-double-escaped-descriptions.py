@@ -52,28 +52,95 @@ import sys
 import urllib.error
 import urllib.request
 
-# A character reference whose leading "&" has itself been escaped: the signature
-# of a save that ran over its own output. Numeric and named forms both appear.
-OVER_ESCAPED = re.compile(r"&amp;(?:amp|lt|gt|quot|apos|nbsp|#[0-9]+|#[xX][0-9a-fA-F]+);")
+# A character reference whose leading "&" has itself been escaped, once per
+# damaging save: the signature of a save that ran over its own output. Numeric
+# and named forms both appear. Group 1 is the run of extra "amp;" layers (one
+# per save), group 2 the reference body the layers were wrapped around.
+OVER_ESCAPED = re.compile(
+    r"&((?:amp;)+)(amp|lt|gt|quot|apos|nbsp|#[0-9]+|#[xX][0-9a-fA-F]+);")
 
 # The fix landed for 1.1.2. Below this, a repair re-corrupts on the next edit.
 MIN_VERSION = (1, 1, 2)
 
 
 def strip_extra_layers(s):
-    """Decode only the layers the bug added, and report how many there were.
+    """Decode only the layers the bug added, and report the worst depth seen.
 
-    Each pass rewrites "&amp;" to "&" exactly once, which undoes one round of
-    escaping. The loop stops as soon as no over-escaped reference remains, so a
-    correctly stored "&amp;" (a literal ampersand) or "&lt;" (a literal "<") is
-    left exactly as it is. The bound is a backstop, not an expectation — the
-    worst row measured was five layers deep.
+    Each over-escaped reference is rewritten IN PLACE — "&amp;amp;gt;" becomes
+    "&gt;" — and nothing else in the string is touched, so a correctly stored
+    "&amp;" (a literal ampersand) or "&lt;" (a literal "<") elsewhere in the
+    same row survives exactly as it is. (An earlier version ran a global
+    s.replace("&amp;", "&") per pass, which decoded every legitimate entity in
+    any row that contained one damaged reference — the exact violation of the
+    docstring's own guarantee.)
+
+    Returns (repaired, worst): `worst` is the deepest per-reference layer count
+    (0 when nothing matched, so the caller's truthiness check still works).
+    References in one row can sit at different depths — the count is per
+    reference, not per row. The worst row measured was five layers deep.
     """
-    layers = 0
-    while OVER_ESCAPED.search(s) and layers < 10:
-        s = s.replace("&amp;", "&")
-        layers += 1
-    return s, layers
+    worst = 0
+
+    def undo(m):
+        nonlocal worst
+        worst = max(worst, len(m.group(1)) // 4)  # each layer is one "amp;"
+        return "&" + m.group(2) + ";"
+
+    return OVER_ESCAPED.sub(undo, s), worst
+
+
+# Mirror of the server's write path, so the read-back can verify the stored
+# value against what the repair SHOULD have produced rather than merely "no
+# longer matches OVER_ESCAPED". SanitizeDescriptionHTML
+# (octbase-api/internal/workmanagement/sanitize.go) keeps allowlisted tags,
+# runs shared.EscapeText (octbase-api/internal/shared/htmlsafe.go) over the
+# text runs between them, and TrimSpaces the result. The values this script
+# sends are the server's own sanitized output with over-escape layers removed,
+# so the tags pass through verbatim; if a sent value somehow contains markup
+# the sanitizer would rewrite, expected_stored and the store disagree and the
+# row is reported NOT REPAIRED — which is the safe direction.
+
+# Same shape as sanitize.go's tagRe: one HTML tag, quoted attrs tolerated.
+_TAG = re.compile(r"(?s)<(/?)([a-zA-Z][a-zA-Z0-9]*)((?:[^>\"']|\"[^\"]*\"|'[^']*')*)>")
+
+# Same shape as htmlsafe.go's entityRe: an already-encoded reference, which
+# idempotent escaping preserves instead of re-encoding its "&".
+_ENTITY = re.compile(r"&(#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);")
+
+
+def escape_once(s):
+    """Python mirror of shared.EscapeText: idempotent text-run escaping."""
+    out = []
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if c == "&":
+            m = _ENTITY.match(s, i)
+            if m:
+                out.append(m.group(0))
+                i = m.end()
+                continue
+            out.append("&amp;")
+        elif c == "<":
+            out.append("&lt;")
+        elif c == ">":
+            out.append("&gt;")
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def expected_stored(sent):
+    """What the server's sanitizer stores for `sent`: tags kept, text runs
+    escaped once (idempotently), surrounding whitespace trimmed."""
+    out, last = [], 0
+    for m in _TAG.finditer(sent):
+        out.append(escape_once(sent[last:m.start()]))
+        out.append(m.group(0))
+        last = m.end()
+    out.append(escape_once(sent[last:]))
+    return "".join(out).strip()
 
 
 def _req(base, method, path, token=None, body=None):
@@ -83,7 +150,7 @@ def _req(base, method, path, token=None, body=None):
     if token:
         r.add_header("Authorization", "Bearer " + token)
     try:
-        with urllib.request.urlopen(r) as resp:
+        with urllib.request.urlopen(r, timeout=30) as resp:
             raw = resp.read()
             return resp.status, (json.loads(raw) if raw else None)
     except urllib.error.HTTPError as e:
@@ -150,23 +217,41 @@ def main():
         page += 1
 
     wanted = set(args.task)
+    missing = wanted - {t["id"] for t in tasks}
+    if missing:
+        print("WARNING: --task id(s) not found in this project's task list "
+              "(nothing was checked for them): " + ", ".join(sorted(missing)),
+              file=sys.stderr)
+
     repaired = failed = 0
     for t in tasks:
         if wanted and t["id"] not in wanted:
             continue
         before = t.get("description") or ""
-        after, layers = strip_extra_layers(before)
-        if not layers:
+        after, worst = strip_extra_layers(before)
+        if not worst:
             continue
 
+        matches = list(OVER_ESCAPED.finditer(before))
         print(f"\n── {t['id']}  {t.get('title', '')[:60]}")
-        print(f"   {layers} extra layer(s)")
-        for m in list(OVER_ESCAPED.finditer(before))[:3]:
+        print(f"   {len(matches)} over-escaped reference(s), deepest {worst} extra layer(s)")
+        # Excerpts around the first three matches. The "after" windows are
+        # sliced with offsets valid for the AFTER string: each replacement
+        # shrinks the text by the length of the stripped layers (group 1), so
+        # the cumulative shrinkage of every earlier match is subtracted.
+        for m in matches[:3]:
             lo, hi = max(0, m.start() - 30), min(len(before), m.end() + 20)
             print(f"   before: …{before[lo:hi]}…")
-        for m in list(OVER_ESCAPED.finditer(before))[:3]:
-            lo = max(0, m.start() - 30)
-            print(f"   after:  …{after[lo:lo + 55]}…")
+        shift = 0
+        for i, m in enumerate(matches):
+            if i < 3:
+                apos = m.start() - shift
+                repl_end = apos + len(m.group(0)) - len(m.group(1))
+                lo, hi = max(0, apos - 30), min(len(after), repl_end + 20)
+                print(f"   after:  …{after[lo:hi]}…")
+            shift += len(m.group(1))
+        if len(matches) > 3:
+            print(f"   … {len(matches) - 3} more match(es) not shown")
 
         if not (args.apply and args.yes):
             continue
@@ -180,13 +265,23 @@ def main():
             print(f"   NOT REPAIRED: {st} {b}")
             continue
         # Never trust the status code — read it back. The write path sanitizes,
-        # so what was stored is what matters, not what was sent.
+        # so what was stored is what matters, not what was sent — and "no longer
+        # matches OVER_ESCAPED" is a weaker claim than "stored what the repair
+        # computed", so compare against the mirrored write path exactly.
         st, back = _req(base, "GET", f"/tasks/{t['id']}", token)
         stored = (back or {}).get("description", "")
-        if OVER_ESCAPED.search(stored):
+        expect = expected_stored(after)
+        if stored != expect:
             failed += 1
-            print("   NOT REPAIRED: the stored value is still over-escaped — the "
-                  "instance is very likely running a build without the fix")
+            if OVER_ESCAPED.search(stored):
+                print("   NOT REPAIRED: the stored value is still over-escaped — the "
+                      "instance is very likely running a build without the fix")
+            else:
+                print("   NOT REPAIRED: the stored value differs from the expected "
+                      "repair result — the server rewrote the value on write; "
+                      "inspect this row by hand")
+                print(f"     expected: {expect[:120]!r}")
+                print(f"     stored:   {stored[:120]!r}")
         else:
             repaired += 1
             print("   repaired")
@@ -195,7 +290,7 @@ def main():
         print(f"\nrepaired {repaired}, failed {failed}")
     else:
         print("\ndry run — nothing was written. Re-run with --apply --yes to repair.")
-    return 1 if failed else 0
+    return 1 if failed or missing else 0
 
 
 if __name__ == "__main__":

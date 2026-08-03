@@ -53,7 +53,9 @@ for arg in "$@"; do
     --delete)    DELETE=1 ;;
     --reverse)   REVERSE=1 ;;
     --no-reload) RELOAD=0 ;;
-    -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # Print the comment header only (line 2 up to the first non-comment line) —
+    # a plain `grep '^#'` would also dump every section-divider comment below.
+    -h|--help) awk 'NR>1 && !/^#/{exit} NR>1{sub(/^# ?/,""); print}' "$0"; exit 0 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -82,6 +84,10 @@ EXCLUDES=(
   "pgdata/" "pgdata_dev/" "pgdata*/"
   # python / playwright test env + caches
   ".venv/" ".venv-octbase-tests/" "__pycache__/" "*.py[cod]" ".pytest_cache/"
+  # npm dependency trees — host-specific (native binaries, platform-keyed
+  # optional deps); each install must run its own `npm ci`. Also keeps a
+  # --reverse --apply --delete from rewriting this tree's node_modules.
+  "node_modules/"
   # go build output
   "octbase-api/octbase-api" "octbase-api/octbase.db" "octbase-api/vendor/"
   "cover.out" "cover_wm.out" "coverage.txt" "*.cover.html"
@@ -105,6 +111,12 @@ echo "mode: $([[ $APPLY == 1 ]] && echo APPLY || echo DRY-RUN)$([[ $DELETE == 1 
 echo "------------------------------------------------------------------------"
 
 if [[ "$APPLY" == 1 ]]; then
+  # Show what would change BEFORE asking — a confirmation over an empty screen
+  # ("above" referred to nothing) is no confirmation at all. The preview is the
+  # same rsync with --dry-run forced on; the answer then gates the real run.
+  echo "Preview (dry-run) of the changes --apply will write:"
+  rsync "${RSYNC_OPTS[@]}" --dry-run "$SRC" "$DST"
+  echo "------------------------------------------------------------------------"
   read -r -p "Write changes to DST above? [y/N] " ans
   [[ "$ans" == [yY] ]] || { echo "aborted."; exit 1; }
 fi
