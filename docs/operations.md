@@ -207,27 +207,56 @@ holding the same schema. Fresh databases are unaffected: they run the baseline
 and land at version 1.
 
 An instance that already ran the old history sits at version **38 or 39** with
-no file on disk for that version. Its schema is correct and the API keeps
-serving, but `/api/v1/health` reports **degraded**, because `main.go` compares
-the live version against `LatestMigrationVersion(migrations)`, which is now 1.
+no file on disk for that version. This is a **hard outage, not a degraded
+health report**: `runMigrations` cannot build a plan from a recorded version it
+has no file for, it returns
+`no migration found for version 38: read down for version 38`, and
+`main.go` treats that as fatal (`os.Exit(1)`). The container crash-loops, no
+port is ever bound, and a deploy fails at its health gate with
+`Connection refused` — `/api/v1/health` is never reached at all.
 
-Fix it by stamping the recorded version down — this rewrites one row in
-`schema_migrations` and touches no table:
+**Which version the instance stopped at decides the procedure**, because the
+baseline squashed `001`–`039` but these instances did not all get that far:
+
+| Recorded version | Schema state | What to do |
+|---|---|---|
+| **39** | matches the baseline | stamp only |
+| **38** | missing everything migration `039` did | apply `039`, *then* stamp |
+
+Version 38 is **not** a database whose schema already matches the baseline.
+`039_activity_referential_integrity` added `activity_entries.release_id`,
+`.sprint_id` and `.target_deleted`, backfilled them, and added four foreign
+keys and two indexes. Stamping a 38 straight to 1 records those as applied when
+they are not — the columns stay missing, and the activity write path fails at
+runtime on a schema golang-migrate now believes is current. Check before you
+stamp:
 
 ```bash
-# Confirm the instance really is at 38/39 and not dirty.
+# 1. Read the recorded version, and confirm it is not dirty.
 psql "$DATABASE_URL" -c 'select * from schema_migrations;'
 
-# Stamp it as the baseline. No DDL runs.
-migrate -path ./migrations -database "$DATABASE_URL" force 1
+# 2. Only if it reads 38 — apply the one migration it never got. The file is no
+#    longer on disk; take it from the commit before the squash.
+git show 56827b4^:octbase-api/migrations/039_activity_referential_integrity.up.sql \
+  | psql "$DATABASE_URL" -v ON_ERROR_STOP=1
 
-# Health should return to ok on the next scrape.
+# 3. Stamp it as the baseline. No DDL runs; this rewrites one row.
+migrate -path ./migrations -database "$DATABASE_URL" force 1
+#    Without the migrate CLI, the equivalent is:
+#    psql "$DATABASE_URL" -c 'UPDATE schema_migrations SET version=1, dirty=false;'
+
+# 4. Restart the API. It applies 002_notification_params on the way up and
+#    should report migrationVersion 2.
 curl -fsS localhost:<api-port>/api/v1/health
 ```
 
-Do this **only** on a database whose schema already matches the baseline —
-i.e. one that had reached 38/39 under the old history. Forcing the version on a
-partially-migrated database tells golang-migrate a lie it cannot detect later.
+Confirm step 2 is needed rather than assuming: an instance already carrying
+`activity_entries.target_deleted` is a 39 whose row simply reads 38, and
+re-running `039` on it fails on the duplicate `ADD CONSTRAINT`.
+
+Do this **only** on a database whose schema matches the baseline once step 2
+has run. Forcing the version on a partially-migrated database tells
+golang-migrate a lie it cannot detect later.
 
 ---
 

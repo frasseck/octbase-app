@@ -13,12 +13,16 @@ All notable changes to Octbase are documented here.
   that schema and to pass the full Go suite, so this is not a schema change:
   a fresh database ends up exactly where it did before, at version 1 instead of
   39. Per-migration rationale stays in git history.
-  **Existing deployments need one manual step.** An instance already at version
-  38/39 has the right schema but no file on disk for its recorded version, so
-  `/api/v1/health` reports degraded until it is stamped with
-  `migrate force 1` — see "Stamping an instance created before the
-  001_baseline squash" in `docs/operations.md`. Nothing is migrated, dropped,
-  or rewritten by the stamp.
+  **Existing deployments need a manual step before they will start at all.** An
+  instance already at version 38/39 has no file on disk for its recorded
+  version, which `runMigrations` cannot build a plan from; `main.go` treats that
+  as fatal, so the API crash-loops and a deploy fails at its health gate with
+  `Connection refused`. It is an outage, not a degraded health report. An
+  instance at **39** needs only the `migrate force 1` stamp, which migrates,
+  drops and rewrites nothing. An instance at **38** never ran migration `039`
+  and must have it applied first, or the stamp records as done a set of columns,
+  foreign keys and indexes it does not have. See "Stamping an instance created
+  before the 001_baseline squash" in `docs/operations.md`.
   `workmanagement`'s service tests, which named the subset of migration files
   they needed, now read the migrations directory like `testutil` already did.
 

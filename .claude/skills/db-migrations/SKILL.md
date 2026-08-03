@@ -21,8 +21,12 @@ trusting a hardcoded count here.
 as of that date; migrations `001`–`039` were removed, and their per-change
 rationale lives in git history (`git log -- octbase-api/migrations/`). Add new
 migrations after the baseline as normal — nothing about the workflow below
-changes. Instances created before the squash need a one-off
-`migrate force 1` stamp; see `docs/operations.md`.
+changes. Instances created before the squash **will not start** until they are
+stamped: the API cannot plan from a recorded version whose file is gone, so it
+crash-loops on `no migration found for version 38`. One at version 39 needs only
+`migrate force 1`; one at 38 must have migration `039` applied first. See
+"Stamping an instance created before the 001_baseline squash" in
+`docs/operations.md`.
 
 ## Migrations run automatically
 
