@@ -267,7 +267,13 @@
   "notifications": {
     "title": "Notifications",
     "markAllRead": "Mark all read",
-    "empty": "No notifications"
+    "empty": "No notifications",
+    "messages": {
+      "task_assigned": "You were assigned to task: {{title}}",
+      "reviewer_set": "You were set as reviewer for task: {{title}}",
+      "status_changed": "Task “{{title}}” status changed to {{status}}",
+      "mentioned": "You were mentioned in a comment"
+    }
   },
   "settings": {
     "title": "Settings",

@@ -2,7 +2,9 @@ package notifications
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 )
 
@@ -12,12 +14,43 @@ type Repo struct{ db *sql.DB }
 // NewRepo creates a new notifications Repo.
 func NewRepo(db *sql.DB) *Repo { return &Repo{db: db} }
 
+// paramsJSON encodes render parameters for storage. A nil map stores SQL NULL,
+// which is what marks a row the client must fall back to `message` for; an
+// empty map stores "{}" — a parameterless kind, still renderable from `kind`.
+// Encoding cannot realistically fail (the values are strings the service put
+// there), but a failure must not cost the notification: it degrades to NULL,
+// which renders the composed English sentence rather than nothing.
+func paramsJSON(params map[string]any) any {
+	if params == nil {
+		return nil
+	}
+	b, err := json.Marshal(params)
+	if err != nil {
+		slog.Error("failed to encode notification params", "error", err)
+		return nil
+	}
+	return string(b)
+}
+
+// scanParams decodes a stored params payload. NULL and unparseable JSON both
+// yield nil, so the client falls back to `message`.
+func scanParams(raw sql.NullString) map[string]any {
+	if !raw.Valid || raw.String == "" {
+		return nil
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(raw.String), &params); err != nil {
+		return nil
+	}
+	return params
+}
+
 // Create inserts a notification.
 func (r *Repo) Create(n *Notification) error {
 	_, err := r.db.Exec(`
-		INSERT INTO notifications (id, user_id, kind, project_id, task_id, page_id, message, is_read)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-		n.ID, n.UserID, n.Kind, n.ProjectID, n.TaskID, n.PageID, n.Message, n.IsRead,
+		INSERT INTO notifications (id, user_id, kind, project_id, task_id, page_id, message, params_json, is_read)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		n.ID, n.UserID, n.Kind, n.ProjectID, n.TaskID, n.PageID, n.Message, paramsJSON(n.Params), n.IsRead,
 	)
 	return err
 }
@@ -29,25 +62,25 @@ func (r *Repo) CreateMany(ns []Notification) error {
 	if len(ns) == 0 {
 		return nil
 	}
-	const cols = 8
+	const cols = 9
 	values := make([]string, 0, len(ns))
 	args := make([]any, 0, len(ns)*cols)
 	for i, n := range ns {
 		base := i * cols
-		values = append(values, fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
-			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8))
-		args = append(args, n.ID, n.UserID, n.Kind, n.ProjectID, n.TaskID, n.PageID, n.Message, n.IsRead)
+		values = append(values, fmt.Sprintf("($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			base+1, base+2, base+3, base+4, base+5, base+6, base+7, base+8, base+9))
+		args = append(args, n.ID, n.UserID, n.Kind, n.ProjectID, n.TaskID, n.PageID, n.Message, paramsJSON(n.Params), n.IsRead)
 	}
 	_, err := r.db.Exec( // #nosec G202 -- concatenates only generated $n placeholders; values are parameterized
 		`
-		INSERT INTO notifications (id, user_id, kind, project_id, task_id, page_id, message, is_read)
+		INSERT INTO notifications (id, user_id, kind, project_id, task_id, page_id, message, params_json, is_read)
 		VALUES `+strings.Join(values, ","), args...) // #nosec G202 -- joins generated $n placeholders only
 	return err
 }
 
 // List returns paginated notifications for a user.
 func (r *Repo) List(userID string, unreadOnly bool, page, size int) ([]Notification, error) {
-	q := `SELECT id, user_id, kind, project_id, task_id, page_id, message, is_read, created_at
+	q := `SELECT id, user_id, kind, project_id, task_id, page_id, message, params_json, is_read, created_at
 		    FROM notifications WHERE user_id = $1`
 	args := []any{userID}
 	if unreadOnly {
@@ -65,9 +98,11 @@ func (r *Repo) List(userID string, unreadOnly bool, page, size int) ([]Notificat
 	var ns []Notification
 	for rows.Next() {
 		var n Notification
-		if err := rows.Scan(&n.ID, &n.UserID, &n.Kind, &n.ProjectID, &n.TaskID, &n.PageID, &n.Message, &n.IsRead, &n.CreatedAt); err != nil {
+		var params sql.NullString
+		if err := rows.Scan(&n.ID, &n.UserID, &n.Kind, &n.ProjectID, &n.TaskID, &n.PageID, &n.Message, &params, &n.IsRead, &n.CreatedAt); err != nil {
 			return nil, err
 		}
+		n.Params = scanParams(params)
 		ns = append(ns, n)
 	}
 	if err := rows.Err(); err != nil {

@@ -9,13 +9,20 @@ byte-identically into each app's `js/` and guarded against drift in CI.
 |--------|----------|
 | `i18n.js` | the i18n engine — `t()`, `setLocale()`, `getLocale()`, locale loading, and the `classic` vocabulary overlay |
 | `meta.js` | task enum metadata — `STATUS_META`, `PRIORITY_META`, `TYPE_META`, the derived `STATUSES` / `PRIORITIES` / `TASK_TYPES`, the estimation helpers, and `openDescendantsOf()` (the task-tree walk behind both SPAs' "open work below this task" completion warning) |
+| `notifications.js` | `notificationMessage()` — renders one notification from its `kind` + `params` through `notifications.messages.<kind>`, so the desktop bell and the mobile inbox read the same sentence in the reader's language. Falls back to the server's English `message` for a row written before params existed (`params` is null) or a kind this client does not know |
 | `richtext.js` | the rich-text sanitizer — `sanitizeRichText()` (DOMPurify-backed), `rtSafeHref()`, `rtSafeImageSrc()`, `looksLikeHTML()`; mirrors the server's allowlist (`octbase-api` `internal/workmanagement/sanitize.go`) |
 
-Three modules, all first-party. `qrcode.js` and `purify.js` were a fourth and
-fifth until **37b stage 4** — vendored copies of `qrcode-generator` and
+Four modules, all first-party. `qrcode.js` and `purify.js` were a fifth and
+sixth until **37b stage 4** — vendored copies of `qrcode-generator` and
 `dompurify` that lived here because there was no dependency graph to put them
 in. They are npm dependencies now (see below), so this package holds only code
 Octbase wrote.
+
+The message keys `notifications.js` asks for are built at runtime, so
+`scripts/check-i18n-keys.mjs` cannot see them. Their guard is a unit test per
+SPA — `octbase-frontend/js/notifications.test.js` and its mobile counterpart —
+which reads the notification kinds out of the Go source, so a kind added on the
+backend without a translation fails there rather than reaching a user's bell.
 
 ## Using it
 
@@ -24,6 +31,7 @@ Each SPA declares `@octbase/shared` as a dependency and imports by module path:
 ```js
 import { t } from '@octbase/shared/i18n.js';
 import { STATUS_META, STATUSES } from '@octbase/shared/meta.js';
+import { notificationMessage } from '@octbase/shared/notifications.js';
 import { sanitizeRichText } from '@octbase/shared/richtext.js';
 ```
 

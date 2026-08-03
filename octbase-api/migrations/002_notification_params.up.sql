@@ -1,0 +1,21 @@
+-- Notifications carry render parameters, so their text can be localized (OCT-323).
+--
+-- notifications.message has always been English prose composed on the server
+-- and rendered verbatim by both SPAs, so a German user read English in the bell
+-- and in the mobile inbox. Activity entries already solved this: they store a
+-- `type` plus a params payload and no text at all, and the frontend renders
+-- `notifications.activity.<type>` with the params interpolated. This gives
+-- notifications the same shape, keyed on the `kind` column they already have.
+--
+-- NULLABLE ON PURPOSE, and it is the whole migration strategy. NULL means "this
+-- row predates the change" and the SPA falls back to the stored sentence, which
+-- is the only text those rows will ever have; '{}' means "render from kind"
+-- and is what a parameterless kind (mentioned) writes. A NOT NULL DEFAULT '{}'
+-- — the shape activity_entries.payload_json uses — could not tell the two
+-- apart, and would make every historical notification render as though its
+-- params had simply gone missing.
+--
+-- message stays NOT NULL and stays written. It is still the email lead line
+-- (email localization needs a server-side catalogue and the recipient's stored
+-- language, split off to its own task) and it is the fallback above.
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS params_json TEXT;
