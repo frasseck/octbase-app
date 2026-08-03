@@ -50,6 +50,27 @@ test('a page with no comments is returned unchanged', () => {
   assert.strictEqual(stripComments(html), html);
 });
 
+test('a comment that mentions <script> in prose is still a comment', () => {
+  // The carve-out that protects inline script bodies must not let a comment's
+  // PROSE start a raw block: index.html's head comment says "classic <script>
+  // tags" mid-sentence, and the first carve-out matched from there to the next
+  // real </script>, swallowing the comment's closer and shipping the `<!--`.
+  // Whichever token starts first — comment or raw block — must win.
+  const html = '<!-- the last two classic <script> tags here -->\n<script type="module" src="js/main.js"></script>\n';
+  const out = stripComments(html);
+  assert.ok(!out.includes('<!--'), 'comment opener survived the strip');
+  assert.ok(out.includes('<script type="module" src="js/main.js"></script>'));
+});
+
+test('a real inline script body keeps its `<!--` text', () => {
+  // The other direction of the same scan: inside a script, `<!--` is JS text,
+  // and eating it would change the program.
+  const html = '<script>\nconst marker = "<!--";\n</script>\n<!-- gone -->\n';
+  const out = stripComments(html);
+  assert.ok(out.includes('const marker = "<!--";'), 'script body was mangled');
+  assert.ok(!out.includes('gone'));
+});
+
 test('the real HTML entries end up comment-free', async () => {
   // The end-to-end statement: run the transform over the shipped sources rather
   // than a fixture, so a new comment shape in a real file is covered by this

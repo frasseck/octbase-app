@@ -31,7 +31,14 @@
 // module scripts before this runs, and theme-init is external — but the carve-
 // out is what makes that a fact about the input rather than a load-bearing
 // assumption of this file.
-const RAW_TEXT_BLOCK = /(<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>)/i;
+//
+// Comments and raw-text blocks are found in ONE left-to-right scan, so
+// whichever starts first claims the overlap. Carving out script blocks alone
+// (the first version of the carve-out) let a comment that merely MENTIONS
+// "<script>" in prose — index.html's own head comment does — start a bogus
+// raw block mid-comment, swallow the comment's `-->`, and leave the `<!--`
+// opener in the shipped page. Found by this plugin's own unit test in CI.
+const TOKEN = /<!--[\s\S]*?-->|<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>/gi;
 
 /** The transform itself. Exported because the two `file://` standalone builds
  *  cannot use the plugin below: they are `lib` builds with no HTML entry, so
@@ -41,9 +48,18 @@ const RAW_TEXT_BLOCK = /(<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style
  *  suite loads from disk, so leaving them out would have left the comments in
  *  the one artifact nobody re-reads. */
 export function stripComments(html) {
-  // split() with a capturing group keeps the raw-text blocks in the result at
-  // odd indices; only the even (outside) slices are stripped.
-  return html.split(RAW_TEXT_BLOCK).map((part, i) => (i % 2 ? part : part
+  // Pass 1: tokenize. Raw-text blocks are parked behind NUL-framed
+  // placeholders (NUL cannot appear in source HTML) so the comment strip
+  // below cannot see into them; comments met first in the scan stay put —
+  // including any "<script>" prose inside them — for pass 2 to remove with
+  // its line-level cleanup intact.
+  const raws = [];
+  const tokenized = html.replace(TOKEN, (m) => {
+    if (m.startsWith('<!--')) return m;
+    raws.push(m);
+    return `\x00${raws.length - 1}\x00`;
+  });
+  const stripped = tokenized
     // A comment that occupies whole lines takes those lines with it, leading
     // indentation and closing newline included. Deleting only the comment text
     // leaves the blank line and the indent that led up to it, which is what the
@@ -59,7 +75,8 @@ export function stripComments(html) {
     // author-written double blank too, which is accepted: the built page is
     // for visitors, and one blank line separates sections just as well. A
     // single blank line survives as itself.
-    .replace(/(\r?\n)[ \t]*(?:\r?\n)+/g, '$1$1'))).join('');
+    .replace(/(\r?\n)[ \t]*(?:\r?\n)+/g, '$1$1');
+  return stripped.replace(/\x00(\d+)\x00/g, (_, i) => raws[+i]);
 }
 
 // Vite emits the tags it injects — the module entry, its modulepreloads, the
