@@ -200,6 +200,35 @@ migrate -path ./migrations -database "$DATABASE_URL" version
 
 The application also runs migrations automatically at startup via golang-migrate.
 
+### Stamping an instance created before the 001_baseline squash
+
+Migrations `001`–`039` were replaced on 2026-08-03 by a single `001_baseline`
+holding the same schema. Fresh databases are unaffected: they run the baseline
+and land at version 1.
+
+An instance that already ran the old history sits at version **38 or 39** with
+no file on disk for that version. Its schema is correct and the API keeps
+serving, but `/api/v1/health` reports **degraded**, because `main.go` compares
+the live version against `LatestMigrationVersion(migrations)`, which is now 1.
+
+Fix it by stamping the recorded version down — this rewrites one row in
+`schema_migrations` and touches no table:
+
+```bash
+# Confirm the instance really is at 38/39 and not dirty.
+psql "$DATABASE_URL" -c 'select * from schema_migrations;'
+
+# Stamp it as the baseline. No DDL runs.
+migrate -path ./migrations -database "$DATABASE_URL" force 1
+
+# Health should return to ok on the next scrape.
+curl -fsS localhost:<api-port>/api/v1/health
+```
+
+Do this **only** on a database whose schema already matches the baseline —
+i.e. one that had reached 38/39 under the old history. Forcing the version on a
+partially-migrated database tells golang-migrate a lie it cannot detect later.
+
 ---
 
 ## The First Administrator

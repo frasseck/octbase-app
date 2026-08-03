@@ -17,6 +17,13 @@ Numbering is sequential and zero-padded (`001_…` through the current head).
 Check `ls octbase-api/migrations | tail` for the current head rather than
 trusting a hardcoded count here.
 
+**The history was squashed on 2026-08-03.** `001_baseline` is the whole schema
+as of that date; migrations `001`–`039` were removed, and their per-change
+rationale lives in git history (`git log -- octbase-api/migrations/`). Add new
+migrations after the baseline as normal — nothing about the workflow below
+changes. Instances created before the squash need a one-off
+`migrate force 1` stamp; see `docs/operations.md`.
+
 ## Migrations run automatically
 
 `cmd/octbase-api/main.go` calls `shared.RunMigrations(db, "migrations")` on

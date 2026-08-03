@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -42,18 +43,24 @@ func newTestDB(t *testing.T) *sql.DB {
 		_ = db.Close()
 		t.Fatalf("set search_path: %v", err)
 	}
-	for _, name := range []string{
-		"001_initial.up.sql", "002_constraints.up.sql", "003_auth.up.sql",
-		"004_notifications.up.sql", "005_scm.up.sql", "006_migration.up.sql",
-		"007_sprints.up.sql", "008_task_due_date.up.sql",
-		"012_board_config.up.sql", "013_attachment_storage.up.sql",
-		"014_task_pinned.up.sql", "015_sprint_counts.up.sql",
-		"020_comment_threads.up.sql", "021_task_done_at.up.sql",
-		"025_version_guards.up.sql", "028_task_hierarchy.up.sql",
-		"030_concurrency_guards.up.sql", "034_task_estimation.up.sql",
-		"035_sprint_effort_snapshot.up.sql",
-	} {
-		b, err := os.ReadFile(filepath.Join(migsDir, name))
+	// Read the directory rather than naming files: this used to list the subset
+	// of migrations these tests needed, which silently rotted every time the
+	// schema moved and broke outright when the history was squashed into
+	// 001_baseline. Same approach as testutil.readMigrations.
+	entries, err := os.ReadDir(migsDir)
+	if err != nil {
+		_ = db.Close()
+		t.Fatalf("read migrations dir: %v", err)
+	}
+	var names []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".up.sql") {
+			names = append(names, e.Name())
+		}
+	}
+	sort.Strings(names) // zero-padded numeric prefixes sort lexically in order
+	for _, name := range names {
+		b, err := os.ReadFile(filepath.Join(migsDir, name)) // #nosec G304 -- test-only helper reading the repo's own migrations
 		if err != nil {
 			_ = db.Close()
 			t.Fatalf("read migration %s: %v", name, err)

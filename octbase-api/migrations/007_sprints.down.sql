@@ -1,2 +1,0 @@
-ALTER TABLE tasks DROP COLUMN IF EXISTS sprint_id;
-DROP TABLE IF EXISTS sprints;
