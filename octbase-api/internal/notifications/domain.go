@@ -2,16 +2,26 @@
 package notifications
 
 // Notification domain object.
+//
+// Kind and Params are what a client renders: `notifications.kinds.<kind>.message`
+// with Params interpolated, the same contract activity entries use. Message is
+// the English sentence the server composed; it is the email lead line, and it is
+// the client's fallback for a row written before Params existed.
+//
+// Params is nil (JSON `null`) only for such a pre-change row. A kind that takes
+// no parameters — `mentioned` — writes an empty object, so "render from kind"
+// and "there is nothing to render from" stay distinguishable.
 type Notification struct {
-	ID        string  `json:"id"`
-	UserID    string  `json:"userId"`
-	Kind      string  `json:"kind"`
-	ProjectID *string `json:"projectId,omitempty"`
-	TaskID    *string `json:"taskId,omitempty"`
-	PageID    *string `json:"pageId,omitempty"`
-	Message   string  `json:"message"`
-	IsRead    bool    `json:"isRead"`
-	CreatedAt string  `json:"createdAt"`
+	ID        string         `json:"id"`
+	UserID    string         `json:"userId"`
+	Kind      string         `json:"kind"`
+	ProjectID *string        `json:"projectId,omitempty"`
+	TaskID    *string        `json:"taskId,omitempty"`
+	PageID    *string        `json:"pageId,omitempty"`
+	Message   string         `json:"message"`
+	Params    map[string]any `json:"params"`
+	IsRead    bool           `json:"isRead"`
+	CreatedAt string         `json:"createdAt"`
 }
 
 // NotificationPreference stores per-user, per-kind delivery settings.

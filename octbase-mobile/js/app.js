@@ -1,6 +1,7 @@
 import qrcode from 'qrcode-generator';
 import { getLocale, i18n, t } from '@octbase/shared/i18n.js';
 import { FIBONACCI_POINTS, STATUSES, STATUS_META, TYPE_META, estimableType, estimateLabel, estimateLimits, estimateText, estimationEnabled, estimationField, estimationUnit, openDescendantsOf, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, taskEstimatable, taskEstimate, typeParentRule } from '@octbase/shared/meta.js';
+import { notificationMessage } from '@octbase/shared/notifications.js';
 import { ACTIONS, API_BASE, Auth, BASE_PATH, CHANGES, DESKTOP_URL, INPUTS, IS_PHONE, SUBMITS, USE_STANDALONE_DEMO_AUTH, V, _A0, _A1, _A2, _A3, _dispatch, _register, api, apiErrorMessage, el, esc, html, http, icon, initials, raw, renderDescriptionHTML, toast } from './core.js';
 
 // ═══════════════════════════════════════════════════════════
@@ -1458,14 +1459,18 @@ async function viewNotifications() {
     el('#content').innerHTML = errorState(e, 'reloadRoute');
   }
 }
+// The inbox row. The text comes from the shared renderer, so the phone reads
+// the same sentence as the desktop bell and reads it in the user's language.
+//
+// It used to be `n.title || n.message || n.type`, with a second `body` line
+// derived from the same three. A notification carries none of `title`, `body`
+// or `type` — the API sends kind/message/params — so both fallbacks were dead
+// and the body line could only ever render empty.
 function notifCard(n) {
-  const title = n.title || n.message || n.type || '';
-  const body = n.body || (n.title ? n.message : '') || '';
   return `<button type="button" class="card row-card${n.isRead?'':' notif-unread'}" data-act="openNotif" data-a0="${esc(n.id)}" data-a1="${esc(n.taskId||'')}" data-a2="${esc(n.projectId||'')}">
     <span class="row-icon">${icon('bell',{size:'sm'})}</span>
     <div class="row-body">
-      <div class="row-title" style="white-space:normal">${esc(title)}</div>
-      ${body?`<div class="row-sub" style="white-space:normal">${esc(body)}</div>`:''}
+      <div class="row-title" style="white-space:normal">${esc(notificationMessage(n))}</div>
       <div class="row-sub">${esc(fmtRelative(n.createdAt))}</div>
     </div>
   </button>`;

@@ -485,6 +485,12 @@
     "title": "Benachrichtigungen",
     "markAllRead": "Alle als gelesen markieren",
     "empty": "Keine Benachrichtigungen",
+    "messages": {
+      "task_assigned": "Ihnen wurde die Aufgabe „{{title}}“ zugewiesen",
+      "reviewer_set": "Sie wurden als Reviewer für die Aufgabe „{{title}}“ festgelegt",
+      "status_changed": "Status der Aufgabe „{{title}}“ geändert zu {{status}}",
+      "mentioned": "Sie wurden in einem Kommentar erwähnt"
+    },
     "preferences": "Einstellungen",
     "preferencesTitle": "Benachrichtigungseinstellungen",
     "preferencesDesc": "Legen Sie fest, wie Sie für jeden Ereignistyp benachrichtigt werden möchten.",

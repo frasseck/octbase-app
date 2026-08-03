@@ -59,7 +59,7 @@ func TestService_Notify_CreatesNotification(t *testing.T) {
 	if svc == nil {
 		return
 	}
-	svc.Notify(testutil.DemoUserID, notifications.KindTaskAssigned, nil, nil, nil, "hello")
+	svc.Notify(testutil.DemoUserID, notifications.KindTaskAssigned, nil, nil, nil, "hello", map[string]any{"title": "T"})
 
 	ns, err := repo.List(testutil.DemoUserID, false, 0, 20)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestService_Notify_RespectsDisabledPreference(t *testing.T) {
 		t.Fatalf("upsert pref: %v", err)
 	}
 
-	svc.Notify(testutil.DemoUserID, notifications.KindStatusChanged, nil, nil, nil, "should not appear")
+	svc.Notify(testutil.DemoUserID, notifications.KindStatusChanged, nil, nil, nil, "should not appear", nil)
 
 	if got := count(t, repo, testutil.DemoUserID); got != 0 {
 		t.Fatalf("expected 0 notifications when in-app disabled, got %d", got)
@@ -183,12 +183,12 @@ func TestService_NotifyStatusChanged(t *testing.T) {
 	tid := testutil.MustCreateTask(t, srv, pid, "Status Task")
 	testutil.MustAddMember(t, srv, pid, testutil.SecondUserID, "PROJECT_MEMBER")
 
-	svc.NotifyStatusChanged(tid, "Status Task", pid, "", testutil.DemoUserID, "DONE")                  // empty reporter → no-op
-	svc.NotifyStatusChanged(tid, "Status Task", pid, testutil.DemoUserID, testutil.DemoUserID, "DONE") // reporter==actor → no-op
+	svc.NotifyStatusChanged(tid, "Status Task", pid, "", testutil.DemoUserID, "DONE", "Done")                  // empty reporter → no-op
+	svc.NotifyStatusChanged(tid, "Status Task", pid, testutil.DemoUserID, testutil.DemoUserID, "DONE", "Done") // reporter==actor → no-op
 	if got := count(t, repo, testutil.DemoUserID); got != 0 {
 		t.Fatalf("expected no self/empty notifications, got %d", got)
 	}
-	svc.NotifyStatusChanged(tid, "Status Task", pid, testutil.SecondUserID, testutil.DemoUserID, "DONE")
+	svc.NotifyStatusChanged(tid, "Status Task", pid, testutil.SecondUserID, testutil.DemoUserID, "DONE", "Done")
 	if got := count(t, repo, testutil.SecondUserID); got != 1 {
 		t.Fatalf("expected 1 status notification, got %d", got)
 	}

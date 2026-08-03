@@ -617,7 +617,7 @@ func (h *Handler) MoveTask(w http.ResponseWriter, r *http.Request) {
 	h.publishBoardEvent(t.ProjectID, t.ID, actorID, "TASK_MOVED")
 	if statusChanged && h.notifier != nil {
 		if t.ReporterID != nil {
-			h.notifier.NotifyStatusChanged(t.ID, t.Title, t.ProjectID, *t.ReporterID, actorID, StatusLabel(t.Status))
+			h.notifier.NotifyStatusChanged(t.ID, t.Title, t.ProjectID, *t.ReporterID, actorID, t.Status, StatusLabel(t.Status))
 		}
 		h.notifier.NotifyTaskChanged(t.ID, t.Title, t.ProjectID, t.ReporterID, t.AssigneeID, actorID,
 			[]string{fmt.Sprintf("Status: %s → %s", StatusLabel(oldStatus), StatusLabel(t.Status))})

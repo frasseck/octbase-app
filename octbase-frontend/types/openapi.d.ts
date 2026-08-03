@@ -3054,6 +3054,11 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
+        /**
+         * @description One in-app notification. `kind` plus `params` is the message, the same contract `ActivityEntry` uses: the client renders `notifications.messages.<kind>` with `params` interpolated, so the text comes out in the reader's language.
+         *     `message` is the English sentence the server composed. It is still what notification emails lead with — email has no browser locale to read, so localizing it needs the recipient's stored language preference and a server-side catalogue, which is separate work — and it is what a client renders when `params` is null.
+         *     `params` is null only for a notification written before this contract existed; those rows have no parameters to recover and the stored sentence is the only text they will ever have. A kind that takes no parameters (`mentioned`) sends an empty object, not null.
+         */
         Notification: {
             /** Format: uuid */
             id?: string;
@@ -3067,6 +3072,10 @@ export interface components {
             /** Format: uuid */
             pageId?: string;
             message?: string;
+            /** @description Render parameters interpolated into the translated message. `task_assigned` and `reviewer_set` carry `title`; `status_changed` carries `title` and `status` (the raw enum, or a custom board-lane name as typed); `mentioned` carries nothing. */
+            params?: {
+                [key: string]: unknown;
+            } | null;
             isRead?: boolean;
             /** Format: date-time */
             createdAt?: string;

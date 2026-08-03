@@ -6,6 +6,31 @@ All notable changes to Octbase are documented here.
 
 ### Changed
 
+- **Notifications are localized: the bell and the mobile inbox read in the
+  user's language.** A notification's text was English prose composed by the
+  server, stored in `notifications.message` and printed verbatim by both SPAs,
+  so a German reader read English and fixing a wording meant rewriting stored
+  rows. Notifications now travel the way activity entries already did — a
+  `kind` naming the event plus a `params` object — and both SPAs render
+  `notifications.messages.<kind>` through the new shared
+  `@octbase/shared/notifications.js`. The status in a *status changed*
+  notification is a localized label on both, because `params.status` carries
+  the raw enum for the client to translate; a custom board-lane status has no
+  entry to translate and is printed as typed. Migration `040` adds a
+  **nullable** `params_json`, and the nullability is the whole upgrade story:
+  `NULL` means "written before this contract" and still renders its stored
+  English sentence, so no historical notification is blanked, while a
+  parameterless kind (`mentioned`) stores `{}` and renders normally. The
+  `Notification` response gains `params`, and the `notification.created` SSE
+  event carries `params` alongside the `message` it always had.
+  **Notification email is deliberately not covered** — email has no browser
+  locale, so it needs the recipient's stored language preference plus a
+  catalogue on the Go side, and it keeps using the composed English sentence
+  until that lands.
+- **The mobile inbox row drops two dead fallbacks.** `notifCard` read
+  `n.title || n.message || n.type` and derived a second body line from the same
+  three, but a notification carries none of `title`, `body` or `type` — so both
+  fallbacks were unreachable and the body line could only ever render empty.
 - **The e2e suite navigates through one helper that says why a route never
   rendered.** `test_search.py` and the `demo_board` fixture drove the SPA with
   `page.evaluate("() => window.router && window.router.go(path)")`, which can

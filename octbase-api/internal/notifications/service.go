@@ -35,14 +35,21 @@ func NewService(db *sql.DB, repo *Repo, hub *sse.Hub, mlr mailer.Mailer) *Servic
 // their Notification Preferences: in-app (persisted + pushed over SSE) and
 // email. The channels are independent — someone who turned off in-app but left
 // email on still gets the email, and vice-versa.
-func (s *Service) Notify(userID, kind string, projectID, taskID, pageID *string, message string) {
-	s.notifyInApp(userID, kind, projectID, taskID, pageID, message)
+//
+// The two channels read the same event differently, which is why both message
+// and params are passed. In-app is rendered by the client from kind + params,
+// so it comes out in the reader's language. Email has no client and no browser
+// locale, so it uses the composed English message; localizing it needs the
+// recipient's stored language preference and a server-side catalogue, and is
+// deliberately a separate piece of work (OCT-323 decision 2).
+func (s *Service) Notify(userID, kind string, projectID, taskID, pageID *string, message string, params map[string]any) {
+	s.notifyInApp(userID, kind, projectID, taskID, pageID, message, params)
 	s.notifyEmail(userID, kind, projectID, taskID, pageID, message)
 }
 
 // notifyInApp creates the in-app notification and pushes it over SSE when the
 // user has the in-app channel enabled for this kind.
-func (s *Service) notifyInApp(userID, kind string, projectID, taskID, pageID *string, message string) {
+func (s *Service) notifyInApp(userID, kind string, projectID, taskID, pageID *string, message string, params map[string]any) {
 	enabled, err := s.repo.IsInAppEnabled(userID, kind)
 	if err != nil || !enabled {
 		return
@@ -55,18 +62,29 @@ func (s *Service) notifyInApp(userID, kind string, projectID, taskID, pageID *st
 		TaskID:    taskID,
 		PageID:    pageID,
 		Message:   message,
+		Params:    params,
 	}
 	if err := s.repo.Create(n); err != nil {
 		slog.Error("failed to create notification", "error", err)
 		return
 	}
 	if projectID != nil {
-		s.hub.Publish(*projectID, map[string]any{
-			"type":    "notification.created",
-			"userId":  userID,
-			"kind":    kind,
-			"message": message,
-		})
+		s.hub.Publish(*projectID, publishedNotification(userID, kind, message, params))
+	}
+}
+
+// publishedNotification is the SSE payload for a new in-app notification. It
+// carries kind + params so a client can render it localized, and keeps the
+// English `message` it has always carried: today's receiver only bumps the
+// unread badge, so dropping the field would break nothing visible here and
+// silently break any client that does read it.
+func publishedNotification(userID, kind, message string, params map[string]any) map[string]any {
+	return map[string]any{
+		"type":    "notification.created",
+		"userId":  userID,
+		"kind":    kind,
+		"message": message,
+		"params":  params,
 	}
 }
 
@@ -96,7 +114,8 @@ func (s *Service) NotifyTaskAssigned(taskID, taskTitle, projectID, assigneeID, a
 	pid := projectID
 	tid := taskID
 	s.Notify(assigneeID, KindTaskAssigned, &pid, &tid, nil,
-		"You were assigned to task: "+taskTitle)
+		"You were assigned to task: "+taskTitle,
+		map[string]any{"title": taskTitle})
 }
 
 // NotifyReviewerSet notifies the reviewer when set on a task.
@@ -107,25 +126,35 @@ func (s *Service) NotifyReviewerSet(taskID, taskTitle, projectID, reviewerID, ac
 	pid := projectID
 	tid := taskID
 	s.Notify(reviewerID, KindReviewerSet, &pid, &tid, nil,
-		"You were set as reviewer for task: "+taskTitle)
+		"You were set as reviewer for task: "+taskTitle,
+		map[string]any{"title": taskTitle})
 }
 
 // NotifyStatusChanged notifies the task reporter when status changes.
 //
-// newStatusLabel is the DISPLAY label, not the enum — the message is stored as
-// composed and the SPA renders it verbatim, so an enum handed in here reaches
-// the notification panel as "changed to IN_REVIEW". Callers pass it through
-// workmanagement.StatusLabel, which this package cannot call itself (modules do
-// not import each other; see docs/architecture.md) and which also leaves a
-// custom board-lane status alone.
-func (s *Service) NotifyStatusChanged(taskID, taskTitle, projectID, reporterID, actorID, newStatusLabel string) {
+// It takes the status TWICE, and the two are not interchangeable:
+//
+//   - newStatus is the raw enum ("IN_REVIEW"). It goes into the render params,
+//     where the client turns it into a status label in the reader's language —
+//     the same treatment the activity feed gives TASK_STATUS_CHANGED. A custom
+//     board-lane status is not in the client's enum table either, and falls
+//     through to being printed as typed.
+//   - newStatusLabel is the English display label ("In Review"), for the stored
+//     message: that is the email lead line, and the fallback for a client too
+//     old to read params. An enum here is what shipped "changed to IN_REVIEW".
+//
+// Callers derive the label with workmanagement.StatusLabel, which this package
+// cannot call itself (modules do not import each other; see
+// docs/architecture.md).
+func (s *Service) NotifyStatusChanged(taskID, taskTitle, projectID, reporterID, actorID, newStatus, newStatusLabel string) {
 	if reporterID == "" || reporterID == actorID {
 		return
 	}
 	pid := projectID
 	tid := taskID
 	s.Notify(reporterID, KindStatusChanged, &pid, &tid, nil,
-		"Task '"+taskTitle+"' status changed to "+newStatusLabel)
+		"Task '"+taskTitle+"' status changed to "+newStatusLabel,
+		map[string]any{"title": taskTitle, "status": newStatus})
 }
 
 // NotifyTaskChanged sends a brief email to the task's reporter and assignee
@@ -256,6 +285,13 @@ var mentionRE = regexp.MustCompile(`@(\S+)`)
 // mentionMessage is the in-app text and email lead line for an @mention.
 const mentionMessage = "You were mentioned in a comment"
 
+// mentionParams is the render payload for an @mention. The sentence names
+// nothing, so there is nothing to interpolate — but it must still be an empty
+// object rather than nil, because nil is reserved for "written before params
+// existed, fall back to the English message". A fresh mention is renderable
+// from its kind alone.
+func mentionParams() map[string]any { return map[string]any{} }
+
 // mentionRecipient is a project member resolved from an @name token.
 type mentionRecipient struct {
 	userID string
@@ -330,6 +366,7 @@ func (s *Service) NotifyMentions(text, projectID, taskID, actorID string) {
 			ProjectID: &pid,
 			TaskID:    &tid,
 			Message:   mentionMessage,
+			Params:    mentionParams(),
 		})
 	}
 	if len(inApp) > 0 {
@@ -337,12 +374,7 @@ func (s *Service) NotifyMentions(text, projectID, taskID, actorID string) {
 			slog.Error("failed to create mention notifications", "count", len(inApp), "error", err)
 		} else {
 			for _, n := range inApp {
-				s.hub.Publish(pid, map[string]any{
-					"type":    "notification.created",
-					"userId":  n.UserID,
-					"kind":    KindMentioned,
-					"message": mentionMessage,
-				})
+				s.hub.Publish(pid, publishedNotification(n.UserID, KindMentioned, mentionMessage, n.Params))
 			}
 		}
 	}

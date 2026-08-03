@@ -1,4 +1,5 @@
 import { t } from '@octbase/shared/i18n.js';
+import { notificationMessage } from '@octbase/shared/notifications.js';
 import { V, api } from './api.js';
 import { Auth } from './auth.js';
 import { _A0, _A2, registerActions, registerChanges } from './delegation.js';
@@ -354,7 +355,7 @@ async function toggleNotifPanel(e) {
       ns.map(n => `
         <button type="button" class="notif-item ${n.isRead?'':'notif-unread'}" data-act="openNotif" data-a0="${esc(n.id)}" data-a1="${esc(n.taskId||'')}">
           ${n.isRead ? '' : '<span class="sr-only">Unread: </span>'}
-          <span class="notif-msg">${esc(n.message)}</span>
+          <span class="notif-msg">${esc(notificationMessage(n))}</span>
           <span class="notif-time">${fmtDateTime(n.createdAt)}</span>
         </button>`).join('');
     panel.innerHTML = html`

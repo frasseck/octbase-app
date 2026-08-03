@@ -1126,7 +1126,7 @@ func (h *Handler) ChangeStatus(w http.ResponseWriter, r *http.Request) {
 	_ = h.writeActivity(t.ProjectID, t.ID, actorID, "TASK_STATUS_CHANGED", map[string]any{"status": req.Status, "from": oldStatus})
 	if h.notifier != nil && oldStatus != req.Status {
 		if t.ReporterID != nil {
-			h.notifier.NotifyStatusChanged(t.ID, t.Title, t.ProjectID, *t.ReporterID, actorID, StatusLabel(req.Status))
+			h.notifier.NotifyStatusChanged(t.ID, t.Title, t.ProjectID, *t.ReporterID, actorID, req.Status, StatusLabel(req.Status))
 		}
 		h.notifier.NotifyTaskChanged(t.ID, t.Title, t.ProjectID, t.ReporterID, t.AssigneeID, actorID,
 			[]string{fmt.Sprintf("Status: %s → %s", StatusLabel(oldStatus), StatusLabel(req.Status))})
