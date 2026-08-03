@@ -100,5 +100,42 @@ class ExpectedStored(unittest.TestCase):
         self.assertEqual(repair.expected_stored(repaired), repaired)
 
 
+class RiskyAttrRefs(unittest.TestCase):
+    """Attr-level damage detection: the server's attribute pipeline (decode one
+    entity layer, re-escape with the non-idempotent EscapeAttr) preserves only
+    &amp; &lt; &gt; &quot; &#39; — a repaired reference in any other spelling
+    inside a tag's attributes must make the row hand-repair territory."""
+
+    def test_amp_damage_in_href_is_a_fixed_point(self):
+        s = '<a href="u?a=1&amp;amp;b=2">x</a>'
+        self.assertEqual(repair.risky_attr_refs(s), [])
+
+    def test_hex_ref_in_attr_is_risky(self):
+        s = '<a href="u?q=&amp;#x27;">x</a>'
+        self.assertEqual(len(repair.risky_attr_refs(s)), 1)
+
+    def test_apos_and_nbsp_in_attr_are_risky(self):
+        s = '<a href="a&amp;apos;b" title="c&amp;nbsp;d">x</a>'
+        self.assertEqual(len(repair.risky_attr_refs(s)), 2)
+
+    def test_arrow_numeric_in_attr_is_risky(self):
+        s = '<a title="go &amp;#8594; there">x</a>'
+        self.assertEqual(len(repair.risky_attr_refs(s)), 1)
+
+    def test_decimal_39_in_attr_is_a_fixed_point(self):
+        s = '<a title="it&amp;#39;s">x</a>'
+        self.assertEqual(repair.risky_attr_refs(s), [])
+
+    def test_same_refs_in_text_runs_are_not_risky(self):
+        s = "go &amp;#8594; there, it&amp;apos;s &amp;nbsp;fine"
+        self.assertEqual(repair.risky_attr_refs(s), [])
+
+    def test_mixed_row_reports_only_the_attr_refs(self):
+        s = '<a title="&amp;#x27;">x</a> and &amp;#x27; in text'
+        risky = repair.risky_attr_refs(s)
+        self.assertEqual(len(risky), 1)
+        self.assertLess(risky[0].start(), s.index(">"))
+
+
 if __name__ == "__main__":
     unittest.main()

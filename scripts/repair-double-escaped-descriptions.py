@@ -131,6 +131,28 @@ def escape_once(s):
     return "".join(out)
 
 
+# Attribute values do NOT get the idempotent EscapeText treatment: sanitizeAttrs
+# decodes one entity layer (shared.DecodeEntities) and then re-escapes with the
+# deliberately non-idempotent shared.EscapeAttr. That round-trip is the identity
+# only for references whose decoded character re-encodes to the same spelling —
+# exactly &amp; &lt; &gt; &quot; &#39;. Any other repaired reference inside a
+# tag's attributes (&apos; &nbsp; hex forms, other numerics) would be rewritten
+# by the server on the repair PUT: the read-back would flag the row NOT
+# REPAIRED, but the attribute would have been mutated anyway. Such rows are
+# detected up front and skipped — the dry run predicts it, and nothing writes.
+ATTR_FIXED_POINT = {"amp", "lt", "gt", "quot", "#39"}
+
+
+def risky_attr_refs(s):
+    """Over-escaped references inside a tag whose repaired spelling the attr
+    pipeline would not preserve. Returns the matches, so the caller can say
+    which references make the row hand-repair territory."""
+    spans = [(m.start(), m.end()) for m in _TAG.finditer(s)]
+    return [m for m in OVER_ESCAPED.finditer(s)
+            if any(a <= m.start() < b for a, b in spans)
+            and m.group(2) not in ATTR_FIXED_POINT]
+
+
 def expected_stored(sent):
     """What the server's sanitizer stores for `sent`: tags kept, text runs
     escaped once (idempotently), surrounding whitespace trimmed."""
@@ -223,7 +245,7 @@ def main():
               "(nothing was checked for them): " + ", ".join(sorted(missing)),
               file=sys.stderr)
 
-    repaired = failed = 0
+    repaired = failed = attr_skipped = 0
     for t in tasks:
         if wanted and t["id"] not in wanted:
             continue
@@ -235,6 +257,14 @@ def main():
         matches = list(OVER_ESCAPED.finditer(before))
         print(f"\n── {t['id']}  {t.get('title', '')[:60]}")
         print(f"   {len(matches)} over-escaped reference(s), deepest {worst} extra layer(s)")
+        risky = risky_attr_refs(before)
+        if risky:
+            refs = ", ".join(sorted({m.group(0) for m in risky}))
+            print(f"   SKIPPED (attr-level damage): {len(risky)} reference(s) inside "
+                  f"tag attributes ({refs}) would be rewritten by the server's "
+                  "attribute pipeline on write — repair this row by hand")
+            attr_skipped += 1
+            continue
         # Excerpts around the first three matches. The "after" windows are
         # sliced with offsets valid for the AFTER string: each replacement
         # shrinks the text by the length of the stripped layers (group 1), so
@@ -287,10 +317,11 @@ def main():
             print("   repaired")
 
     if args.apply and args.yes:
-        print(f"\nrepaired {repaired}, failed {failed}")
+        print(f"\nrepaired {repaired}, failed {failed}, "
+              f"skipped (attr-level damage, repair by hand) {attr_skipped}")
     else:
         print("\ndry run — nothing was written. Re-run with --apply --yes to repair.")
-    return 1 if failed or missing else 0
+    return 1 if failed or missing or attr_skipped else 0
 
 
 if __name__ == "__main__":

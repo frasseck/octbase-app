@@ -36,12 +36,15 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APPS = ['octbase-frontend', 'octbase-mobile'];
 // The (?!=) keeps comparisons (`el.innerHTML === x`) from matching as sinks.
-const SINK = /\.(innerHTML|outerHTML)\s*(\+)?=(?!=)\s*/g;
+// Logical assignments (||= &&= ??=) assign too — they were unmatched, so
+// `el.innerHTML ||= userHtml` sailed past every rule; their RHS gets the same
+// scrutiny as a plain `=`.
+const SINK = /\.(innerHTML|outerHTML)\s*(\+|\|\||&&|\?\?)?=(?!=)\s*/g;
 
 // User-content fields that must never be spliced into HTML unescaped. Limited
 // to fields that hold free-form, attacker-influenceable text.
@@ -73,15 +76,27 @@ const STRICT_FILES = new Set([
 // dropped before the field check. Applied twice to cover one nesting level.
 const TRUSTED_CALL = /\b(?:esc|t|icon|raw|sanitizeRichText|\w+(?:Html|HTML|Inner))\s*\([^()]*\)/g;
 
+// Remove html`…` tagged-template spans from an expression. Everything inside
+// the tagged template is escaped by construction, so it can't be an unescaped
+// splice — but the mere PRESENCE of one proves nothing about the rest of the
+// expression: `${item.title + html`x`}` still splices item.title raw. Cutting
+// the safe spans out and testing what remains closes that hole.
+function stripTaggedTemplates(e) {
+  let m;
+  while ((m = /\bhtml\s*`/.exec(e)) !== null) {
+    const bodyStart = m.index + m[0].length;
+    const end = templateEnd(e.slice(bodyStart));
+    e = e.slice(0, m.index) + "''" + e.slice(Math.min(bodyStart + end + 1, e.length));
+  }
+  return e;
+}
+
 function interpolationAllowed(expr) {
   let e = expr.trim().replace(/'[^']*'|"[^"]*"/g, "''"); // drop string contents
+  e = stripTaggedTemplates(e);
   e = e.replace(TRUSTED_CALL, "''").replace(TRUSTED_CALL, "''");
   if (!USER_FIELDS.test(e)) return true;        // not a high-risk field access
   if (/\besc\s*\(/.test(e)) return true;        // explicitly escaped
-  // Only a TAGGED nested template proves anything: html`` escapes its own
-  // interpolations by construction. A bare backtick — an untagged nested
-  // template like `${item.title || `—`}` — must not blanket-allow the read.
-  if (/\bhtml\s*`/.test(e)) return true;
   return false;
 }
 
@@ -142,11 +157,64 @@ function interpolations(src) {
   return out;
 }
 
-const violations = [];
-function report(file, idx, text, msg) {
-  // crude line number from char offset
-  const line = text.slice(0, idx).split('\n').length;
-  violations.push(`${file}:${line}: ${msg}`);
+// Scan one source file's text; returns the violation strings for it. Split
+// out (and exported) so the unit tests can probe the rules against fixture
+// snippets without touching the repo scan below.
+export function scanSource(f, text) {
+  const out = [];
+  const report = (idx, msg) => {
+    // crude line number from char offset
+    const line = text.slice(0, idx).split('\n').length;
+    out.push(`${f}:${line}: ${msg}`);
+  };
+
+  for (const m of text.matchAll(/document\.write\s*\(/g)) report(m.index, 'document.write() is forbidden');
+
+  SINK.lastIndex = 0;
+  let m;
+  while ((m = SINK.exec(text)) !== null) {
+    const append = m[2] === '+';
+    const rhsStart = m.index + m[0].length;
+    if (append) { report(m.index, '`.innerHTML +=` (append-concatenation) is forbidden'); continue; }
+
+    const rest = text.slice(rhsStart);
+    if (rest[0] === '`') {
+      if (STRICT_FILES.has(f)) {
+        report(m.index, 'untagged template assigned to innerHTML in a strict (html``-migrated) file — use html`` and wrap trusted fragments in raw()');
+      }
+      for (const expr of interpolations(rest.slice(1))) {
+        if (!interpolationAllowed(expr)) {
+          report(rhsStart, `unescaped interpolation in innerHTML: \${${expr.trim()}} — wrap in esc() or use html\`\``);
+        }
+      }
+    }
+
+    // The concatenation rule applies regardless of what the RHS starts with:
+    // `` el.innerHTML = `<b>` + userText `` is the same antipattern with the
+    // string literal spelled as a template, so the branch above is no
+    // exemption. Template bodies are blanked first (a `${a + 'b'}` inside a
+    // template is not concatenation into the sink, and a multi-line template
+    // collapses to one line), and the blanked text is what the statement end
+    // is found in, so a `;` inside a template body (say, an entity like
+    // &nbsp;) cannot truncate the scan. A statement without a semicolon (ASI)
+    // extends past a newline while a line ENDS in a continuation token — or
+    // while the NEXT line STARTS with one: JS also parses leading-operator
+    // style (`= foo\n  + '<b>'`) as one expression, and scanning only line 1
+    // let that spelling of the concat antipattern through unexamined.
+    const blanked = blankTemplateBodies(rest.slice(0, 1000));
+    const ext = (blanked.match(/^(?:[^\n]*[+,(=?:&|][ \t]*\n|[^\n]*\n(?=[ \t]*[+.?:&|]))*[^\n]*/) || [''])[0];
+    const semi = ext.indexOf(';');
+    const stmt = semi >= 0 ? ext.slice(0, semi + 1) : ext;
+    // A `+` inside a trusted producer's own argument list (`esc(prefix + '!')`)
+    // builds the string BEFORE it is escaped — that is not concatenation into
+    // the sink, and flagging it forced pointless rewrites. Same double
+    // application as interpolationAllowed to cover one nesting level.
+    const stmtOutsideTrusted = stmt.replace(TRUSTED_CALL, "''").replace(TRUSTED_CALL, "''");
+    if (/['"`]\s*\+|\+\s*['"`]/.test(stmtOutsideTrusted)) {
+      report(rhsStart, 'string concatenation into innerHTML — use esc()/html``');
+    }
+  }
+  return out;
 }
 
 // Directories never scanned: third-party trees, build output, test harnesses.
@@ -165,64 +233,28 @@ function collect(absDir, relDir, out) {
   }
 }
 
-const jsFiles = [];
-for (const app of APPS) collect(join(REPO, app, 'js'), `${app}/js`, jsFiles);
-// octbase-shared keeps its modules at the package top level; anything nested
-// there today is tooling, so only the top-level files are runtime surface.
-for (const ent of readdirSync(join(REPO, 'octbase-shared'), { withFileTypes: true })) {
-  if (ent.isFile() && ent.name.endsWith('.js') && !ent.name.endsWith('.test.js')) {
-    jsFiles.push({ path: `octbase-shared/${ent.name}`, abs: join(REPO, 'octbase-shared', ent.name) });
-  }
-}
-
-for (const { path: f, abs } of jsFiles) {
-  const text = readFileSync(abs, 'utf8');
-
-  for (const m of text.matchAll(/document\.write\s*\(/g)) report(f, m.index, text, 'document.write() is forbidden');
-
-  SINK.lastIndex = 0;
-  let m;
-  while ((m = SINK.exec(text)) !== null) {
-    const append = m[2] === '+';
-    const rhsStart = m.index + m[0].length;
-    if (append) { report(f, m.index, text, '`.innerHTML +=` (append-concatenation) is forbidden'); continue; }
-
-    const rest = text.slice(rhsStart);
-    if (rest[0] === '`') {
-      if (STRICT_FILES.has(f)) {
-        report(f, m.index, text, 'untagged template assigned to innerHTML in a strict (html``-migrated) file — use html`` and wrap trusted fragments in raw()');
-      }
-      for (const expr of interpolations(rest.slice(1))) {
-        if (!interpolationAllowed(expr)) {
-          report(f, rhsStart, text, `unescaped interpolation in innerHTML: \${${expr.trim()}} — wrap in esc() or use html\`\``);
-        }
-      }
-    }
-
-    // The concatenation rule applies regardless of what the RHS starts with:
-    // `` el.innerHTML = `<b>` + userText `` is the same antipattern with the
-    // string literal spelled as a template, so the branch above is no
-    // exemption. Template bodies are blanked first (a `${a + 'b'}` inside a
-    // template is not concatenation into the sink, and a multi-line template
-    // collapses to one line), and the blanked text is what the statement end
-    // is found in, so a `;` inside a template body (say, an entity like
-    // &nbsp;) cannot truncate the scan. A statement without a semicolon (ASI)
-    // extends past a newline only while each line ends in a continuation
-    // token — requiring the `;` meant such a statement was never scanned at
-    // all, while stopping at any newline would miss a multi-line concat.
-    const blanked = blankTemplateBodies(rest.slice(0, 1000));
-    const ext = (blanked.match(/^(?:[^\n]*[+,(=?:&|][ \t]*\n)*[^\n]*/) || [''])[0];
-    const semi = ext.indexOf(';');
-    const stmt = semi >= 0 ? ext.slice(0, semi + 1) : ext;
-    if (/['"`]\s*\+|\+\s*['"`]/.test(stmt)) {
-      report(f, rhsStart, text, 'string concatenation into innerHTML — use esc()/html``');
+// Run the repo scan only when invoked as a script — importing this module
+// (the unit tests do) must stay side-effect-free.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const jsFiles = [];
+  for (const app of APPS) collect(join(REPO, app, 'js'), `${app}/js`, jsFiles);
+  // octbase-shared keeps its modules at the package top level; anything nested
+  // there today is tooling, so only the top-level files are runtime surface.
+  for (const ent of readdirSync(join(REPO, 'octbase-shared'), { withFileTypes: true })) {
+    if (ent.isFile() && ent.name.endsWith('.js') && !ent.name.endsWith('.test.js')) {
+      jsFiles.push({ path: `octbase-shared/${ent.name}`, abs: join(REPO, 'octbase-shared', ent.name) });
     }
   }
-}
 
-if (violations.length) {
-  console.error(`HTML-injection guard: ${violations.length} violation(s)\n`);
-  for (const v of violations) console.error('  ' + v);
-  process.exit(1);
+  const violations = [];
+  for (const { path: f, abs } of jsFiles) {
+    violations.push(...scanSource(f, readFileSync(abs, 'utf8')));
+  }
+
+  if (violations.length) {
+    console.error(`HTML-injection guard: ${violations.length} violation(s)\n`);
+    for (const v of violations) console.error('  ' + v);
+    process.exit(1);
+  }
+  console.log('HTML-injection guard: clean ✓');
 }
-console.log('HTML-injection guard: clean ✓');
