@@ -5,8 +5,6 @@ thumb-driven experience for the core day-to-day flows, while **tablets and deskt
 full desktop app** (`octbase-frontend/`). It is an **enhancement, not a replacement** — the desktop
 app is untouched and both talk to the same backend (`octbase-api`, `/api/v1`).
 
-> Spec / design rationale: see [`../prompts/31_octbase-mobile.md`](../prompts/31_octbase-mobile.md).
-
 ## Activation — force phones to mobile, everyone else to desktop
 
 Device routing is done **server-side in the desktop app's Caddy front door**

@@ -348,7 +348,7 @@ once after cloning.
 Both scripts are runnable by hand. Override a hook in a pinch with
 `git commit --no-verify` / `git push --no-verify` (discouraged). These mirror the
 CI guards for fast local feedback; they are **not** the full security review —
-the deep, LLM-driven assessment lives in `prompts/18_octbase-security.md` and is
+the deep, LLM-driven assessment lives in `prompts/06_security-assessment.md` and is
 run manually (e.g. pre-release), never as a hook.
 
 ### Go tests

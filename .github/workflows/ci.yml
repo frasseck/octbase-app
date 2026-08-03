@@ -394,7 +394,7 @@ jobs:
         # and library vulnerabilities. --ignore-unfixed keeps the gate actionable
         # (an un-upgradable base-image CVE does not block every build); drop it,
         # or add a .trivyignore with a justification, to triage a specific
-        # finding — see the gate in prompts/37a §2. Images are piped in as a tar
+        # finding, with the justification in the file. Images are piped in as a tar
         # so the scan is agnostic to whether docker or podman built them.
         run: |
           set -euo pipefail

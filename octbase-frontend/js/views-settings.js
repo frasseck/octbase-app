@@ -20,7 +20,7 @@ import { renderSidebar, renderTopbar } from './views-shell.js';
 // Personal settings dashboard: language + theme preferences (backend-persisted
 // via GET/PATCH /users/me/preferences, internal/dashboard) and MFA enrollment/
 // management (internal/security/mfa). Two independent backend modules behind
-// one page — see docs/architecture.md and prompts/33_octbase-user-settings-mfa.md.
+// one page — see docs/architecture.md.
 //
 // Preferences are cached locally (_settingsPrefs) the same way notification
 // preferences are (_notifPrefs in realtime.js): the PATCH endpoint always takes

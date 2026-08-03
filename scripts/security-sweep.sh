@@ -7,7 +7,7 @@
 # stack, NO database, NO network — everything here is a static check that returns
 # in ~1-2s, so it is safe to run from the pre-commit hook on every commit.
 #
-# The DEEP assessment (prompts/18_octbase-security.md) is a separate, LLM-driven
+# The DEEP assessment (prompts/06_security-assessment.md) is a separate, LLM-driven
 # pentest — it does NOT run here and is not a pre-commit thing.
 #
 # Design rule: everything in the HARD section must be genuinely zero-hit on a

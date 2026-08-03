@@ -11,7 +11,7 @@ import (
 	"github.com/octbase/octbase-api/internal/testutil"
 )
 
-// Effort-based burndown and velocity (prompts/42b). The count series these
+// Effort-based burndown and velocity. The count series these
 // extend is asserted in report_test.go and must stay untouched — see
 // TestSprintBurndown_UnitTasksIsUnchanged.
 

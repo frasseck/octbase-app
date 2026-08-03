@@ -1,6 +1,9 @@
 """E2E smoke suite for the mobile SPA (octbase-mobile/).
 
-See prompts/35_octbase-mobile-e2e-tests.md for the full brief.
+It lives in this directory, not under octbase-mobile/, because CI's e2e job
+already runs pytest here and the session browser/api fixtures in conftest.py
+are app-agnostic — so mobile coverage costs no workflow change. All
+mobile-specific fixtures stay in this file.
 
 The mobile app is hash-routed and honors ?apiBase= in dev contexts. Loaded
 from file:// it auto-authenticates as the seeded demo user (standalone demo

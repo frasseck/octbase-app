@@ -7,7 +7,7 @@
 // bottom of this file. These are the security boundary against javascript:/data:/
 // protocol-relative/control-character bypasses, so the adversarial cases below
 // are the point of the file. DOMPurify-backed sanitizeRichText needs a real DOM
-// and is left to the e2e suite (the honest no-build boundary — see prompts/37a).
+// and is left to the e2e suite.
 
 import { test } from 'vitest';
 import assert from 'node:assert';

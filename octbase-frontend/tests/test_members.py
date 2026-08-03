@@ -1,5 +1,4 @@
-"""UI tests for the project "Members" page (project-based permissions,
-prompts/23_project-based-permissions.md).
+"""UI tests for the project "Members" page (project-based permissions).
 
 The seeded demo user is the sole PROJECT_OWNER of the Demo Project. These
 tests cover the Members page opened from the project settings menu (a full

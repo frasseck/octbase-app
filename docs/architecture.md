@@ -157,9 +157,8 @@ passes through an escaping producer — is enforced by CI
 (`scripts/check-innerhtml.mjs`).
 
 **Bundler-free was the other half, and it was retired on 2026-07-30 — see §5.2
-for the decision and `prompts/37b_octbase-frontend-build-step.md` for the staged
-migration.** All seven stages landed by 2026-07-31; both SPAs and the code they
-share are ES modules built by Vite:
+for the decision.** The migration ran in seven stages, all landed by
+2026-07-31; both SPAs and the code they share are ES modules built by Vite:
 
 | | Module system | Build |
 |---|---|---|
@@ -270,9 +269,8 @@ false and were false when written:
   `file://`, and the e2e suite — not on a client stack.
 
 The honest form of the benefit is the first paragraph: **no toolchain and no
-npm graph.** The migration in `prompts/37b_octbase-frontend-build-step.md`
-should be weighed against *that*, not against a byte-fidelity property this
-codebase does not have.
+npm graph.** The migration recorded in §5.2 should be weighed against *that*,
+not against a byte-fidelity property this codebase does not have.
 
 **What it costs — and where the pressure will come from:**
 
@@ -360,9 +358,10 @@ a build changes how files are joined and checked, not how the UI renders.
 
 ### 5.2 Decision record — the bundler non-goal is retired (2026-07-30)
 
-**Decision.** Both SPAs migrate to ES modules built by Vite, executed in stages
-per `prompts/37b_octbase-frontend-build-step.md`. §5.1 above is **historical
-context from here on**, not a live constraint. It is kept rather than deleted
+**Decision.** Both SPAs migrate to ES modules built by Vite, executed in seven
+stages (all landed by 2026-07-31; the staged plan lived in `prompts/` and was
+retired with it — see the git history for the per-stage record). §5.1 above is
+**historical context from here on**, not a live constraint. It is kept rather than deleted
 because a decision reversal is only auditable next to the reasoning it reversed.
 
 **Who and when.** Lars (maintainer), 2026-07-30, in session, after being shown

@@ -3,7 +3,7 @@
 // internal/security (not internal/auth or internal/identityaccess) so this
 // auth/crypto surface has its own bounded context, separate from the
 // low-risk, no-crypto internal/dashboard preferences module — see
-// docs/architecture.md and prompts/33_octbase-user-settings-mfa.md.
+// docs/architecture.md.
 package mfa
 
 import "time"

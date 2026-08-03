@@ -1,5 +1,4 @@
-"""Permission-driven UI tests for the PROJECT_OWNER / permission-matrix work
-(prompts/23_project-based-permissions.md).
+"""Permission-driven UI tests for the PROJECT_OWNER / permission-matrix work.
 
 The seeded demo user is the creator of the Demo Project and therefore holds
 PROJECT_OWNER on it. These tests verify:

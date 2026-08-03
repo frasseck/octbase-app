@@ -1,9 +1,9 @@
 # E2E known-failures baseline
 
-Every stage of `prompts/37_octbase-frontend-execution-runbook.md` (and the work
-it sequences in 37a / 37b) gates on *"the e2e suite is green with the same known
-failures."* This file is what "the same" means. Without it that gate is
-unfalsifiable.
+Every gate that reads *"the e2e suite is green with the same known failures"* —
+the QA prompts in `prompts/`, the release skills, and the staged frontend work
+this file was written for — depends on this list. It is what "the same" means.
+Without it that gate is unfalsifiable.
 
 **How to use it:** run the suite as described under *Reproducing* below, then
 compare. A failure listed here is the baseline. **A failure that is not listed

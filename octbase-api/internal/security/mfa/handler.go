@@ -181,7 +181,7 @@ func (h *Handler) Confirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Documented deviation from prompts/33 §1: no activity.Write here. The
+	// Deliberate: no activity.Write here. The
 	// activity log is project-scoped (activity_entries.project_id NOT NULL,
 	// ListByProject is its only read path), so a user-level event like "MFA
 	// enabled" has no project to attach to. Enable/disable are recorded in the

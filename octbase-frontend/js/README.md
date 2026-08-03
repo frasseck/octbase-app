@@ -14,8 +14,7 @@ escaping producers, and the same view registry.
 ## Why ES modules + Vite — and what deliberately stays classic
 
 The no-bundler stance was retired on 2026-07-30 (decision record:
-`docs/architecture.md` §5.2, migration plan:
-`prompts/37b_octbase-frontend-build-step.md`). Its central technical objection
+`docs/architecture.md` §5.2). Its central technical objection
 was real and had to be answered rather than waved away: **Chrome blocks `import`
 over `file://`** (origin `null`, CORS), and two things loaded the app from
 `file://` — the **standalone demo**
@@ -544,14 +543,13 @@ status-grouped, cross-cutting, with bulk "Set status").
   set at a time, adding each to `STRICT_FILES` — entries are never removed.
   `STRICT_FILES` entries are app-scoped repo-relative paths (`octbase-frontend/js/…`),
   not bare basenames: both SPAs have same-named files.
-- **The 37b migration is mid-flight** — this SPA is converted (stage 2),
-  `octbase-shared` is a real package (stage 3, which also brought the
-  multi-stage container builds forward because an unbundled image could no
-  longer resolve its own imports), DOMPurify and the QR generator are pinned npm
-  dependencies (stage 4, which also removed the last two classic `<script>` tags
-  the module graph had to work around), and the `?v=` stamping machinery is
-  retired in favour of content-hashed filenames (stage 5 — see "Cache-busting").
-  The stages still open are: CI rewiring (6), and generated OpenAPI types plus a
-  Vitest layer (7). Plan and status:
-  `prompts/37b_octbase-frontend-build-step.md`; decision record:
-  `docs/architecture.md` §5.2.
+- **The module migration is complete** (all seven stages landed by 2026-07-31):
+  this SPA is converted (stage 2), `octbase-shared` is a real package (stage 3,
+  which also brought the multi-stage container builds forward because an
+  unbundled image could no longer resolve its own imports), DOMPurify and the QR
+  generator are pinned npm dependencies (stage 4, which also removed the last
+  two classic `<script>` tags the module graph had to work around), the `?v=`
+  stamping machinery gave way to content-hashed filenames (stage 5 — see
+  "Cache-busting"), CI was rewired onto ESLint + the build + the guards (stage
+  6), and generated OpenAPI types plus the Vitest layer landed (stage 7).
+  Decision record: `docs/architecture.md` §5.2.
