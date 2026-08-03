@@ -135,6 +135,14 @@ jobs:
       # guard understands the repo's escaping convention (the html`` ratchet in
       # its STRICT_FILES set), which the plugin cannot see. eslint.config.mjs
       # carries the measurement behind that split.
+      #
+      # The self-test runs first, and gates: "guard exits 0 on a clean tree" is
+      # the only signal the guard step itself produces, and a rule weakened by a
+      # refactor still produces it — the two bypasses fixed on 2026-08-03 sat
+      # undetected behind exactly that signal. The test set is what fails when
+      # a rule loosens, so a guard whose certification fails certifies nothing.
+      - name: HTML-injection guard self-test
+        run: node --test scripts/test-check-innerhtml.mjs
       - name: HTML-injection guard
         run: node scripts/check-innerhtml.mjs
       # The one failure a valid module graph still allows: a top-level read of a
