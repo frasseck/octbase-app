@@ -2,7 +2,12 @@
 
 All notable changes to Octbase are documented here.
 
-## Unreleased
+## v1.0.1 — 2026-08-04
+
+The first release of the re-baselined repository. `v1.0.1` was originally
+tagged at `971d706`, before the `001_baseline` migration squash; the tag was
+moved to this commit on 2026-08-04 so that it names the code the fleet
+actually runs. Everything below shipped under it.
 
 ### Changed
 
