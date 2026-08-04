@@ -2,7 +2,7 @@
 #
 # release.sh — release the current branch and redeploy the live demo.
 #
-# Steps (run from the octbase repo, i.e. frasseck/octbase.git):
+# Steps (run from this repo, frasseck/octbase-app.git):
 #   1. Commit the release flow's own edits (CHANGELOG.md) on the current branch.
 #   2. Push the current branch to origin and wait for CI on that exact commit.
 #   3. Merge the CI-verified commit into main (--no-ff) and push main — done in
