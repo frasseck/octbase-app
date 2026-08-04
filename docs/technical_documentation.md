@@ -420,7 +420,8 @@ Full variable reference: [`operations.md`](operations.md) and [`.env.example`](.
 - **Webhook authenticity** — Bitbucket/GitHub receivers validate HMAC-SHA256.
 - **Edge hardening** — strict CSP, HSTS, `X-Frame-Options: DENY`, sandboxed
   uploads (random storage keys, content-type allowlist + byte sniff, size cap),
-  and rate limiting on `/api/v1/auth/*` (120/min/IP) and `/api/v1/users` (60/min).
+  and rate limiting on the public auth routes plus both `invitations/{token}`
+  routes (one shared 120/min/IP budget) and `/api/v1/users` (60/min).
 - For scale-time tenancy and isolation considerations, see
   [`hosting-concept.md`](hosting-concept.md) §12.
 

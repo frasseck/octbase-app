@@ -59,7 +59,8 @@ part of this stack.
 
 ## Recovering client IPs (per-client rate limiting & audit source IPs)
 
-Per-IP rate limiting (`/api/v1/auth/*` 120/min, `/api/v1/users` 60/min) and
+Per-IP rate limiting (the public auth routes and both `invitations/{token}`
+routes sharing 120/min, `/api/v1/users` 60/min) and
 audit-log source addresses are only per-*client* if the client's IP survives the
 whole path to the API. Out of the box it does **not**, and every client on the
 installation shares one bucket — ordinary login traffic can then 429 real users.

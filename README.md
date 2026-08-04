@@ -44,9 +44,36 @@ repository (`ocete.ch`); it is not part of this repo.
 
 ```bash
 cp .env.example .env
-# Before production: set OCTBASE_JWT_SECRET and POSTGRES_PASSWORD to strong
-# random values, and OCTBASE_SECURE_COOKIES=true — outside demo mode the API
-# refuses to start unless secure cookies are on and OCTBASE_APP_URL is set.
+```
+
+**`.env.example` is a production template, and copying it is not enough to
+bring a stack up.** It ships `OCTBASE_DEMO_MODE=false`, a placeholder
+`OCTBASE_JWT_SECRET` and `OCTBASE_SECURE_COOKIES=false`; outside demo mode the
+API refuses to start without a ≥ 32-byte secret, `OCTBASE_SECURE_COOKIES=true`
+and `OCTBASE_APP_URL` (`cmd/octbase-api/main.go`). Left as copied, the API
+container exits at startup and crash-loops. Edit `.env` for one of the two
+cases before going further:
+
+*A local/demo stack* — seeds the demo accounts below and permits the dev JWT
+fallback. Never deploy it:
+
+```ini
+OCTBASE_DEMO_MODE=true
+```
+
+*A real deployment* — no accounts are seeded, so provision the first
+administrator too (`OCTBASE_BOOTSTRAP_ADMIN_EMAIL` + `_PASSWORD_HASH`):
+
+```ini
+POSTGRES_PASSWORD=…      # openssl rand -base64 24
+OCTBASE_JWT_SECRET=…     # openssl rand -base64 32
+OCTBASE_SECURE_COOKIES=true
+OCTBASE_APP_URL=https://your.host
+```
+
+Then:
+
+```bash
 podman-compose up --build
 ```
 
@@ -61,7 +88,9 @@ used by `podman-compose.yml`.
 | http://localhost:8000/docs | OpenAPI UI |
 | http://localhost:8000/metrics | Prometheus metrics |
 
-**First login:** `OCTBASE_DEMO_MODE=true` (the default in compose) seeds two users:
+**First login:** with `OCTBASE_DEMO_MODE=true` the API seeds two users on
+startup. A stack that left demo mode off has neither; its first account is
+whatever `OCTBASE_BOOTSTRAP_ADMIN_EMAIL` provisioned.
 
 | Email | Password | Role |
 |---|---|---|
@@ -70,7 +99,11 @@ used by `podman-compose.yml`.
 
 Log in at http://localhost:8080/. The **admin panel** (`/#/admin`) and **audit log** (`/#/admin/audit-logs`) are only visible to SUPER_ADMIN users.
 
-To add more users, use the invitation flow — a SUPER_ADMIN or ADMIN generates a link and the invitee sets their own password:
+To add more users, use the invitation flow — the inviter generates a link and
+the invitee sets their own password. A SUPER_ADMIN or ADMIN may invite anyone;
+a user who is PROJECT_OWNER or PROJECT_ADMIN of a project may invite to *that*
+project (`project.invite_users`, `internal/rbac`), which is why the route is
+not behind the admin guard despite its `/admin/` path:
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
@@ -81,9 +114,10 @@ TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
 curl -X POST http://localhost:8000/api/v1/admin/invitations \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"email":"teammate@example.com","projectId":"<project-uuid>","role":"PROJECT_MEMBER"}'
-# `role` is a per-project role, applied to `projectId` on accept (omit both to
-# invite without any project membership). Accepted accounts always get global
-# role USER.
+# `role` is a per-project role, applied to `projectId` on accept. Omit both to
+# invite without any project membership — SUPER_ADMIN/ADMIN only, since a
+# project admin's permission to invite is scoped to their project. Accepted
+# accounts always get global role USER.
 # Returns { "acceptURL": "http://localhost:8080/#/invitations/<token>/accept" }
 # Open acceptURL in a browser; the invitee enters a name and password.
 ```
@@ -327,7 +361,11 @@ setups).
 - Graceful shutdown — 30-second drain on SIGTERM
 - Connection pool: 25 max open / 5 idle / 5-minute lifetime (sized for Postgres default of 100 connections)
 - Structured JSON logging with `OCTBASE_LOG_LEVEL`
-- Rate limiting per IP: `/api/v1/auth/*` — 120 req/min, `/api/v1/users` — 60 req/min
+- Rate limiting per IP, applied to two route groups rather than by path prefix:
+  the **public** auth routes (`login`, `mfa/verify`, `refresh`, `logout`,
+  `forgot-password`, `reset-password`) **and both `invitations/{token}` routes**
+  share one 120 req/min budget; `/api/v1/users` — 60 req/min. The authenticated
+  `auth/me` and `auth/change-password` are in neither bucket
 
 ---
 
@@ -394,20 +432,33 @@ git diff --exit-code -- octbase-frontend/types/openapi.d.ts   # …and fail if s
 npm run typecheck                   # tsc over the // @ts-check allowlist
 npm run build                       # both SPAs, site + standalone bundles
 npm run test:unit                   # JS unit layer (Vitest)
+npm audit --omit=dev --audit-level=low        # advisories in the deps that reach a browser
 
-# HTML-injection guard (no unescaped interpolation into innerHTML)
+# HTML-injection guard — its self-test runs first and gates, because a rule
+# weakened by a refactor still lets the guard itself exit 0
+node --test scripts/test-check-innerhtml.mjs
 node scripts/check-innerhtml.mjs
 # Top-level read of a not-yet-evaluated binding across an import cycle
 node scripts/check-tdz.mjs
 # /metrics must not be reachable through either Caddy front door
 bash scripts/check-metrics-not-proxied.sh
+# Translation guards: every Go error code, every audit action, and every t()
+# key must exist in both SPAs' locale files — a miss ships a wrong-language
+# label that looks right in every screenshot
+node scripts/check-error-translations.mjs
+node scripts/check-audit-actions.mjs
+node scripts/check-i18n-keys.mjs
 ```
 
 ### Frontend end-to-end tests (Playwright + pytest)
 
 The `octbase-frontend/tests/` suite drives the UI with Playwright and verifies state through direct API calls. The backend is JWT-only, so both the browser UI and the test's `ApiClient` sign in as the seeded demo user (`demo@octbase.dev` / `demopass1234`) to obtain a token.
 
-Prerequisites: a live API with `OCTBASE_DEMO_MODE=true` (e.g. via `podman-compose up -d`), plus a Python virtualenv with the test deps:
+Prerequisites: a live API with `OCTBASE_DEMO_MODE=true` (e.g. via
+`podman-compose up -d`), started with `OCTBASE_MFA_ENC_KEY` and
+`OCTBASE_ATTACHMENTS_DIR` set — without them the MFA and attachment tests fail
+rather than skip, which is why CI sets both on the API it drives — plus a Python
+virtualenv with the test deps:
 
 ```bash
 cd octbase-frontend/tests
@@ -462,7 +513,7 @@ RBAC tests (`test_rbac.py`) also require `OCTBASE_SUPERADMIN_EMAIL` and `OCTBASE
 
 #### Known limitation: login rate limiting
 
-Every test that uses the `app`/`demo_board`/`task_panel` fixtures opens a fresh browser context and signs in through the UI login form (the JWT is kept in memory only, not in `localStorage`, so it can't be reused across contexts). The API rate-limits `/api/v1/auth/*` to **120 requests/minute per IP** (`internal/shared/ratelimit.go`). Running a large number of e2e tests back to back can exceed that limit, which makes the UI show "Invalid email or password" (masking a `429 RATE_LIMITED`) and causes the `app` fixture's `wait_for_selector("text=Demo Project")` to time out — a flaky failure unrelated to browser/headless setup.
+Every test that uses the `app`/`demo_board`/`task_panel` fixtures opens a fresh browser context and signs in through the UI login form (the JWT is kept in memory only, not in `localStorage`, so it can't be reused across contexts). The API gives the public auth routes one shared budget of **120 requests/minute per IP** (`internal/shared/ratelimit.go`), and every login spends from it. Running a large number of e2e tests back to back can exceed that limit, which makes the UI show "Invalid email or password" (masking a `429 RATE_LIMITED`) and causes the `app` fixture's `wait_for_selector("text=Demo Project")` to time out — a flaky failure unrelated to browser/headless setup.
 
 Mitigations:
 - Run files individually or with `-k` to keep a single run's login count under the per-minute limit (e.g. `pytest test_board.py -k TestBoardCards`).
@@ -490,17 +541,19 @@ Mitigations:
 All routes are under `/api/v1/`. Browse the full spec at `http://localhost:8000/docs`.
 
 ```
-# Auth (rate-limited 120/min per IP)
+# Auth — the eight public routes below share one 120 req/min per-IP budget
 POST   /api/v1/auth/login                 # { email, password } → accessToken + refresh cookie, or a challengeToken if MFA is enabled
 POST   /api/v1/auth/mfa/verify            # exchange challengeToken + TOTP/recovery code → accessToken + refresh cookie
 POST   /api/v1/auth/refresh               # rotate refresh token → new accessToken
 POST   /api/v1/auth/logout                # clear refresh token
-POST   /api/v1/auth/forgot-password       # public — { email } → 202 always; emails a 60-min single-use reset link
-POST   /api/v1/auth/reset-password        # public — { token, newPassword }; revokes all sessions
-POST   /api/v1/auth/change-password       # authenticated — { currentPassword, newPassword }; revokes other sessions, keeps this one
+POST   /api/v1/auth/forgot-password       # { email } → 202 always; emails a 60-min single-use reset link
+POST   /api/v1/auth/reset-password        # { token, newPassword }; revokes all sessions
+GET    /api/v1/invitations/{token}        # inspect a pending invitation
+POST   /api/v1/invitations/{token}/accept # set name + password, create account
+
+# Auth — authenticated, NOT in the rate-limit bucket above
+POST   /api/v1/auth/change-password       # { currentPassword, newPassword }; revokes other sessions, keeps this one
 GET    /api/v1/auth/me
-GET    /api/v1/invitations/{token}        # public — inspect a pending invitation
-POST   /api/v1/invitations/{token}/accept # public — set name + password, create account
 
 # Current user
 GET    /api/v1/users/me
@@ -627,11 +680,12 @@ GET    /api/v1/projects/{id}/export       # whole-project ZIP
 POST   /api/v1/projects/{id}/import       # ZIP into an existing project
 POST   /api/v1/projects/import            # ZIP as a new project
 
-# Admin (ADMIN or SUPER_ADMIN)
-POST   /api/v1/admin/invitations
-GET    /api/v1/admin/users                # legacy — prefer /api/v1/users
-PATCH  /api/v1/admin/users/{userId}
-POST   /api/v1/admin/users/{userId}/reset-password
+# Admin
+POST   /api/v1/admin/invitations          # NOT admin-only despite the path: SUPER_ADMIN, ADMIN,
+                                          # or a PROJECT_OWNER/PROJECT_ADMIN of the target project
+GET    /api/v1/admin/users                # ADMIN or SUPER_ADMIN — legacy, prefer /api/v1/users
+PATCH  /api/v1/admin/users/{userId}       # ADMIN or SUPER_ADMIN
+POST   /api/v1/admin/users/{userId}/reset-password   # ADMIN or SUPER_ADMIN
 
 # Platform
 GET    /api/v1/health      # DB pool + migration version, 503 when degraded
