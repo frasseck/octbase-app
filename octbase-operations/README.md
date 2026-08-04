@@ -14,6 +14,8 @@ this folder is specifically the *"is it healthy, and what do I do if not"* layer
 | File | Purpose |
 |---|---|
 | `check-health.sh` | One command that probes the whole stack and exits non-zero when something is wrong. Safe to run on a cron / from a monitor. |
+| `stamp-baseline.sh` | Repairs instances that will not start after a migration history rewrite (the `001_baseline` squash). Runs as **root** across the client registry; dumps first, decides 38-vs-39 per instance, stamps, restarts, waits for health. `DRY_RUN=1` inspects without changing anything. |
+| `repair-039-poststamp.sql` | The follow-up for an instance stamped *without* applying `039` first. Adds only the DDL — the version row is already correct, so do **not** re-stamp. Guarded and transactional: a no-op if the instance was genuinely a 39. |
 | `README.md` | This document — the concept and the reaction runbook. |
 
 ---
@@ -135,6 +137,58 @@ The API is up but reports `degraded`. The body says why:
 A crash loop. `podman logs --tail 100 <project>_octbase-api_1` for the panic /
 fatal. Common causes: missing/short `OCTBASE_JWT_SECRET` (≥32 bytes required with
 demo mode off — the API refuses to start), or an unreachable DB at boot.
+
+### `api` — DOWN / crash-looping straight after an upgrade
+
+If the API stopped starting on the deploy that upgraded it, suspect the database
+before the code. An instance whose `schema_migrations` version has no migration
+file in the new build cannot be migrated: `main.go` treats that as fatal, so the
+container never binds a port. Current builds say so plainly —
+
+```
+database migration version is ahead of the migrations on disk: database records
+version 38 but the highest migration on disk is 2. …
+```
+
+— older ones report golang-migrate's own wording,
+`no migration found for version 38: read down for version 38`, which reads like a
+corrupt file rather than a database from before a history rewrite.
+
+**This does not look the way the rest of this runbook trains you to expect.**
+On 2026-08-04 it took down two client stacks, and neither presented as an `api`
+problem from outside:
+
+- The front door still answered `/` with **200**. Only `/api/*` returned 502,
+  because Caddy served the static SPA fine and had nothing to proxy to. The
+  login page rendered normally and simply could not log in.
+- On one stack the API's host port was **still listening** while the container
+  behind it was dead — rootless podman's port-forwarder outlives the container
+  it forwards to. *A listening port is not evidence the API is alive.* The other
+  stack had stopped entirely and did not listen at all. Same root cause, two
+  different signatures.
+
+Repair with [`stamp-baseline.sh`](stamp-baseline.sh) (root; `DRY_RUN=1` first).
+The one thing not to shortcut is **which version the instance stopped at** — a
+38 never ran `039`, so stamping it straight to the baseline records columns,
+foreign keys and indexes as applied that do not exist. The database then reports
+healthy while the activity feed 500s. Nothing self-repairs on purpose: stamping
+is an assertion golang-migrate cannot verify and never re-checks.
+
+Verify afterwards against the schema, not against `/health` — `/health` only
+echoes the version row you just wrote:
+
+```bash
+psql … -tAc "SELECT (SELECT count(*) FROM pg_constraint
+                       WHERE conname LIKE 'fk_activity_entries_%'),
+                    (SELECT count(*) FROM information_schema.columns
+                       WHERE table_name='activity_entries'
+                         AND column_name IN ('release_id','sprint_id','target_deleted'))"
+# expect 4 | 3 — if short, apply repair-039-poststamp.sql (DDL only, do not re-stamp)
+```
+
+Full procedure and the reasoning behind it:
+[`../docs/operations.md`](../docs/operations.md) → "Stamping an instance created
+before the 001_baseline squash".
 
 ### `postgres` — DOWN / `pg_isready FAILED` / `healthcheck=unhealthy`
 The database is the root dependency — fix this before anything else.
