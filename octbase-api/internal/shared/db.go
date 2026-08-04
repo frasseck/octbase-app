@@ -67,6 +67,12 @@ func OpenDB(dsn string, opts ...DBOption) (*sql.DB, error) {
 	return stdlib.OpenDB(*connConfig), nil
 }
 
+// ErrMigrationVersionAhead reports a database whose recorded migration version
+// is higher than any file on disk — the signature of an instance that ran a
+// migration history the current build no longer carries (a squash, a
+// renumbering, or a rollback to an older image).
+var ErrMigrationVersionAhead = errors.New("database migration version is ahead of the migrations on disk")
+
 // RunMigrations applies all pending migrations from the given directory path.
 func RunMigrations(db *sql.DB, migrationsPath string) error {
 	driver, err := pgxmigrate.WithInstance(db, &pgxmigrate.Config{})
@@ -77,11 +83,56 @@ func RunMigrations(db *sql.DB, migrationsPath string) error {
 	if err != nil {
 		return fmt.Errorf("create migrate instance: %w", err)
 	}
+	if err := checkVersionOnDisk(m, migrationsPath); err != nil {
+		return err
+	}
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 	version, dirty, _ := m.Version()
 	slog.Info("migrations applied", "version", version, "dirty", dirty)
+	return nil
+}
+
+// checkVersionOnDisk fails early, and legibly, on a database recording a version
+// this build has no file for.
+//
+// golang-migrate's own diagnosis for that state is
+// `no migration found for version 38: read down for version 38` — it is looking
+// for the *down* file to plan from, so the message reads like a corrupt or
+// missing file rather than what it is: a database from before a migration
+// history rewrite. That wording cost real downtime after the 2026-08-03
+// 001_baseline squash, where it was first triaged as degraded health rather
+// than the hard startup failure it is (main.go treats any error here as fatal,
+// so the container crash-loops and never binds a port).
+//
+// This deliberately does NOT self-repair. Stamping the version is an assertion
+// about a schema that golang-migrate cannot verify and will never re-check, so
+// it has to stay an operator decision made against the actual schema — see
+// docs/operations.md, "Stamping an instance created before the 001_baseline
+// squash", where which version the instance stopped at changes the procedure.
+func checkVersionOnDisk(m *migrate.Migrate, migrationsPath string) error {
+	current, _, err := m.Version()
+	if errors.Is(err, migrate.ErrNilVersion) {
+		return nil // fresh database — nothing recorded yet
+	}
+	if err != nil {
+		return fmt.Errorf("read current migration version: %w", err)
+	}
+	latest, err := LatestMigrationVersion(migrationsPath)
+	if err != nil {
+		return fmt.Errorf("determine latest migration version: %w", err)
+	}
+	if current > latest {
+		return fmt.Errorf(
+			"%w: database records version %d but the highest migration on disk is %d. "+
+				"This instance predates a migration history rewrite and cannot be migrated automatically. "+
+				"Verify the schema and stamp it as described in docs/operations.md "+
+				"(\"Stamping an instance created before the 001_baseline squash\") — "+
+				"check which version it stopped at first, because stamping a partially "+
+				"migrated database records migrations as applied that never ran",
+			ErrMigrationVersionAhead, current, latest)
+	}
 	return nil
 }
 

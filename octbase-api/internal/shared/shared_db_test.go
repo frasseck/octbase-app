@@ -421,3 +421,113 @@ func TestWithTx(t *testing.T) {
 // every application start (cmd/octbase-api) and in the deployed stack's
 // /api/v1/health migration-version check, which is the meaningful integration
 // path for this plumbing.
+
+// A database recording a version with no file on disk must fail fast and say
+// what to do about it.
+//
+// This is the 2026-08-03 001_baseline squash, as a test. Migrations 001–039
+// were replaced by a single 001_baseline, so every pre-existing instance
+// carried a version (38 or 39) this build has no file for; runMigrations could
+// not build a plan, main.go treated that as fatal, and the API crash-looped
+// without ever binding a port. Two client stacks were down for hours.
+//
+// CI could not have caught it, and the reason outlives this particular squash:
+// testutil.NewTestDB executes the migration SQL directly rather than through
+// golang-migrate, so no test database has ever had a schema_migrations table.
+// The migrate path — the one every deploy onto an existing database takes — ran
+// for the first time in production. This test is the only place it is exercised
+// against a database that is not empty, so it builds its own schema and drives
+// shared.RunMigrations for real rather than using the shared harness.
+func TestRunMigrationsRejectsVersionAheadOfDisk(t *testing.T) {
+	const migrationsPath = "../../migrations"
+
+	latest, err := shared.LatestMigrationVersion(migrationsPath)
+	if err != nil {
+		t.Fatalf("LatestMigrationVersion: %v", err)
+	}
+
+	db, schema := newMigrateSchema(t)
+
+	// A fresh database still migrates cleanly — the guard must not fire on the
+	// empty case (ErrNilVersion), which is every CI run and every new install.
+	if err := shared.RunMigrations(db, migrationsPath); err != nil {
+		t.Fatalf("fresh database must migrate cleanly: %v", err)
+	}
+	// And re-running is a no-op, the restart-an-unchanged-deployment path.
+	if err := shared.RunMigrations(db, migrationsPath); err != nil {
+		t.Fatalf("re-running migrations must be a no-op: %v", err)
+	}
+
+	// Now make it look like a pre-squash instance: a recorded version whose
+	// file this build does not carry.
+	legacy := latest + 37
+	if _, err := db.Exec(`UPDATE schema_migrations SET version = $1, dirty = false`, legacy); err != nil {
+		t.Fatalf("simulate legacy version in %s: %v", schema, err)
+	}
+
+	err = shared.RunMigrations(db, migrationsPath)
+	if err == nil {
+		t.Fatal("a database ahead of the migrations on disk must not be migrated silently")
+	}
+	if !errors.Is(err, shared.ErrMigrationVersionAhead) {
+		t.Fatalf("error must be identifiable as ErrMigrationVersionAhead, got: %v", err)
+	}
+
+	// The message is the deliverable: this failure is read by an operator at
+	// 3am staring at a crash-looping container, and golang-migrate's own
+	// wording ("no migration found for version 38: read down for version 38")
+	// was misread as degraded health rather than a hard outage.
+	msg := err.Error()
+	for _, want := range []string{
+		strconv.FormatUint(uint64(legacy), 10), // where the database thinks it is
+		strconv.FormatUint(uint64(latest), 10), // where this build can take it
+		"docs/operations.md",                   // the procedure that fixes it
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error message must mention %q so it is actionable; got: %s", want, msg)
+		}
+	}
+}
+
+// newMigrateSchema returns a connection scoped to its own empty schema, so
+// golang-migrate can create a real schema_migrations table without colliding
+// with any other test. Dropped on cleanup.
+func newMigrateSchema(t *testing.T) (*sql.DB, string) {
+	t.Helper()
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_URL not set")
+	}
+
+	admin, err := shared.OpenDB(dsn)
+	if err != nil {
+		t.Fatalf("OpenDB: %v", err)
+	}
+	defer func() { _ = admin.Close() }()
+
+	schema := "migtest_" + strings.ReplaceAll(shared.NewUUID(), "-", "")
+	if _, err := admin.Exec("CREATE SCHEMA " + schema); err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanup, err := shared.OpenDB(dsn)
+		if err != nil {
+			return
+		}
+		defer func() { _ = cleanup.Close() }()
+		_, _ = cleanup.Exec("DROP SCHEMA IF EXISTS " + schema + " CASCADE")
+	})
+
+	// search_path on the DSN rather than a SET, so every pooled connection lands
+	// in the scratch schema — golang-migrate opens its own.
+	sep := "?"
+	if strings.Contains(dsn, "?") {
+		sep = "&"
+	}
+	db, err := shared.OpenDB(dsn + sep + "search_path=" + schema)
+	if err != nil {
+		t.Fatalf("OpenDB(scoped): %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	return db, schema
+}

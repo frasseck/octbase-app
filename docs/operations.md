@@ -210,11 +210,29 @@ and land at version 1.
 An instance that already ran the old history sits at version **38 or 39** with
 no file on disk for that version. This is a **hard outage, not a degraded
 health report**: `runMigrations` cannot build a plan from a recorded version it
-has no file for, it returns
-`no migration found for version 38: read down for version 38`, and
-`main.go` treats that as fatal (`os.Exit(1)`). The container crash-loops, no
-port is ever bound, and a deploy fails at its health gate with
+has no file for, `main.go` treats that as fatal (`os.Exit(1)`), the container
+crash-loops, no port is ever bound, and a deploy fails at its health gate with
 `Connection refused` — `/api/v1/health` is never reached at all.
+
+The startup log names the problem directly:
+
+```
+database migration version is ahead of the migrations on disk: database records
+version 38 but the highest migration on disk is 2. This instance predates a
+migration history rewrite and cannot be migrated automatically. …
+```
+
+Builds from before that check report golang-migrate's own wording instead —
+`no migration found for version 38: read down for version 38`. It is the same
+condition: migrate is looking for the *down* file to plan from, so the message
+reads like a corrupt or missing migration file rather than a database from
+before a history rewrite. That is how this was first mistaken for degraded
+health.
+
+Nothing self-repairs, deliberately. Stamping is an assertion about the schema
+that golang-migrate cannot verify and will never re-check, and the correct
+procedure depends on which version the instance stopped at — so it stays a
+decision made by a human against the actual schema.
 
 **Which version the instance stopped at decides the procedure**, because the
 baseline squashed `001`–`039` but these instances did not all get that far:
