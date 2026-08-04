@@ -18,14 +18,16 @@ meaningfully faster.
 | `octbase-api/` | Go backend, OpenAPI spec, migrations, tests |
 | `octbase-frontend/` | Desktop plain-DOM SPA (ES modules, built by Vite) + Caddy front door — reverse-proxies `/api` and serves the mobile SPA under `/m/` |
 | `octbase-mobile/` | Phone-first plain-DOM SPA (ES modules, built by Vite), served under `/m/` by the frontend |
-| `octbase-shared/` | `@octbase/shared` — the npm workspace package both SPAs import: i18n loader, task meta, rich-text sanitizer. One copy, no sync |
+| `octbase-shared/` | `@octbase/shared` — the npm workspace package both SPAs import: i18n loader, task meta, notification rendering, rich-text sanitizer. One copy, no sync |
 | `octbase-operations/` | Health observation: `check-health.sh` stack probe + reaction runbook |
 | `package.json`, `package-lock.json` | npm workspace root (`octbase-shared`, `octbase-frontend`, `octbase-mobile`) — the frontend build and its pinned toolchain. Node ≥ 22 |
 | `testdata/` | Case tables read by **both** test suites — `url-guard-cases.json` pins the Go/JS parity of the URL guards |
-| `scripts/` | Repo tooling: the frontend CI guards (`check-innerhtml.mjs`, `check-tdz.mjs`, `check-metrics-not-proxied.sh`), the Vite classic-asset hasher, DB reset, end-to-end agile API scenario, git hooks + security sweep (`git-hooks/`, `security-sweep.sh`, `security-heavy.sh`) |
+| `scripts/` | Repo tooling: the frontend CI guards (`check-innerhtml.mjs`, `check-tdz.mjs`, `check-metrics-not-proxied.sh`, `check-error-translations.mjs`, `check-audit-actions.mjs`, `check-i18n-keys.mjs`, `check-vendor-integrity.sh`), the Vite classic-asset hasher, DB reset, end-to-end agile API scenario, git hooks + security sweep (`git-hooks/`, `security-sweep.sh`, `security-heavy.sh`) |
 | `podman-compose.yml` | Full stack: PostgreSQL + API + frontend + mobile (deployable — no dev tooling) |
 | `podman-compose.dev.yml` | Dev-only overlay: adds Mailpit mail capture (never deploy) |
 | `.env.example` | All supported environment variables with defaults |
+| `CHANGELOG.md` | Core changes, newest under `## Unreleased`. Any change to the behavior of `octbase-api/`, `octbase-frontend/`, `octbase-mobile/` or `octbase-shared/` gets an entry in the same commit, under `Added` / `Changed` / `Fixed` / `Security` and no other heading |
+| `prompts/` | The ordered QA suite the project is reviewed with (e.g. `06_security-assessment.md`) — run by hand, never as a hook |
 | `docs/architecture.md` | Normative architecture decisions (style, concurrency model, scaling stance) |
 | `docs/operations.md` | Production runbook |
 | `docs/hosting-concept.md` | Deployment topology, sizing, multi-client scaling models |
@@ -79,7 +81,13 @@ podman-compose up --build
 
 `.env` controls the host ports (`POSTGRES_PORT`, `API_PORT`, `FRONTEND_PORT`) and the
 Postgres credentials/database name (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`)
-used by `podman-compose.yml`.
+used by `podman-compose.yml`. It also controls which *interface* each one binds:
+`BIND_ADDR` (default `127.0.0.1`) covers Postgres and the API, so they are not
+published off-host, while the front door has its own `FRONTEND_BIND_ADDR`
+(default `0.0.0.0`) — deliberately separate, so publishing the app does not mean
+publishing the database. Set `BIND_ADDR=0.0.0.0` only if you genuinely need to
+reach Postgres or the API directly from outside the host; it also bypasses the
+optional `OCTBASE_SITE_AUTH` front-door gate.
 
 | URL | What |
 |---|---|
@@ -187,12 +195,14 @@ See `.env.example` for the full list with types and defaults.
 | `OCTBASE_SCM_ENC_KEY` | for SCM | — | 32-byte key (base64/hex) encrypting stored SCM access tokens — required before any repository connection can be saved |
 | `OCTBASE_MFA_ENC_KEY` | for MFA | — | 32-byte key (base64/hex) encrypting users' TOTP secrets at rest — required before any user can enroll in MFA; deliberately separate from `OCTBASE_SCM_ENC_KEY` |
 | `OCTBASE_REQUIRE_MFA` | no | `off` | MFA enforcement scope: `off` / `admins` (ADMIN + SUPER_ADMIN) / `all` — an in-scope login without MFA gets a scoped enrollment challenge instead of a session |
+| `OCTBASE_MFA_CHALLENGE_TTL` | no | `5m` | Lifetime of the login MFA challenge token exchanged at `auth/mfa/verify` |
 | `OCTBASE_AUDIT_RETENTION_DAYS` / `_ACTIVITY_RETENTION_DAYS` | no | `365` | GDPR storage-limitation purge windows (days); `0` disables the purge |
 | `OCTBASE_FEATURE_TASKVIEW` | no | `true` | Toggles the Task view SPA feature, exposed to the frontend via `/api/v1/config` |
 | `OCTBASE_EDITION` | no | `ENTERPRISE` | Deployment edition — `TEAM` / `BUSINESS` / `ENTERPRISE` (case-insensitive; missing/invalid falls back to `ENTERPRISE`). Gates optional product surface per client; exposed via `/api/v1/config` |
 | `OCTBASE_OPTION_JIRA_IMPORT` | no | `false` | Additional bookable option: activates Jira CSV import in the `BUSINESS` edition (ignored — with a warning — on `TEAM`; `ENTERPRISE` always includes it) |
 | `OCTBASE_DB_MAX_OPEN_CONNS` / `_MAX_IDLE_CONNS` | no | `25` / `5` | DB connection pool sizing per API instance — see `docs/hosting-concept.md` §4 |
 | `OCTBASE_OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET` | no | — | OAuth app credentials per provider (`GITHUB`/`GITLAB`/`BITBUCKET`); enables "Connect with OAuth". Needs `OCTBASE_OAUTH_REDIRECT_BASE` |
+| `OCTBASE_OAUTH_<PROVIDER>_AUTH_URL` / `_TOKEN_URL` / `_SCOPE` | no | provider's cloud defaults | Per-provider endpoint/scope overrides for self-hosted GitLab or GitHub Enterprise |
 | `OCTBASE_APP_URL` | no | `http://localhost:8080` | Base URL used in invitation emails |
 | `OCTBASE_ATTACHMENTS_DIR` | no | `/data/attachments` | Filesystem directory for uploaded task attachments — uploads are disabled if it can't be created |
 | `OCTBASE_MAX_UPLOAD_MB` | no | `10` | Max size (MiB) of a single uploaded attachment; `0` disables the limit |
@@ -221,11 +231,6 @@ The public, static marketing/landing site for Octbase is a **separate website**
 maintained in its own repository (`ocete.ch`) — it has no API/database dependency
 and is not part of this repo or its `podman-compose.yml`. See that repo for
 its build, environment variables, and contact-form mailer.
-
-All services in this `podman-compose.yml` set `restart: always`. To have Podman
-restart them after a host reboot, see "Start on boot" in `docs/operations.md`
-(enable `podman-restart.service`, plus `loginctl enable-linger` for rootless
-setups).
 
 ---
 
@@ -289,7 +294,7 @@ setups).
 
 ### Reports & statistics
 
-- **Project statistics page** (`/projects/:id/statistics`, chart icon in the topbar left of the settings gear; `GET /projects/{id}/reports/statistics`) — open / in progress / finished-in-30-days / overdue / unassigned counts, the status, type and open-work-by-priority distributions, weekly throughput over the last 8 weeks, average **and** median cycle time from creation to done, open work per assignee, the active sprint, and the release plan. It is deliberately not a sidebar entry: the sidebar lists the places work is done, this is a view onto the project as a whole
+- **Project statistics page** (`/projects/:id/statistics`, chart icon in the topbar left of the settings gear; `GET /projects/{id}/reports/statistics`) — open / in progress / overdue / due-within-7-days / unassigned counts and the created- and completed-in-30-days flow pair, the status, type and open-work-by-priority distributions, weekly throughput over the last 8 weeks, average **and** median cycle time from creation to done (sampled over the last 90 days, so it describes how the team works *now*), open work per assignee (busiest 12), the active sprint, and the release plan. It is deliberately not a sidebar entry: the sidebar lists the places work is done, this is a view onto the project as a whole
 - **Sprint burndown** (`GET /sprints/{id}/burndown`) and **velocity** over the last N completed sprints (`GET /projects/{id}/reports/velocity`, default 6, cap 20)
 - Where a project estimates effort, the statistics page and the burndown measure the **estimate instead of the ticket count**, and additionally report remaining/done effort and how many tasks are unestimated
 
@@ -366,6 +371,9 @@ setups).
   `forgot-password`, `reset-password`) **and both `invitations/{token}` routes**
   share one 120 req/min budget; `/api/v1/users` — 60 req/min. The authenticated
   `auth/me` and `auth/change-password` are in neither bucket
+- All four compose services set `restart: always`. To have Podman restart them
+  after a host reboot, see "Start on boot" in `docs/operations.md` (enable
+  `podman-restart.service`, plus `loginctl enable-linger` for rootless setups)
 
 ---
 
@@ -474,7 +482,7 @@ All browsers run **headless** — pick the engine with `OCTBASE_BROWSER`:
 |---|---|---|---|
 | `firefox` (default) | Playwright's bundled Firefox | `python -m playwright install firefox` | Desktop / dev machines |
 | `chromium` | Playwright's bundled Chromium | `python -m playwright install chromium` | Headless servers where the bundled Firefox build fails to launch (missing shared libs) |
-| `chrome` | System Google Chrome (`channel="chrome"`) | Install Chrome via the OS package manager | Servers without Firefox but with `google-chrome` installed |
+| `chrome` | System Google Chrome (`channel="chrome"`) | Install Chrome via the OS package manager | Servers where neither bundled build installs. **This is what CI uses** (`OCTBASE_BROWSER: chrome`), so it is the best-tested engine after the default |
 
 ```bash
 OCTBASE_BROWSER=chromium pytest                  # whole suite
@@ -687,11 +695,14 @@ GET    /api/v1/admin/users                # ADMIN or SUPER_ADMIN — legacy, pre
 PATCH  /api/v1/admin/users/{userId}       # ADMIN or SUPER_ADMIN
 POST   /api/v1/admin/users/{userId}/reset-password   # ADMIN or SUPER_ADMIN
 
-# Platform
+# Platform (the last four are served outside /api/v1)
 GET    /api/v1/health      # DB pool + migration version, 503 when degraded
 GET    /api/v1/version
 GET    /api/v1/config      # app version + feature toggles (e.g. taskView) for the SPA
 GET    /api/v1/meta/enums  # canonical statuses, priorities, types, roles, relation types …
+GET    /health             # same DB/migration check as the v1 route, plus the app version;
+                           # what octbase-operations/check-health.sh probes
+GET    /docs               # Swagger UI (locally vendored assets, no CDN)
 GET    /metrics
 GET    /openapi.yaml
 ```
