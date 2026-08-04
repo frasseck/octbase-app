@@ -391,7 +391,10 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(shared.RealIP(trustedProxies))
-	r.Use(middleware.Logger)
+	// chi's Logger, but with URL-borne credentials redacted: the SSE ?token=
+	// fallback, the OAuth code/state, and the invitation token in the path are
+	// all bearer credentials, and the request line is printed verbatim.
+	r.Use(shared.RequestLogger())
 	r.Use(middleware.Recoverer)
 	r.Use(shared.CORSMiddleware)
 	r.Use(shared.SecurityHeaders)

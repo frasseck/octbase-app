@@ -2,6 +2,28 @@
 
 All notable changes to Octbase are documented here.
 
+## Unreleased
+
+### Security
+
+- **URL-borne credentials are redacted from the API request log.** chi's request
+  logger prints the full request line, and three credentials travel in a URL
+  rather than a header or body: the SSE `?token=` fallback (EventSource clients
+  cannot set an `Authorization` header), the OAuth `code`/`state` on the SCM
+  callback, and the invitation token, which is a path segment
+  (`/api/v1/invitations/{token}`). Every one of them was written to stdout in
+  cleartext — an access token valid for the whole `OCTBASE_JWT_ACCESS_TTL`, an
+  authorization code exchangeable for the provider tokens we then store
+  encrypted, and an invitation good for its 7-day TTL — readable by anyone who
+  can read a deployment's container logs. `middleware.Logger` is replaced by
+  `shared.RequestLogger()`, which hands chi's own formatter a copy of the
+  request with those values replaced by `REDACTED`; the log line is otherwise
+  byte-identical, and the handler still receives the real request, so the SSE
+  lookup and the OAuth exchange are unchanged. Redaction is by parameter name,
+  not by guessing which values look like secrets: a new URL-borne credential
+  must be added to `sensitiveQueryParams`, and the omission is visible in the
+  log rather than silent.
+
 ## v1.0.1 — 2026-08-04
 
 The first release of the re-baselined repository. `v1.0.1` was originally
