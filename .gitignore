@@ -2,8 +2,12 @@
 octbase-api/octbase-api
 octbase-api/octbase.db
 
-# Postgres data (podman-compose bind mount)
-/pgdata/
+# Postgres data (podman-compose bind mount, ${PGDATA_DIR}). The glob covers
+# both documented values: ./pgdata, the compose default, and ./pgdata_dev,
+# which the dev overlay's .env uses — only the first was listed, so a dev stack
+# left an unignored directory in the tree that git could not even read
+# ("warning: could not open directory 'pgdata_dev/'" on every status).
+/pgdata*/
 
 # Uploaded attachment files (podman-compose bind mount; ATTACHMENTS_DIR)
 /attachments/

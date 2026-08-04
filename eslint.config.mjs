@@ -29,7 +29,19 @@ export default [
       '**/dist/**',
       '**/dist-standalone/**',
       'octbase-api/**',
-      'pgdata_dev/**',
+      // The two bind-mount directories podman-compose creates in the repo
+      // root. Both are owned by a container UID and unreadable to the
+      // developer's account, so ESLint's directory walk does not merely lint
+      // them — it dies with EACCES before reporting anything. Only
+      // `pgdata_dev/**` was listed, so `npx eslint .` failed outright on any
+      // machine that had ever run the dev stack, while CI stayed green because
+      // a fresh checkout has neither directory. A lint gate that cannot fail
+      // where the developer runs it is not a gate.
+      //   pgdata*/  — ${PGDATA_DIR}, ./pgdata by default and ./pgdata_dev in
+      //               the dev overlay's .env
+      //   attachments/ — OCTBASE_ATTACHMENTS_DIR's host side
+      'pgdata*/**',
+      'attachments/**',
       '**/.venv/**',
       // Vendored third-party code: reviewed and SHA-256-pinned in
       // scripts/vendor-manifest.txt, not ours to restyle. Linting it would
