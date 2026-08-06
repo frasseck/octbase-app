@@ -66,7 +66,7 @@ convention regressions.
 | `docs/technical_documentation.md` | Whole-stack technology reference (services, containers, networking, DNS/TLS) |
 
 The public marketing/landing site is a **separate website** in its own repository
-(`ocete.ch`) — it is not part of this repo.
+(`octbase-web`) — it is not part of this repo.
 
 ## Build & test commands
 

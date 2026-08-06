@@ -35,7 +35,7 @@ A full Octbase application deployment is four services (see `podman-compose.yml`
 | `octbase-mobile` | Phone-first SPA | Caddy (static) | 8080 | Stateless |
 
 The public **marketing/landing site** (`octbase-web` + its `mailer`, both stateless
-Caddy/Go) is a **separate website deployed from its own repository (`ocete.ch`)**.
+Caddy/Go) is a **separate website deployed from its own repository (`octbase-web`)**.
 It is included below in the platform-wide topology and sizing because it still
 runs as a small stateless edge, but it is not part of the application stack and
 scales independently.
@@ -249,7 +249,7 @@ services:
   octbase-mobile:     { deploy: { resources: { limits: { cpus: "0.5", memory: 64M } } } }
 ```
 
-(The marketing site and its mailer live in the separate `ocete.ch` repo and
+(The marketing site and its mailer live in the separate `octbase-web` repo and
 carry their own limits there.)
 
 Also tune Postgres per stack (it ships with defaults sized for a generic host):

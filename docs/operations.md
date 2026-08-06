@@ -52,7 +52,7 @@
 | `PORT` | string | `8000` | No | HTTP listen port |
 
 The public marketing/landing site and its contact-form mailer are a **separate
-website** (`ocete.ch` repo) with their own `WEB_*` variables — they are no longer
+website** (`octbase.io` repo) with their own `WEB_*` variables — they are no longer
 part of this stack.
 
 ---

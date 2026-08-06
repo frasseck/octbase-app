@@ -856,7 +856,7 @@ function prefetchLandingProject(destination) {
 // Octbase is desktop-first. On a touch-primary mobile device we don't boot the
 // app at all — we redirect to the marketing site instead. A narrowed *desktop*
 // window has a fine pointer, so it still boots and gets the hamburger drawer.
-const MOBILE_REDIRECT_URL = 'https://www.ocete.ch';
+const MOBILE_REDIRECT_URL = 'https://www.octbase.io';
 
 function isMobileDevice() {
   return window.matchMedia(

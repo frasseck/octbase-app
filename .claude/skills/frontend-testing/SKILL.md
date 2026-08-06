@@ -32,7 +32,7 @@ the old `/home/claude/taskbase/` path (repo was renamed). If `pip` or `pytest`
 fail, recreate it:
 
 ```bash
-cd /home/claude/dev.ocete.ch/octbase-frontend/tests
+cd /home/claude/dev.octbase.io/octbase-frontend/tests
 rm -rf .venv
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
@@ -44,7 +44,7 @@ Call binaries directly via `.venv/bin/python`, `.venv/bin/pytest`.
 ### Running tests
 
 ```bash
-cd /home/claude/dev.ocete.ch/octbase-frontend/tests
+cd /home/claude/dev.octbase.io/octbase-frontend/tests
 
 # Whole suite
 OCTBASE_BROWSER=chrome .venv/bin/python -m pytest -q

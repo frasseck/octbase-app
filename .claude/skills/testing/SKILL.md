@@ -248,7 +248,7 @@ regression; the modes below are the recurring causes it accounts for.
   local API's env before blaming the diff.
 - **`test_accessibility.py` silently skips its whole file** unless
   `OCTBASE_ACCESS_API_BASE` / `OCTBASE_ACCESS_UI_URL` point at a **served** UI
-  (they default to the deployed `dev.ocete.ch`, unreachable locally, and
+  (they default to the deployed `dev.octbase.io`, unreachable locally, and
   `file://` will not do). A green suite does **not** mean these ran — 13 of the
   22 default skips are this file. Once pointed at a served stack, one of them
   fails for real (`TestLiveRegions::test_bulk_bar_is_labelled_region`, empty

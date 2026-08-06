@@ -55,7 +55,7 @@ bottom-center `octbase X.Y` tag reads it from `/config` at boot.
 
 **Version-number baseline:** platform syncs may stamp deployment versions
 without a changelog release (1.0.5/1.0.6 were such stamps). Check the live
-demo (`curl -s https://demo.ocete.ch/health`) and bump patch from the highest
+demo (`curl -s https://demo.octbase.io/health`) and bump patch from the highest
 deployed/stamped version, not just from the changelog's last heading.
 
 ## 4. Asset cache-busting — nothing to do (since 37b stage 5)
@@ -107,7 +107,7 @@ ansible-playbook playbooks/sync-instance.yml -e client=demo     # sync main, reb
 Confirm health via the public URL before standing down:
 
 ```bash
-curl -s https://demo.ocete.ch/health   # expect status ok + the released version
+curl -s https://demo.octbase.io/health   # expect status ok + the released version
 ```
 
 ## Related

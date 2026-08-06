@@ -16,7 +16,7 @@ driven by **this checkout and its `.env`**. Check with `podman ps`:
 
 | Stack (`-p` name) | Checkout | Postgres | API | Frontend | Mailpit |
 |---|---|---|---|---|---|
-| `octbase_dev` | `/home/claude/dev.ocete.ch` (this repo; plain `podman-compose up`) | `localhost:8102` | `localhost:8101` | `localhost:8100` | — |
+| `octbase_dev` | `/home/claude/dev.octbase.io` (this repo; plain `podman-compose up`) | `localhost:8102` | `localhost:8101` | `localhost:8100` | — |
 
 These come from this checkout's `.env` (`POSTGRES_PORT` / `API_PORT` /
 `FRONTEND_PORT`), which is the authority — read it rather than this table if the
@@ -26,7 +26,7 @@ not follow until 2026-08-01.
 > The old `octbase` demo stack (`/home/claude/demo.ocete.ch`, ports
 > 5432/8000/8080) is **gone since 2026-07-13** — the public demo migrated to
 > its own `oct-demo` account (managed by `octbase-service`, not reachable
-> from this account). Test the demo via **https://demo.ocete.ch**; ports
+> from this account). Test the demo via **https://demo.octbase.io**; ports
 > 8000/5432 are usually free for local/disposable use now.
 
 > ⚠️ **Never run compose with a different `-p` from this checkout without
@@ -132,7 +132,7 @@ so you only need a reachable Postgres. The migrations path is **relative**
 
 ```bash
 ss -lptn 'sport = :8000'   # FIRST: the port must be free, or you test their stack
-cd /home/claude/dev.ocete.ch/octbase-api
+cd /home/claude/dev.octbase.io/octbase-api
 OCTBASE_DEMO_MODE=true \
 OCTBASE_DATABASE_URL="postgres://octbase:octbase@localhost:5432/octbase?sslmode=disable" \
 PORT=8000 \

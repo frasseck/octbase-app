@@ -32,8 +32,8 @@ import os
 #   OCTBASE_ACCESS_UI_URL    — fully-qualified index.html URL
 # Keep the UI same-origin with the API to avoid the CORS rejection a cross-port
 # apiBase would trigger.
-ACCESS_API_BASE = os.getenv("OCTBASE_ACCESS_API_BASE", "http://dev.ocete.ch:8001")
-ACCESS_UI_URL = os.getenv("OCTBASE_ACCESS_UI_URL", "http://dev.ocete.ch:8081/index.html")
+ACCESS_API_BASE = os.getenv("OCTBASE_ACCESS_API_BASE", "http://dev.octbase.io:8001")
+ACCESS_UI_URL = os.getenv("OCTBASE_ACCESS_UI_URL", "http://dev.octbase.io:8081/index.html")
 
 
 @pytest.fixture(scope="session")
@@ -68,7 +68,7 @@ def run_axe(page):
 class TestAxeScans:
     # `api` gates on the access deployment being reachable: without it these
     # page-only tests hang 30s in page.goto and FAIL (instead of skipping like
-    # every fixture-based sibling) when the suite runs where dev.ocete.ch is
+    # every fixture-based sibling) when the suite runs where dev.octbase.io is
     # not reachable, e.g. in the GitHub pipeline.
     def test_login_page(self, page, api):
         page.goto(ACCESS_UI_URL)

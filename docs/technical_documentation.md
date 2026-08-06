@@ -22,7 +22,7 @@ Octbase is a split monorepo: a single Go API (a modular monolith) plus several
 podman-compose. One Caddy container (`octbase-frontend`) is the **front door**: it
 terminates TLS, serves the desktop SPA, reverse-proxies `/api` to the Go API, and
 serves the mobile SPA under `/m/`. The public marketing site is a **separate
-website** with its own repository (`ocete.ch`) and is not part of this stack.
+website** with its own repository (`octbase.io`) and is not part of this stack.
 
 ```
                                  Internet / DNS
@@ -74,7 +74,7 @@ comment above the `FROM`; refreshing a pin is a deliberate step documented in
 
 The public marketing/landing site (`octbase-web` + its contact-form `mailer`) is
 **not** part of this stack — it is a separate website in its own repository
-(`ocete.ch`).
+(`octbase.io`).
 
 `octbase-mobile` is intentionally **not** published to the host — it is only
 reachable through the frontend Caddy front door on the internal compose network,
@@ -276,7 +276,7 @@ keep Postgres and the internal services on a private network.
 
 Octbase ships no DNS configuration of its own — it expects a reverse proxy on a
 public host. The records below are the deployment wiring. The reference public
-deployment uses `demo.ocete.ch`; substitute your own domain.
+deployment uses `demo.octbase.io`; substitute your own domain.
 
 ### 6.1 Records for the application
 
@@ -284,7 +284,7 @@ deployment uses `demo.ocete.ch`; substitute your own domain.
 |---|---|---|---|
 | `app.example.com` (or apex) | `A` / `AAAA` | Public IPv4 / IPv6 of the host running `octbase-frontend` | The application front door — SPA, `/api`, SSE, webhooks, OAuth callback |
 
-The public marketing/landing site is a separate website (`ocete.ch` repo) with
+The public marketing/landing site is a separate website (`octbase.io` repo) with
 its own hostname and DNS. Pick **one canonical app hostname** here and use it
 consistently for `OCTBASE_APP_URL`,
 `OCTBASE_CORS_ORIGIN`, and `OCTBASE_OAUTH_REDIRECT_BASE` — they must all agree.
