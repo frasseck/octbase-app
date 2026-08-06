@@ -93,14 +93,14 @@ func TestBuildMessage(t *testing.T) {
 }
 
 func TestRenderHTML_FontLinkAndEscaping(t *testing.T) {
-	html := renderHTML("Task updated", "Open it:\nhttps://dev.ocete.ch/#/projects/p1?task=t1 <b>x</b>")
+	html := renderHTML("Task updated", "Open it:\nhttps://dev.octbase.io/#/projects/p1?task=t1 <b>x</b>")
 
 	// A web-safe font stack is applied inline (clients can't load custom fonts).
 	if !strings.Contains(html, "-apple-system,BlinkMacSystemFont") {
 		t.Errorf("expected system font stack in HTML:\n%s", html)
 	}
 	// Bare URLs become clickable anchors pointing at the same URL.
-	if !strings.Contains(html, `<a href="https://dev.ocete.ch/#/projects/p1?task=t1"`) {
+	if !strings.Contains(html, `<a href="https://dev.octbase.io/#/projects/p1?task=t1"`) {
 		t.Errorf("URL was not linkified:\n%s", html)
 	}
 	// Body content is HTML-escaped, so injected markup is inert text.

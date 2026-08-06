@@ -3,8 +3,8 @@
 # sync-installs.sh — file-level sync of the Octbase application source between
 # the two side-by-side installs on this host:
 #
-#     SRC (source of truth)  dev.ocete.ch/    (this repo, release branch)
-#     DST (deploy target)    demo.ocete.ch/   (this repo, main)
+#     SRC (source of truth)  dev.octbase.io/    (this repo, release branch)
+#     DST (deploy target)    demo.octbase.io/   (this repo, main)
 #
 # NOTE (2026-07-13): the public demo no longer lives at ~/demo.ocete.ch — it
 # migrated to its own oct-demo account, managed by octbase-service (deploy via
@@ -25,11 +25,11 @@
 #     rebuild is required. Pass --no-reload to skip this.
 #
 # Usage:
-#   scripts/sync-installs.sh                 # dry-run, dev.ocete.ch -> demo.ocete.ch
+#   scripts/sync-installs.sh                 # dry-run, dev.octbase.io -> demo.octbase.io
 #   scripts/sync-installs.sh --apply         # copy, then rebuild+restart DST containers
 #   scripts/sync-installs.sh --apply --no-reload  # copy only, leave containers as-is
 #   scripts/sync-installs.sh --apply --delete   # mirror (also remove DST-only files)
-#   scripts/sync-installs.sh --reverse       # dry-run, demo.ocete.ch -> dev.ocete.ch
+#   scripts/sync-installs.sh --reverse       # dry-run, demo.octbase.io -> dev.octbase.io
 #   SRC=/path/a DST=/path/b scripts/sync-installs.sh --apply   # override paths
 #
 set -euo pipefail

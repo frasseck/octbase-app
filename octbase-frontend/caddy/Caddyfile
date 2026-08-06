@@ -93,7 +93,7 @@
 	# Compression. The JS is already minified in the image (see the esbuild
 	# stage in ../Containerfile), but minification is the small half: the
 	# desktop SPA is ~372 KB minified and ~91 KB gzipped, so serving it
-	# uncompressed wastes ~280 KB on every cold load. demo.ocete.ch only
+	# uncompressed wastes ~280 KB on every cold load. demo.octbase.io only
 	# avoided that because an edge proxy on the host compresses for it — a
 	# one-stack-per-client deployment with no such edge got the full payload.
 	# Compress here so it never depends on what sits in front.

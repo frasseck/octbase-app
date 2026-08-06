@@ -36,7 +36,7 @@ meaningfully faster.
 | `.github/workflows/ci.yml` | CI: lint, test (coverage floor), frontend checks, e2e, security scan → build image (Trivy) |
 
 The public marketing/landing page is a **separate website** in its own
-repository (`ocete.ch`); it is not part of this repo.
+repository (`octbase-web`); it is not part of this repo.
 
 ---
 
@@ -228,7 +228,7 @@ See `.env.example` for the full list with types and defaults.
 ## Landing page
 
 The public, static marketing/landing site for Octbase is a **separate website**
-maintained in its own repository (`ocete.ch`) — it has no API/database dependency
+maintained in its own repository (`octbase-web`) — it has no API/database dependency
 and is not part of this repo or its `podman-compose.yml`. See that repo for
 its build, environment variables, and contact-form mailer.
 

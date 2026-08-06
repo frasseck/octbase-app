@@ -56,7 +56,7 @@ podman-compose -p <project> up -d <service>      # recreate one service
 `octbase_dev` from this checkout, and never use a different `-p` from here
 without overriding the `.env` (`.env`/pgdata collision, see `dev-stack`).
 The public demo is platform-managed under the `oct-demo` account since
-2026-07-13 — diagnose it via https://demo.ocete.ch and `octbase-service`,
+2026-07-13 — diagnose it via https://demo.octbase.io and `octbase-service`,
 not from this host's podman.
 
 After any fix, re-run the checker and confirm `==> overall: OK`.

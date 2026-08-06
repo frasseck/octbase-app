@@ -91,7 +91,7 @@ what convention it breaks, and the fix. If nothing is wrong, say so plainly.
 ## How to run checks
 
 ```bash
-cd /home/claude/dev.ocete.ch/octbase-api
+cd /home/claude/dev.octbase.io/octbase-api
 go build ./... && go vet ./... && gofmt -l .
 golangci-lint run ./...   # if available
 ```

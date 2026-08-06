@@ -18,7 +18,7 @@ skip without it — and skipped tests count as uncovered). Point it at a running
 stack's Postgres (see the `dev-stack` skill) on its own database:
 
 ```bash
-cd /home/claude/dev.ocete.ch/octbase-api
+cd /home/claude/dev.octbase.io/octbase-api
 export TEST_DATABASE_URL="postgres://octbase:octbase@localhost:5432/octbase_test?sslmode=disable"
 
 go test ./... -count=1 -coverprofile=cover.out

@@ -11,7 +11,7 @@ Run them locally before pushing; all but the build are cheap.
 ## Run them all
 
 ```bash
-cd /home/claude/dev.ocete.ch
+cd /home/claude/dev.octbase.io
 
 npm ci
 npx eslint .                     # replaced the node --check loop (37b stage 6)

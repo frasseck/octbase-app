@@ -65,9 +65,9 @@ function renderLoginPage() {
       </div>
     </div>
     <nav class="auth-footer">
-      <a href="https://ocete.ch/privacy.html" target="_blank" rel="noopener">${t('auth.privacy')}</a>
+      <a href="https://octbase.io/privacy.html" target="_blank" rel="noopener">${t('auth.privacy')}</a>
       <span aria-hidden="true">·</span>
-      <a href="https://ocete.ch/impressum.html" target="_blank" rel="noopener">${t('auth.imprint')}</a>
+      <a href="https://octbase.io/impressum.html" target="_blank" rel="noopener">${t('auth.imprint')}</a>
     </nav>
     <div class="app-version" aria-hidden="true">octbase ${S.appVersion}</div>`;
 }

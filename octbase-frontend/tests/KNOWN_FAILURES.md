@@ -74,7 +74,7 @@ The 22 skips are all deliberate env-gates or seed-state guards, not breakage:
 
 | Count | Tests | Why it skips |
 |---|---|---|
-| 13 | `test_accessibility.py` (whole file) | `OCTBASE_ACCESS_API_BASE` / `OCTBASE_ACCESS_UI_URL` are unset, so they default to the deployed `dev.ocete.ch:8001/8081`, which is unreachable locally. They need a **served** UI — `file://` will not do. See below. |
+| 13 | `test_accessibility.py` (whole file) | `OCTBASE_ACCESS_API_BASE` / `OCTBASE_ACCESS_UI_URL` are unset, so they default to the deployed `dev.octbase.io:8001/8081`, which is unreachable locally. They need a **served** UI — `file://` will not do. See below. |
 | 8 | `test_rbac.py` super-admin cases | `OCTBASE_SUPERADMIN_EMAIL` / `_PASSWORD` unset (documented as optional in that file). |
 | 1 | `test_board.py:333` drag case | Seeded Review column has no card to drag — `seed.go` places both demo tasks in Planned / In Progress. |
 

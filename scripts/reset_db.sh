@@ -17,7 +17,7 @@
 #
 # The target is whatever podman-compose.yml + .env in THIS repo describe. With
 # the checked-in dev .env that is the "octbase_dev" stack (API on :8101). It does
-# NOT touch the separate live demo install in demo.ocete.ch.
+# NOT touch the separate live demo install in demo.octbase.io.
 #
 # Usage:
 #   scripts/reset_db.sh           # prompts before wiping
