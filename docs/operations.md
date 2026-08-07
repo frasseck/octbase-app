@@ -21,7 +21,7 @@
 | `OCTBASE_SITE_USER` | string | `octbase` | No | Username shown in the front-door Basic Auth prompt when the gate is on (frontend container) |
 | `OCTBASE_SMTP_HOST` | string | *(empty)* | No | SMTP host; empty = log to stdout |
 | `OCTBASE_SMTP_PORT` | string | `587` | No | SMTP port |
-| `OCTBASE_SMTP_FROM` | string | `noreply@beyags.com` | No | Sender address |
+| `OCTBASE_SMTP_FROM` | string | `noreply@octbase.io` | No | Sender address |
 | `OCTBASE_SMTP_USER` | string | *(empty)* | No | SMTP username |
 | `OCTBASE_SMTP_PASS` | string | *(empty)* | No | SMTP password |
 | `OCTBASE_WEBHOOK_SECRET_BITBUCKET` | string | *(empty)* | No | HMAC secret for Bitbucket webhooks |

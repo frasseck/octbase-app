@@ -21,6 +21,21 @@ All notable changes to Octbase are documented here.
   covers the audit and activity tables, so they must not accumulate a record of
   who was mailed.
 
+### Changed
+
+- **The default `OCTBASE_SMTP_FROM` is now `noreply@octbase.io`** (was
+  `noreply@beyags.com`), catching the fallback up with the domain rename. Every
+  deployment sets the variable explicitly, so this changes nothing on a
+  configured stack — but the fallback is what a stack that *forgot* the variable
+  sends as, and a sender on a domain the relay does not host is exactly the
+  case that fails SPF and lands in spam rather than erroring visibly. The same
+  stale address was documented as the default in `.env.example`,
+  `podman-compose.yml`, both `README`s and `docs/operations.md`; all now agree.
+  `docs/technical_documentation.md` §6.4's example sending domain follows.
+  Unrelated `oncall@beyags.com` addresses in `octbase-operations/` are alert
+  recipients at the operating company, not the product's sender, and are
+  unchanged.
+
 ### Security
 
 - **URL-borne credentials are redacted from the API request log.** chi's request

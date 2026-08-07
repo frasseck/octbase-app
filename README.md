@@ -188,7 +188,7 @@ See `.env.example` for the full list with types and defaults.
 | `OCTBASE_CORS_ORIGIN` | yes | `http://localhost:8080` | Allowed CORS origin |
 | `OCTBASE_SMTP_HOST` | no | *(empty)* | SMTP host — unset logs emails to stdout |
 | `OCTBASE_SMTP_PORT` | no | `587` | SMTP port |
-| `OCTBASE_SMTP_FROM` | no | `noreply@beyags.com` | Sender address |
+| `OCTBASE_SMTP_FROM` | no | `noreply@octbase.io` | Sender address |
 | `OCTBASE_SMTP_USER` / `_PASS` | no | — | SMTP credentials |
 | `OCTBASE_WEBHOOK_SECRET_BITBUCKET` | no | — | HMAC secret for Bitbucket webhooks |
 | `OCTBASE_WEBHOOK_SECRET_GITHUB` | no | — | HMAC secret for GitHub webhooks |

@@ -310,7 +310,7 @@ DNS only needs to be correct for the challenge method you use (HTTP-01 needs por
 Octbase only sends mail (notifications via `OCTBASE_SMTP_*`); it does **not**
 receive mail, so **no `MX` record is required for Octbase itself**. To keep
 outgoing mail from being marked as spam, configure the standard records on the
-**sending domain** (the domain in `OCTBASE_SMTP_FROM`, e.g. `beyags.com`):
+**sending domain** (the domain in `OCTBASE_SMTP_FROM`, e.g. `octbase.io`):
 
 | Record | Type | Purpose |
 |---|---|---|

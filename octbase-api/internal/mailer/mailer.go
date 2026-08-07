@@ -61,7 +61,7 @@ func New() Mailer {
 	m := &SMTPMailer{
 		host: os.Getenv("OCTBASE_SMTP_HOST"),
 		port: envOrDefault("OCTBASE_SMTP_PORT", "587"),
-		from: envOrDefault("OCTBASE_SMTP_FROM", "noreply@beyags.com"),
+		from: envOrDefault("OCTBASE_SMTP_FROM", "noreply@octbase.io"),
 		user: os.Getenv("OCTBASE_SMTP_USER"),
 		pass: os.Getenv("OCTBASE_SMTP_PASS"),
 	}
