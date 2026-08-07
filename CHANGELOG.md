@@ -73,6 +73,17 @@ All notable changes to Octbase are documented here.
 
 ### Security
 
+- **DOMPurify is pinned to 3.4.13** (was `3.4.12`), picking up the fix for
+  GHSA-55q2-fjhq-7xh7: removing an `IN_PLACE` hook left a detached subtree
+  executable, which is an XSS. DOMPurify is shipped code — it is the rich-text
+  sanitizer both SPAs import — so this is runtime surface, not dev tooling.
+  Caught by the `npm audit --omit=dev` step that arrived with 37b stage 4, and
+  fixed the way that step is meant to be answered: by bumping the pin, never by
+  relaxing `--audit-level`. This is the second advisory that guard has caught
+  since it replaced the SHA-256 integrity check on the vendored copies, which
+  is the whole argument for the swap — a hash could prove the file had not been
+  tampered with, but never that an advisory had been published against it.
+
 - **URL-borne credentials are redacted from the API request log.** chi's request
   logger prints the full request line, and three credentials travel in a URL
   rather than a header or body: the SSE `?token=` fallback (EventSource clients
