@@ -72,10 +72,16 @@ func TestProjectSettings_ExtendedHierarchy(t *testing.T) {
 	if status != http.StatusUnprocessableEntity || code != "TASK_PARENT_NOT_ALLOWED" {
 		t.Errorf("theme with parent: status %d code %s, want 422 TASK_PARENT_NOT_ALLOWED", status, code)
 	}
-	// An EPIC's parent must now be an INITIATIVE, not a THEME.
-	status, code, _ = postTask(t, srv, pid, "Epic under theme", "EPIC", theme["id"].(string))
+	// An EPIC may hang off the INITIATIVE above it or skip straight to the
+	// THEME — the skip-level rule applies to the optional levels too.
+	underTheme := mustPostTask(t, srv, pid, "Epic under theme", "EPIC", theme["id"].(string))
+	if underTheme["parentId"] != theme["id"] {
+		t.Errorf("epic under theme: parentId = %v, want %v", underTheme["parentId"], theme["id"])
+	}
+	// Downward is still refused: an INITIATIVE cannot hang off an EPIC.
+	status, code, _ = postTask(t, srv, pid, "Initiative under epic", "INITIATIVE", epic["id"].(string))
 	if status != http.StatusUnprocessableEntity || code != "TASK_PARENT_TYPE_INVALID" {
-		t.Errorf("epic under theme: status %d code %s, want 422 TASK_PARENT_TYPE_INVALID", status, code)
+		t.Errorf("initiative under epic: status %d code %s, want 422 TASK_PARENT_TYPE_INVALID", status, code)
 	}
 }
 

@@ -204,7 +204,14 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		shared.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
 		return
 	}
-	if target.GlobalRole == rbac.GlobalSuperAdmin {
+	// The guard protects a Super Admin from *other* Super Admins; the actor is
+	// not "another", so editing your own record is allowed. Without that
+	// exemption the role cannot change its own display name or email at all —
+	// there is no self-service profile route, and this is the only write path
+	// onto a user record, so a seeded Super Admin name would be permanent.
+	// Role and status stay locked even here; see below.
+	selfEdit := target.ID == actorID
+	if target.GlobalRole == rbac.GlobalSuperAdmin && !selfEdit {
 		shared.WriteError(w, http.StatusForbidden, "FORBIDDEN", "cannot modify another Super Admin")
 		return
 	}
@@ -256,6 +263,17 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		s := *req.Status
 		if s != "active" && s != "disabled" && s != "invited" {
 			shared.WriteError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "invalid status")
+			return
+		}
+		// A Super Admin target can only be the actor themselves by now, and
+		// disabling the account you are signed in as would lock the one
+		// unrestricted role out of the installation. Deactivation has its own
+		// endpoint, which refuses a Super Admin outright (rbac.CanDisableUser);
+		// the self-edit path must not become the way around it. A role change
+		// is refused one field up by rbac.CanUpdateUserRole, which already
+		// treats every Super Admin target as undemotable.
+		if target.GlobalRole == rbac.GlobalSuperAdmin && s != target.Status {
+			shared.WriteError(w, http.StatusForbidden, "FORBIDDEN", "cannot change a Super Admin's account status")
 			return
 		}
 		status = s

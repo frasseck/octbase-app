@@ -6,6 +6,24 @@ All notable changes to Octbase are documented here.
 
 ### Added
 
+- **A task may now hang under any level above it, not only the one directly
+  above.** A `TASK` can sit straight under an `EPIC` without a `STORY` invented
+  to hold it; a `STORY` may hang off a `THEME` where those levels are on. The
+  rule was previously "the parent is the type exactly one level up", which is
+  why `POST /projects/{id}/tasks` with a task's `parentId` pointing at an epic
+  came back `422 TASK_PARENT_TYPE_INVALID`. `SUBTASK` is the deliberate
+  exception and keeps its mandatory, exactly-a-`TASK` parent — a subtask is the
+  breakdown of one specific task, and letting it float under an epic would
+  leave nothing for it to be a subtask *of*. Downward links are still refused
+  (a story may not hang off a task), as is a type parenting its own type.
+  This is a strict relaxation: every parent link that was valid before is still
+  valid, so no migration and no data repair is involved. The retype guard
+  follows the same predicate — retyping a story up to an epic over its task
+  children now succeeds instead of answering `TASK_HAS_CHILDREN`, and project
+  import preserves parent links it used to drop with a warning. Both SPAs'
+  parent pickers list every allowed level, grouped by type; the picker label no
+  longer names a single type, because there is no longer a single answer.
+
 - **Outgoing mail is now observable.** The mailer logs its resolved SMTP
   configuration once at startup (`host`, `port`, `from`, `user`, and whether a
   password is set — never the password itself), and one `email sent` line per
@@ -20,6 +38,21 @@ All notable changes to Octbase are documented here.
   than the recipient: container logs are not covered by the retention purge that
   covers the audit and activity tables, so they must not accumulate a record of
   who was mailed.
+
+### Fixed
+
+- **A Super Admin can edit their own profile again.**
+  `PATCH /api/v1/users/{userId}` refused every `SUPER_ADMIN` target with
+  `403 "cannot modify another Super Admin"` — including the signed-in actor,
+  who is not "another". Because there is no self-service profile route
+  (`GET /auth/me` is read-only) and this is the only write path onto a user
+  record, a Super Admin's display name and email were unchangeable for the life
+  of the account: the seeded `Super Admin` could never be given a person's name.
+  The guard now exempts the actor from itself. Editing a *different* Super
+  Admin is still refused, and the self path does not become a way around the
+  demote/disable rules: a self role change was already refused by
+  `CanUpdateUserRole`, and a self status change is now refused explicitly
+  rather than letting the account disable the session it is signed in with.
 
 ### Changed
 

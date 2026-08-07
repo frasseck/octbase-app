@@ -673,11 +673,17 @@ func (p *Project) TaskTypeChain() []string {
 	return append(chain, TaskTypeEpic, TaskTypeStory, TaskTypeTask, TaskTypeSubtask)
 }
 
-// ParentTaskTypeFor returns the task type a parent of the given child type
-// must have in the project's active chain, and whether a parent is mandatory.
-// Parents are always exactly one hierarchy level up: only SUBTASK→TASK is
-// mandatory, every other link is optional. The chain's top type — and a type
-// the project has not enabled — returns ("", false): no parent allowed.
+// ParentTaskTypeFor returns the task type directly above the given child type
+// in the project's active chain, and whether a parent is mandatory. Only
+// SUBTASK→TASK is mandatory, every other link is optional. The chain's top
+// type — and a type the project has not enabled — returns ("", false): no
+// parent allowed.
+//
+// This is the *nearest* parent type, not the only allowed one: except for a
+// SUBTASK, any level further up is allowed as well (see
+// TaskParentTypeAllowed). Use it for defaults and for the parent-allowed /
+// parent-required questions; use TaskParentTypeAllowed to validate a concrete
+// pair.
 func ParentTaskTypeFor(p *Project, childType string) (parentType string, required bool) {
 	chain := p.TaskTypeChain()
 	for i, tt := range chain {
@@ -691,9 +697,11 @@ func ParentTaskTypeFor(p *Project, childType string) (parentType string, require
 	return "", false
 }
 
-// ChildTaskTypeFor returns the only task type the children of a task of the
-// given type may have in the project's active chain ("" when the type cannot
-// have children, i.e. SUBTASK or a type the project has not enabled).
+// ChildTaskTypeFor returns the task type directly below the given type in the
+// project's active chain ("" when the type cannot have children, i.e. SUBTASK
+// or a type the project has not enabled). Like ParentTaskTypeFor this is the
+// nearest level, not the only allowed one — a task of any lower level may hang
+// under it (see TaskParentTypeAllowed).
 func ChildTaskTypeFor(p *Project, parentType string) string {
 	chain := p.TaskTypeChain()
 	for i, tt := range chain {
@@ -704,6 +712,36 @@ func ChildTaskTypeFor(p *Project, parentType string) string {
 	return ""
 }
 
+// TaskParentTypeAllowed reports whether a task of childType may hang under a
+// parent of parentType in the project's active chain. A parent may be any
+// level *above* the child, not only the level directly above it, so a task can
+// sit straight under an epic without a story invented to hold it.
+//
+// SUBTASK is the exception: its parent stays mandatory and stays exactly a
+// TASK, because a subtask is the breakdown of one specific task — letting it
+// float under an epic would leave nothing for it to be a subtask *of*.
+func TaskParentTypeAllowed(p *Project, childType, parentType string) bool {
+	chain := p.TaskTypeChain()
+	childIdx, parentIdx := -1, -1
+	for i, tt := range chain {
+		if tt == childType {
+			childIdx = i
+		}
+		if tt == parentType {
+			parentIdx = i
+		}
+	}
+	// childIdx == 0 is the chain's top type, which can have no parent at all;
+	// -1 on either side is a type this project has not enabled.
+	if childIdx <= 0 || parentIdx < 0 {
+		return false
+	}
+	if childType == TaskTypeSubtask {
+		return parentIdx == childIdx-1
+	}
+	return parentIdx < childIdx
+}
+
 // ValidateTaskParent checks the hierarchy rules for a task of childType in
 // project p against its prospective parent. parent is the resolved parent task
 // (nil when no parent is set, or when the referenced ID was not found — pass
@@ -712,7 +750,7 @@ func ChildTaskTypeFor(p *Project, parentType string) string {
 func ValidateTaskParent(p *Project, childType, childID string, parent *Task, parentSet bool) error {
 	parentType, required := ParentTaskTypeFor(p, childType)
 	if parentType == "" && parentSet {
-		return &DomainError{Code: "TASK_PARENT_NOT_ALLOWED", Message: "a " + strings.ToLower(childType) + " cannot have a parent task", Field: "parentId"}
+		return &DomainError{Code: "TASK_PARENT_NOT_ALLOWED", Message: withArticle(childType) + " cannot have a parent task", Field: "parentId"}
 	}
 	if required && !parentSet {
 		return &DomainError{Code: "TASK_PARENT_REQUIRED", Message: "a subtask requires a parent task", Field: "parentId"}
@@ -723,10 +761,33 @@ func ValidateTaskParent(p *Project, childType, childID string, parent *Task, par
 	if parent == nil || parent.ProjectID != p.ID || parent.ID == childID {
 		return &DomainError{Code: "TASK_PARENT_INVALID", Message: "parent task not found in this project", Field: "parentId"}
 	}
-	if parent.TaskType != parentType {
-		return &DomainError{Code: "TASK_PARENT_TYPE_INVALID", Message: "parent of a " + strings.ToLower(childType) + " must be a " + strings.ToLower(parentType), Field: "parentId"}
+	if !TaskParentTypeAllowed(p, childType, parent.TaskType) {
+		return &DomainError{Code: "TASK_PARENT_TYPE_INVALID", Message: parentTypeMessage(childType, parentType), Field: "parentId"}
 	}
 	return nil
+}
+
+// parentTypeMessage phrases the TASK_PARENT_TYPE_INVALID message. nearest is
+// the type directly above childType; every level above that one is allowed
+// too, so the message says so rather than naming a single type the caller
+// would then take as the only option. A SUBTASK really does have only one.
+func parentTypeMessage(childType, nearest string) string {
+	child, parent := withArticle(childType), withArticle(nearest)
+	if childType == TaskTypeSubtask {
+		return "parent of " + child + " must be " + parent
+	}
+	return "parent of " + child + " must be " + parent + " or a higher level"
+}
+
+// withArticle lowercases a task type and prefixes the right indefinite
+// article — "an epic", "a story". EPIC and INITIATIVE are the vowel-initial
+// two, and a plain "a "+type had been rendering "a epic" in these messages.
+func withArticle(taskType string) string {
+	s := strings.ToLower(taskType)
+	if strings.HasPrefix(s, "e") || strings.HasPrefix(s, "i") {
+		return "an " + s
+	}
+	return "a " + s
 }
 
 // ProjectPriority is an admin-defined additional task priority for one

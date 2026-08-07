@@ -1,6 +1,6 @@
 import qrcode from 'qrcode-generator';
 import { getLocale, i18n, t } from '@octbase/shared/i18n.js';
-import { FIBONACCI_POINTS, STATUSES, STATUS_META, TYPE_META, estimableType, estimateLabel, estimateLimits, estimateText, estimationEnabled, estimationField, estimationUnit, openDescendantsOf, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, taskEstimatable, taskEstimate, typeParentRule } from '@octbase/shared/meta.js';
+import { FIBONACCI_POINTS, STATUSES, STATUS_META, TYPE_META, estimableType, estimateLabel, estimateLimits, estimateText, estimationEnabled, estimationField, estimationUnit, openDescendantsOf, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, taskEstimatable, taskEstimate, typeChain, typeParentAllowed, typeParentRule } from '@octbase/shared/meta.js';
 import { notificationMessage } from '@octbase/shared/notifications.js';
 import { ACTIONS, API_BASE, Auth, BASE_PATH, CHANGES, DESKTOP_URL, INPUTS, IS_PHONE, SUBMITS, USE_STANDALONE_DEMO_AUTH, V, _A0, _A1, _A2, _A3, _dispatch, _register, api, apiErrorMessage, el, esc, html, http, icon, initials, raw, renderDescriptionHTML, toast } from './core.js';
 
@@ -1321,18 +1321,26 @@ async function viewCreateTask(pid) {
 let _ctParents = [];
 
 // ctParentFieldHtml renders the parent picker for the chosen type: candidates
-// are the tasks of the type one level up in the project's chain
-// (typeParentRule); empty for the chain's top type.
+// are the tasks of every type ABOVE it in the project's chain
+// (typeParentAllowed), grouped by type; empty for the chain's top type.
 function ctParentFieldHtml(taskType) {
   const rule = typeParentRule(S.project, taskType);
   if (!rule.parentType) return '';
-  const opts = _ctParents.filter(tk => tk.taskType === rule.parentType);
   const label = t('task.parentLabel');
+  const groups = typeChain(S.project)
+    .filter(ty => typeParentAllowed(S.project, taskType, ty))
+    .map(ty => {
+      const opts = _ctParents.filter(tk => tk.taskType === ty);
+      if (!opts.length) return '';
+      return `<optgroup label="${esc(TYPE_META[ty].label)}">${
+        opts.map(tk=>`<option value="${esc(tk.id)}">${esc((tk.seqNumber!=null?taskKey(tk,S.project)+' — ':'')+tk.title)}</option>`).join('')
+      }</optgroup>`;
+    }).join('');
   return `
-          <label class="field-label" for="ct-parent">${esc(label)} (${esc(TYPE_META[rule.parentType].label)})</label>
+          <label class="field-label" for="ct-parent">${esc(label)}</label>
           <select class="select" id="ct-parent">
             ${rule.required ? '' : `<option value="">${esc(t('task.noParent'))}</option>`}
-            ${opts.map(tk=>`<option value="${esc(tk.id)}">${esc((tk.seqNumber!=null?taskKey(tk,S.project)+' — ':'')+tk.title)}</option>`).join('')}
+            ${groups}
           </select>`;
 }
 

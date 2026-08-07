@@ -56,18 +56,33 @@ function typeChain(project) {
   if (project && project.initiativeEnabled) chain.push('INITIATIVE');
   return chain.concat(['EPIC', 'STORY', 'TASK', 'SUBTASK']);
 }
-// typeParentRule mirrors the backend's ParentTaskTypeFor: the parent of a
-// type is the type directly above it in the project's chain (null at the
-// top or for a type the project has not enabled); only a SUBTASK's parent is
-// mandatory.
+// typeParentRule mirrors the backend's ParentTaskTypeFor: parentType is the
+// type directly above taskType in the project's chain (null at the top or for
+// a type the project has not enabled); only a SUBTASK's parent is mandatory.
+// parentType is the NEAREST allowed parent, not the only one — every level
+// further up is allowed too (typeParentAllowed), so use it for defaults and
+// for the allowed/required questions, not to validate a concrete pair.
 function typeParentRule(project, taskType) {
   const chain = typeChain(project);
   const i = chain.indexOf(taskType);
   if (i <= 0) return { parentType: null, required: false };
   return { parentType: chain[i - 1], required: taskType === 'SUBTASK' };
 }
-// typeChildOf returns the only child type of taskType in the project's chain
-// ('' when the type cannot have children there).
+// typeParentAllowed mirrors the backend's TaskParentTypeAllowed: a parent may
+// be any level ABOVE the child in the project's chain, not just the one
+// directly above, so a task may sit straight under an epic. SUBTASK is the
+// exception — its parent stays exactly a TASK.
+function typeParentAllowed(project, taskType, parentType) {
+  const chain = typeChain(project);
+  const ci = chain.indexOf(taskType);
+  const pi = chain.indexOf(parentType);
+  if (ci <= 0 || pi < 0) return false;
+  if (taskType === 'SUBTASK') return pi === ci - 1;
+  return pi < ci;
+}
+// typeChildOf returns the child type directly below taskType in the project's
+// chain ('' when the type cannot have children there). Like typeParentRule
+// this is the nearest level; any lower type may hang under it.
 function typeChildOf(project, taskType) {
   const chain = typeChain(project);
   const i = chain.indexOf(taskType);
@@ -217,4 +232,4 @@ const STATUSES   = Object.keys(STATUS_META);
 const PRIORITIES = Object.keys(PRIORITY_META);
 const TASK_TYPES = Object.keys(TYPE_META);
 
-export { DEFAULT_BOARD_LANE_LIMIT, ESTIMATION_UNITS, FIBONACCI_POINTS, PRIORITIES, PRIORITY_META, STATUSES, STATUS_META, TASK_TYPES, TYPE_META, boardLaneLimit, estimableType, estimateLabel, estimateLimits, estimateText, estimationEnabled, estimationField, estimationUnit, openDescendantsOf, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, taskEstimatable, taskEstimate, typeChain, typeChildOf, typeParentRule };
+export { DEFAULT_BOARD_LANE_LIMIT, ESTIMATION_UNITS, FIBONACCI_POINTS, PRIORITIES, PRIORITY_META, STATUSES, STATUS_META, TASK_TYPES, TYPE_META, boardLaneLimit, estimableType, estimateLabel, estimateLimits, estimateText, estimationEnabled, estimationField, estimationUnit, openDescendantsOf, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, taskEstimatable, taskEstimate, typeChain, typeChildOf, typeParentAllowed, typeParentRule };

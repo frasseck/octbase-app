@@ -203,6 +203,73 @@ func TestUpdateUser_Success(t *testing.T) {
 	}
 }
 
+// TestUpdateUser_SuperAdminSelfEdit covers OCT-12: a Super Admin may edit
+// their own profile. The another-Super-Admin guard used to match the actor
+// too, which left the role unable to change its own display name at all —
+// there is no self-service profile route, so this is the only write path onto
+// a user record. Role and status stay locked even on the self path, since
+// this must not become a way around the demote/disable rules.
+func TestUpdateUser_SuperAdminSelfEdit(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	if db == nil {
+		return
+	}
+	srv := testutil.NewTestServer(t, db)
+	self := "/api/v1/users/" + testutil.SuperAdminUserID
+
+	// The point of the fix: renaming yourself works.
+	resp := testutil.Do(t, srv, http.MethodPatch, self,
+		map[string]interface{}{"displayName": "Nicole Muster"}, testutil.SuperAdminUserID)
+	testutil.AssertStatus(t, resp, http.StatusOK)
+	var u map[string]interface{}
+	testutil.DecodeJSON(t, resp, &u)
+	if u["displayName"] != "Nicole Muster" {
+		t.Errorf("displayName = %v, want Nicole Muster", u["displayName"])
+	}
+
+	// Self-demotion and self-disabling stay refused: the first would strip the
+	// installation of its only unrestricted role, the second would lock the
+	// signed-in account out of itself.
+	for _, c := range []struct {
+		name string
+		body map[string]interface{}
+	}{
+		{"self demote", map[string]interface{}{"globalRole": "USER"}},
+		{"self disable", map[string]interface{}{"status": "disabled"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			r := testutil.Do(t, srv, http.MethodPatch, self, c.body, testutil.SuperAdminUserID)
+			defer func() { _ = r.Body.Close() }()
+			if r.StatusCode != http.StatusForbidden {
+				t.Errorf("status = %d, want 403", r.StatusCode)
+			}
+		})
+	}
+
+	// Restating the current status is not a change, so it is not refused —
+	// the guard is about moving a Super Admin's status, not about the field
+	// appearing in the body alongside an edit.
+	keep := testutil.Do(t, srv, http.MethodPatch, self,
+		map[string]interface{}{"displayName": "Nicole M.", "status": "active"}, testutil.SuperAdminUserID)
+	testutil.AssertStatus(t, keep, http.StatusOK)
+
+	// A *different* Super Admin is still off limits — the guard narrowed to
+	// exclude the actor, it did not go away.
+	other := "00000000-0000-0000-0000-0000000000a1"
+	if _, err := db.Exec(
+		`INSERT INTO users (id,email,display_name,global_role,status,is_active,created_at,updated_at)
+		 VALUES ($1,'other-super@test.dev','Other Super','SUPER_ADMIN','active',true,now(),now())`, other,
+	); err != nil {
+		t.Fatalf("seed second super admin: %v", err)
+	}
+	forbid := testutil.Do(t, srv, http.MethodPatch, "/api/v1/users/"+other,
+		map[string]interface{}{"displayName": "Hijacked"}, testutil.SuperAdminUserID)
+	defer func() { _ = forbid.Body.Close() }()
+	if forbid.StatusCode != http.StatusForbidden {
+		t.Errorf("edit another Super Admin: status = %d, want 403", forbid.StatusCode)
+	}
+}
+
 func TestUpdateUser_Errors(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	if db == nil {
