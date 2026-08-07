@@ -70,6 +70,23 @@ All notable changes to Octbase are documented here.
 
 ### Changed
 
+- **The OAuth callback test no longer depends on the environment it runs in,
+  and the redirect branch it never covered is now tested.** `GET
+  /api/v1/oauth/{provider}/callback` answers 200 JSON, or a 302 to
+  `OCTBASE_APP_URL` when that is set. `TestOAuthCallback_StoresTokens` asserted
+  the 200 without pinning the variable, so which branch it exercised was decided
+  by ambient state — and `testutil.Do` follows redirects with
+  `http.DefaultClient`, so on a machine where `OCTBASE_APP_URL` was exported
+  (exporting a stack's `.env` to pick up `TEST_DATABASE_URL` is the usual way to
+  run the suite) the test issued a **real outbound HTTPS request** to whatever
+  host that named, and failed on that host's TLS certificate — an error naming
+  neither OAuth nor the branch it had silently taken. It now pins
+  `OCTBASE_APP_URL` empty, and a new `TestOAuthCallback_RedirectsToAppURL`
+  covers the 302 with a client that does not follow it, asserting the
+  `Location` header against an unroutable `.invalid` host so a regression that
+  starts following the redirect fails loudly instead of reaching a real server.
+  No production code changed.
+
 - **The default `OCTBASE_SMTP_FROM` is now `noreply@octbase.io`** (was
   `noreply@beyags.com`), catching the fallback up with the domain rename. Every
   deployment sets the variable explicitly, so this changes nothing on a
