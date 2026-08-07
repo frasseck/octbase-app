@@ -41,6 +41,20 @@ All notable changes to Octbase are documented here.
 
 ### Fixed
 
+- **The Settings password form no longer shows a warning sign before anything
+  is wrong.** Its inline error box is hidden with the HTML `hidden` attribute,
+  which the UA stylesheet implements as a plain `display:none` — so
+  `.form-error { display: flex }` outranked it and the empty box was painted
+  from the moment the page opened. With no message in it, all that showed was
+  the `::before` ⚠ floating above the *Change password* button, which read as a
+  warning about the button rather than as an error that had not happened yet
+  (reported as "what is this warning sign for? I don't get it"). `[hidden]` now
+  restates `display: none !important` alongside the `.hidden` class, so both
+  spellings hide for real and the next use of the attribute is not bitten the
+  same way. The existing e2e tests missed it because `:not([hidden])` asks
+  about the attribute, not about what is on screen; the new one asks the
+  browser whether the box is visible.
+
 - **A Super Admin can edit their own profile again.**
   `PATCH /api/v1/users/{userId}` refused every `SUPER_ADMIN` target with
   `403 "cannot modify another Super Admin"` — including the signed-in actor,

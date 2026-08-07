@@ -1340,6 +1340,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
 .divider { height: 0.0625rem; background: var(--md-outline-variant); margin: var(--space-3) 0; }
 .tag { display: inline-flex; padding: var(--space-1) var(--space-3); border-radius: var(--md-full); font-size: 0.75rem; font-weight: 500; background: var(--md-surface-c-high); color: var(--md-on-surface-variant); }
 .hidden { display: none !important; }
+/* The `hidden` ATTRIBUTE only gets `display:none` from the UA stylesheet, which
+   any author `display` rule outranks — so `<p class="form-error" hidden>` stayed
+   on screen as a bare ⚠ with no message next to the Settings password button.
+   Restate it with the same weight `.hidden` uses so both spellings really hide. */
+[hidden] { display: none !important; }
 .text-danger { color: var(--md-error); }
 
 /* ── View layout ── */
