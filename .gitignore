@@ -16,8 +16,16 @@ octbase-api/octbase.db
 octbase-api/vendor/
 
 .vscode
-.env.local
-.env
+
+# Environment files. The glob is deliberate: the previous pair of literal
+# entries (.env and .env.local) matched those two names and nothing else, so
+# every neighbouring variant a human or a script produces — .env.dev, .env.prod,
+# and above all the .env.bak.<timestamp> that editing a live .env tends to leave
+# behind — stayed untracked-but-committable while holding the same SMTP relay
+# password, JWT signing secret and database URL as the file it was copied from.
+# .env.example is the one that must stay in the repo; it holds no real values.
+.env*
+!.env.example
 
 # Editor and OS
 .DS_Store

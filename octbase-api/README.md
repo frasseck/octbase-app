@@ -60,7 +60,7 @@ go build -o octbase-api ./cmd/octbase-api
 | `OCTBASE_APP_URL` | `http://localhost:8080` | Base URL used to build links in emails (invitation accept, task deep-links) |
 | `OCTBASE_SMTP_HOST` | _(empty)_ | SMTP server host. **Leave blank to log emails to stdout** instead of sending |
 | `OCTBASE_SMTP_PORT` | `587` | SMTP server port |
-| `OCTBASE_SMTP_FROM` | `noreply@beyags.com` | `From` address on outgoing mail |
+| `OCTBASE_SMTP_FROM` | `noreply@octbase.io` | `From` address on outgoing mail |
 | `OCTBASE_SMTP_USER` | _(empty)_ | SMTP username (omit for unauthenticated relays like Mailpit) |
 | `OCTBASE_SMTP_PASS` | _(empty)_ | SMTP password |
 

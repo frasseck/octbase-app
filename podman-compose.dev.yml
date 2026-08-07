@@ -11,8 +11,20 @@
 services:
   octbase-api:
     environment:
-      OCTBASE_SMTP_HOST: "${OCTBASE_SMTP_HOST:-mailpit}"
-      OCTBASE_SMTP_PORT: "${OCTBASE_SMTP_PORT:-1025}"
+      # Hardcoded, not "${OCTBASE_SMTP_HOST:-mailpit}": the :- default only
+      # applies when the variable is UNSET, so once a developer put real relay
+      # credentials in .env this overlay quietly started sending through the
+      # production relay — the exact opposite of what it exists for. Layering
+      # this file must always mean capture. Production never layers it (the
+      # client stacks build from podman-compose.yml + podman-compose.client.yml),
+      # so the real relay still comes from the client's .env there.
+      OCTBASE_SMTP_HOST: "mailpit"
+      OCTBASE_SMTP_PORT: "1025"
+      # Mailpit accepts anything, so blank the credentials too: with a user set
+      # the API would attempt AUTH against a server that offers none and fail
+      # before delivering (mailer.go deliver()).
+      OCTBASE_SMTP_USER: ""
+      OCTBASE_SMTP_PASS: ""
     depends_on:
       mailpit:
         condition: service_started

@@ -25,7 +25,7 @@ func TestNew_DefaultsToDevMode(t *testing.T) {
 	if m.port != "587" {
 		t.Errorf("port = %q, want default 587", m.port)
 	}
-	if m.from != "noreply@beyags.com" {
+	if m.from != "noreply@octbase.io" {
 		t.Errorf("from = %q, want default", m.from)
 	}
 }

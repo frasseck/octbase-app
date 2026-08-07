@@ -4,6 +4,40 @@ All notable changes to Octbase are documented here.
 
 ## Unreleased
 
+### Added
+
+- **Outgoing mail is now observable.** The mailer logs its resolved SMTP
+  configuration once at startup (`host`, `port`, `from`, `user`, and whether a
+  password is set — never the password itself), and one `email sent` line per
+  successful delivery carrying the subject, the relay address and the elapsed
+  time. Previously every line in the package reported a failure, so silence
+  meant either "delivered" or "nothing ever tried to send", and the two were
+  indistinguishable: an instance deployed with an empty `OCTBASE_SMTP_PASS`, or
+  authenticating as the wrong mailbox on a relay hosting several, looked exactly
+  like a healthy one from the outside — a password reset that never arrived left
+  no trace, because `auth/forgot-password` answers `202` either way by design.
+  The success line mirrors the queue's failure line and logs the subject rather
+  than the recipient: container logs are not covered by the retention purge that
+  covers the audit and activity tables, so they must not accumulate a record of
+  who was mailed.
+
+### Changed
+
+- **The default `OCTBASE_SMTP_FROM` is now `noreply@octbase.io`** (was
+  `noreply@beyags.com`), catching the fallback up with the domain rename. Every
+  deployment sets the variable explicitly, so this changes nothing on a
+  configured stack — but the fallback is what a stack that *forgot* the variable
+  sends as, and a sender on a domain the relay does not host is exactly the
+  case that fails SPF and lands in spam rather than erroring visibly. The same
+  stale address was documented as the default in `.env.example`,
+  `podman-compose.yml`, both `README`s and `docs/operations.md`; all now agree.
+  `docs/technical_documentation.md` §6.4's example sending domain follows, as
+  does the example alert address in `octbase-operations/README.md`, now
+  `support@octbase.io`. That last one is illustrative only — it shows how to
+  pipe `check-health.sh --json` into a `mail` command and is read by nothing;
+  the fleet's real alert recipient is `alert_email` in `octbase-service`, which
+  this repo does not carry.
+
 ### Security
 
 - **URL-borne credentials are redacted from the API request log.** chi's request

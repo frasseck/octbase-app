@@ -155,7 +155,7 @@ services:
       # mailbox holds password-reset and invitation links).
       OCTBASE_SMTP_HOST: "${OCTBASE_SMTP_HOST:-}"
       OCTBASE_SMTP_PORT: "${OCTBASE_SMTP_PORT:-587}"
-      OCTBASE_SMTP_FROM: "${OCTBASE_SMTP_FROM:-noreply@beyags.com}"
+      OCTBASE_SMTP_FROM: "${OCTBASE_SMTP_FROM:-noreply@octbase.io}"
       OCTBASE_SMTP_USER: "${OCTBASE_SMTP_USER:-}"
       OCTBASE_SMTP_PASS: "${OCTBASE_SMTP_PASS:-}"
       # Uploaded task attachments live on the volume mounted below. Kept explicit
