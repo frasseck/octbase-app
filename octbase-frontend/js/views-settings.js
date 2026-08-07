@@ -118,6 +118,10 @@ async function renderSettingsPage() {
 
       <div class="grid-2col">
       <div class="settings-col">
+        <section class="settings-section" id="settings-name-section">
+          ${raw(renderNameSection())}
+        </section>
+
         <section class="settings-section" id="settings-profile-section">
           ${raw(renderProfileSection())}
         </section>
@@ -169,6 +173,23 @@ function renderPrefsSection() {
 function refreshPrefsSection() {
   const mount = el('#settings-prefs-section');
   if (mount) mount.innerHTML = renderPrefsSection();
+}
+
+// Display name: the one profile field a user may change about themselves
+// (PATCH /users/me). The email is deliberately absent — it is the login
+// identity and only an administrator moves it, which the description says so
+// nobody hunts for a field that is not there.
+function renderNameSection() {
+  const u = S.user || {};
+  return `
+    <h3 class="settings-section-title">${t('settings.nameTitle')}</h3>
+    <p class="settings-desc">${t('settings.nameDesc')}</p>
+    <form class="settings-name-form" data-submit="saveDisplayName">
+      <label class="form-label" for="settings-display-name">${t('settings.nameLabel')}</label>
+      <input class="form-input" id="settings-display-name" name="displayName" maxlength="100"
+             value="${esc(u.name || u.displayName || '')}" autocomplete="name">
+      <button type="submit" class="btn btn-primary btn-sm">${t('settings.nameSave')}</button>
+    </form>`;
 }
 
 // Profile picture: upload (multipart), preview and remove. The avatar chip is
@@ -534,6 +555,40 @@ function clearPasswordError() {
     .forEach(id => { const i = el('#' + id); if (i) i.removeAttribute('aria-invalid'); });
 }
 
+// saveDisplayName writes the caller's own name via PATCH /users/me and keeps
+// the in-memory user in step, because the name is drawn in the top bar and on
+// every avatar chip — re-reading the section alone would leave the rest of the
+// shell showing the old one until the next reload.
+async function saveDisplayName(e) {
+  e.preventDefault();
+  const input = el('#settings-display-name');
+  const name = (input?.value || '').trim();
+  if (!name) {
+    toast(t('errors.validation.displayNameRequired'), 'error');
+    input?.focus();
+    return;
+  }
+  try {
+    const updated = await api.users.updateMe({ displayName: name });
+    // `name` is the alias GET /auth/me serves; keep both in step so whichever
+    // one a render path reads gives the same answer.
+    S.user = { ...(S.user || {}), name: updated.displayName, displayName: updated.displayName };
+    refreshNameSection();
+    // Repaints the topbar name and the avatar initials in place — a rename that
+    // left "JS" next to "Jane Doe" would look like the save had not taken.
+    applyUserToShell();
+    toast(t('settings.nameUpdated'), 'success');
+  } catch (err) {
+    toast(apiErrorMessage(err), 'error');
+    input?.focus();
+  }
+}
+
+function refreshNameSection() {
+  const mount = el('#settings-name-section');
+  if (mount) mount.innerHTML = renderNameSection();
+}
+
 async function changePasswordSubmit(e) {
   e.preventDefault();
   clearPasswordError();
@@ -587,6 +642,7 @@ registerChanges({
 registerSubmits({
   confirmMfaEnrollmentSubmit: (el, ev) => confirmMfaEnrollmentSubmit(ev),
   changePasswordSubmit: (el, ev) => changePasswordSubmit(ev),
+  saveDisplayName: (el, ev) => saveDisplayName(ev),
 });
 
 export { openMfaDisableModal, openMfaRegenerateModal, reconcilePreferences, renderSettingsPage, startMfaEnrollment };

@@ -262,7 +262,11 @@
     "userNotFound": "Benutzer nicht gefunden.",
     "versionConflict": "Dieses Element wurde inzwischen von jemand anderem geändert. Bitte neu laden und erneut versuchen.",
     "viewLoadFailed": "Fehler beim Laden der Ansicht",
-    "boardLaneLimitInvalid": "Die Anzahl Karten pro Spalte muss zwischen 0 (alle anzeigen) und 500 liegen."
+    "boardLaneLimitInvalid": "Die Anzahl Karten pro Spalte muss zwischen 0 (alle anzeigen) und 500 liegen.",
+    "validation": {
+      "displayNameRequired": "Anzeigename ist erforderlich",
+      "displayNameTooLong": "Anzeigename ist zu lang (maximal 100 Zeichen)"
+    }
   },
   "notifications": {
     "title": "Benachrichtigungen",
@@ -324,7 +328,11 @@
       "changed": "Passwort geändert. Andere Geräte wurden abgemeldet.",
       "mismatch": "Die beiden neuen Passwörter stimmen nicht überein.",
       "required": "Geben Sie Ihr aktuelles und ein neues Passwort ein."
-    }
+    },
+    "nameTitle": "Anzeigename",
+    "nameLabel": "Dein Name",
+    "nameSave": "Name speichern",
+    "nameUpdated": "Anzeigename aktualisiert"
   },
   "theme": {
     "system": "System",

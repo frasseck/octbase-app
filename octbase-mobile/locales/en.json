@@ -262,7 +262,11 @@
     "userNotFound": "User not found.",
     "versionConflict": "This item was changed by someone else. Reload and try again.",
     "viewLoadFailed": "Error loading view",
-    "boardLaneLimitInvalid": "The number of cards per lane must be between 0 (show all) and 500."
+    "boardLaneLimitInvalid": "The number of cards per lane must be between 0 (show all) and 500.",
+    "validation": {
+      "displayNameRequired": "Display name is required",
+      "displayNameTooLong": "Display name is too long (100 characters maximum)"
+    }
   },
   "notifications": {
     "title": "Notifications",
@@ -324,7 +328,11 @@
       "changed": "Password changed. Other devices have been signed out.",
       "mismatch": "The two new passwords do not match.",
       "required": "Enter your current password and a new one."
-    }
+    },
+    "nameTitle": "Display name",
+    "nameLabel": "Your name",
+    "nameSave": "Save name",
+    "nameUpdated": "Display name updated"
   },
   "theme": {
     "system": "System",

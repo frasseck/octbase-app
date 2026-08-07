@@ -3,6 +3,7 @@ package identityaccess_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/octbase/octbase-api/internal/testutil"
@@ -519,5 +520,156 @@ func TestAssignTask_GlobalAdminReviewer(t *testing.T) {
 	// The creator is recorded as the reporter, which is what the UI shows.
 	if task["reporterId"] != testutil.DemoUserID {
 		t.Errorf("reporterId = %v, want %v", task["reporterId"], testutil.DemoUserID)
+	}
+}
+
+// TestUpdateMe covers the self-service profile edit (OCT-26). The point of the
+// route is that it is NOT privileged: a plain USER must be able to rename
+// themselves, which before this existed nobody below Super Admin could do.
+func TestUpdateMe(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+
+	// Every global role can rename itself — this is the whole feature.
+	for _, actor := range []struct{ name, id string }{
+		{"plain user", testutil.SecondUserID},
+		{"admin", testutil.DemoUserID},
+		{"super admin", testutil.SuperAdminUserID},
+	} {
+		t.Run(actor.name, func(t *testing.T) {
+			want := "Renamed " + actor.name
+			resp := testutil.Do(t, srv, http.MethodPatch, "/api/v1/users/me",
+				map[string]interface{}{"displayName": want}, actor.id)
+			testutil.AssertStatus(t, resp, http.StatusOK)
+			var u map[string]interface{}
+			testutil.DecodeJSON(t, resp, &u)
+			if u["displayName"] != want {
+				t.Errorf("displayName = %v, want %v", u["displayName"], want)
+			}
+			// Read it back rather than trusting the write's response body.
+			back := testutil.Do(t, srv, http.MethodGet, "/api/v1/users/me", nil, actor.id)
+			testutil.AssertStatus(t, back, http.StatusOK)
+			var got map[string]interface{}
+			testutil.DecodeJSON(t, back, &got)
+			if got["displayName"] != want {
+				t.Errorf("read back displayName = %v, want %v", got["displayName"], want)
+			}
+		})
+	}
+}
+
+// TestUpdateMe_EmailIsNotSelfEditable is the other half of the ask: the name
+// yes, the address no. Email is the login identity, so it stays on the
+// Super-Admin route — and the refusal must name that route rather than read as
+// an unknown field.
+func TestUpdateMe_EmailIsNotSelfEditable(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+
+	for _, field := range []string{"email", "globalRole", "status"} {
+		t.Run(field, func(t *testing.T) {
+			resp := testutil.Do(t, srv, http.MethodPatch, "/api/v1/users/me",
+				map[string]interface{}{field: "attacker@evil.test"}, testutil.SecondUserID)
+			defer func() { _ = resp.Body.Close() }()
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400", resp.StatusCode)
+			}
+			var body map[string]interface{}
+			testutil.DecodeJSON(t, resp, &body)
+			if body["code"] != "UNSUPPORTED_FIELD" {
+				t.Errorf("code = %v, want UNSUPPORTED_FIELD", body["code"])
+			}
+			msg, _ := body["message"].(string)
+			if !strings.Contains(msg, "/api/v1/users/{userId}") {
+				t.Errorf("message %q should point at the admin route", msg)
+			}
+		})
+	}
+
+	// The address really is untouched — the rejection is not cosmetic.
+	back := testutil.Do(t, srv, http.MethodGet, "/api/v1/users/me", nil, testutil.SecondUserID)
+	testutil.AssertStatus(t, back, http.StatusOK)
+	var u map[string]interface{}
+	testutil.DecodeJSON(t, back, &u)
+	if u["email"] != "second@octbase.dev" {
+		t.Errorf("email = %v, want it unchanged", u["email"])
+	}
+}
+
+func TestUpdateMe_Validation(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+
+	cases := []struct {
+		name string
+		body map[string]interface{}
+		want int
+	}{
+		{"blank", map[string]interface{}{"displayName": "   "}, http.StatusUnprocessableEntity},
+		{"absent", map[string]interface{}{}, http.StatusUnprocessableEntity},
+		{"too long", map[string]interface{}{"displayName": strings.Repeat("a", 101)}, http.StatusUnprocessableEntity},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			resp := testutil.Do(t, srv, http.MethodPatch, "/api/v1/users/me", c.body, testutil.SecondUserID)
+			defer func() { _ = resp.Body.Close() }()
+			if resp.StatusCode != c.want {
+				t.Errorf("status = %d, want %d", resp.StatusCode, c.want)
+			}
+		})
+	}
+
+	// The cap counts runes, not bytes: 100 multi-byte characters is a legal
+	// name even though it is 300 bytes.
+	ok := testutil.Do(t, srv, http.MethodPatch, "/api/v1/users/me",
+		map[string]interface{}{"displayName": strings.Repeat("あ", 100)}, testutil.SecondUserID)
+	testutil.AssertStatus(t, ok, http.StatusOK)
+
+	// Surrounding whitespace is trimmed rather than stored.
+	trimmed := testutil.Do(t, srv, http.MethodPatch, "/api/v1/users/me",
+		map[string]interface{}{"displayName": "  Padded Name  "}, testutil.SecondUserID)
+	testutil.AssertStatus(t, trimmed, http.StatusOK)
+	var u map[string]interface{}
+	testutil.DecodeJSON(t, trimmed, &u)
+	if u["displayName"] != "Padded Name" {
+		t.Errorf("displayName = %q, want it trimmed", u["displayName"])
+	}
+}
+
+// TestUpdateMe_CannotRenameAnyoneElse pins the boundary the route must not
+// cross: "me" is the token, not a user id, so there is no way to aim it at
+// another account. Renaming someone else stays a Super Admin action.
+func TestUpdateMe_CannotRenameAnyoneElse(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+
+	// A plain USER aiming the admin route at another account is refused...
+	resp := testutil.Do(t, srv, http.MethodPatch, "/api/v1/users/"+testutil.DemoUserID,
+		map[string]interface{}{"displayName": "Hijacked"}, testutil.SecondUserID)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("plain user patching another account: status = %d, want 403", resp.StatusCode)
+	}
+	// ...and the target's name is untouched.
+	back := testutil.Do(t, srv, http.MethodGet, "/api/v1/users/me", nil, testutil.DemoUserID)
+	testutil.AssertStatus(t, back, http.StatusOK)
+	var u map[string]interface{}
+	testutil.DecodeJSON(t, back, &u)
+	if u["displayName"] == "Hijacked" {
+		t.Error("a plain user renamed another account")
+	}
+}
+
+// TestUpdateMe_Unauthenticated keeps the route behind auth — it is unprivileged,
+// not public.
+func TestUpdateMe_Unauthenticated(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+
+	resp := testutil.Do(t, srv, http.MethodPatch, "/api/v1/users/me",
+		map[string]interface{}{"displayName": "Nobody"}, "")
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("status = %d, want 401", resp.StatusCode)
 	}
 }

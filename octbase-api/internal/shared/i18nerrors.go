@@ -8,6 +8,7 @@ import "strings"
 // mapped to a key by code alone like other error codes.
 var validationMessageKeys = map[string]string{
 	"displayName is required":                     "errors.validation.displayNameRequired",
+	"displayName is too long":                     "errors.validation.displayNameTooLong",
 	"email is required":                           "errors.validation.emailRequired",
 	"name is required":                            "errors.validation.nameRequired",
 	"password is required":                        "errors.validation.passwordRequired",

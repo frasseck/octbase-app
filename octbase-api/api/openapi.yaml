@@ -1089,6 +1089,32 @@ paths:
       responses:
         '200': { description: Current user, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Users]
+      summary: Edit my own profile
+      description: >
+        Self-service profile edit, available to every authenticated user
+        regardless of global role. `displayName` is the only editable field:
+        `email`, `globalRole` and `status` are rejected with
+        `400 UNSUPPORTED_FIELD` and stay on `PATCH /api/v1/users/{userId}`,
+        which requires Super Admin. The name is trimmed and capped at 100
+        characters (counted in runes, not bytes).
+      operationId: usersMeUpdate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string, maxLength: 100 }
+              required: [displayName]
+      responses:
+        '200': { description: Updated user, content: { application/json: { schema: { $ref: '#/components/schemas/AdminUser' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /api/v1/users/me/avatar:
     post:
       tags: [Users]

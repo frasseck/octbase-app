@@ -21,7 +21,7 @@ import time
 import pytest
 import requests
 from conftest import (API_BASE, API_PREFIX, DEMO_USER_EMAIL, DEMO_USER_PASSWORD,
-                      SHORT, TIMEOUT, settle)
+                      SHORT, TIMEOUT, poll_until, settle, unique)
 
 
 def _totp(secret: str, offset: int = 0) -> str:
@@ -399,3 +399,52 @@ class TestSettingsTerminology:
         task = api.get("/api/tasks/00000000-0000-0000-0000-000000000201")
         assert "storyPoints" in task, "storyPoints must not be renamed by a display preference"
         assert "sprintId" in task
+
+
+class TestSettingsDisplayName:
+    """PATCH /users/me — the self-service rename (OCT-26). Before it existed
+    only a Super Admin could change anybody's name, including their own, so a
+    plain user had to ask an administrator to correct a typo in their own name.
+
+    The name is restored after each test: the demo user is seeded public
+    surface that other tests and the seed pin by value."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_name(self, api):
+        original = api.get("/api/auth/me")["displayName"]
+        yield
+        api.patch("/api/users/me", {"displayName": original})
+
+    def test_section_is_present_with_the_current_name(self, settings_page, api):
+        assert settings_page.is_visible("#settings-name-section")
+        field = settings_page.query_selector("#settings-display-name")
+        assert field is not None, "the display-name input is missing"
+        assert field.input_value() == api.get("/api/auth/me")["displayName"]
+
+    def test_email_is_not_offered_for_editing(self, settings_page):
+        # The ask was explicit: the name yes, the address no. An input the
+        # server would refuse is worse than no input at all.
+        section = settings_page.query_selector("#settings-name-section")
+        assert section.query_selector("input[type='email']") is None
+        assert section.query_selector("input[name='email']") is None
+
+    def test_saving_renames_the_user_and_updates_the_topbar(self, settings_page, api):
+        new_name = unique("Renamed")
+        settings_page.fill("#settings-display-name", new_name)
+        settings_page.click("#settings-name-section button[type='submit']")
+        settle(settings_page)
+
+        # The server is the authority — read it back rather than trusting the toast.
+        assert poll_until(
+            lambda: api.get("/api/auth/me")["displayName"] == new_name,
+            message="display name was not persisted",
+        )
+        # And the shell repaints, so the page cannot show a stale name.
+        assert new_name in settings_page.inner_text("#user-name")
+
+    def test_blank_name_is_refused_and_changes_nothing(self, settings_page, api):
+        before = api.get("/api/auth/me")["displayName"]
+        settings_page.fill("#settings-display-name", "   ")
+        settings_page.click("#settings-name-section button[type='submit']")
+        settle(settings_page)
+        assert api.get("/api/auth/me")["displayName"] == before
