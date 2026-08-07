@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/octbase/octbase-api/internal/auditlog"
@@ -25,6 +26,7 @@ func NewHandler(db *sql.DB, users *UserRepo, memberships *MembershipRepo, audit 
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/v1/users/me", h.GetMe)
+	r.Patch("/api/v1/users/me", h.UpdateMe)
 	r.Get("/api/v1/projects/{projectId}/members", h.ListMembers)
 	r.Get("/api/v1/projects/{projectId}/assignable-users", h.ListAssignableUsers)
 	r.Get("/api/v1/projects/{projectId}/memberships", h.ListMemberships)
@@ -72,6 +74,83 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 	if u == nil {
 		shared.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
+		return
+	}
+	shared.WriteJSON(w, http.StatusOK, u)
+}
+
+// MaxDisplayNameLen caps a self-chosen display name. The column is unbounded
+// text and the admin route never needed a limit, but this one is reachable by
+// every authenticated user, and the name is rendered on cards, mentions and
+// avatars all over both SPAs — so the cap is about what the rest of the app
+// can sensibly draw, not about storage.
+const MaxDisplayNameLen = 100
+
+// UpdateMe lets the caller edit their own profile. Display name only: email is
+// the login identity, and handing every user a self-service way to move it
+// would turn an account takeover into a locked door (which is also why the
+// admin path mails the *old* address when it changes one). Email and global
+// role therefore stay on PATCH /users/{userId}, behind Super Admin.
+//
+// This is the counterpart to POST /users/me/avatar — the same "my own profile"
+// surface, so it lives beside it rather than in usermgmt, whose routes are all
+// administrative.
+func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	userID := shared.GetUserID(r)
+	if userID == "" {
+		shared.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication required")
+		return
+	}
+
+	var req struct {
+		DisplayName *string `json:"displayName"`
+	}
+	// email/globalRole/status get a message naming where they *do* live, so the
+	// refusal reads as a boundary rather than as a typo in the field name.
+	if !shared.DecodePatch(w, r, map[string]bool{"displayName": true}, map[string]string{
+		"email":      "email is not self-editable; an administrator changes it via PATCH /api/v1/users/{userId}",
+		"globalRole": "globalRole is not self-editable; an administrator changes it via PATCH /api/v1/users/{userId}",
+		"status":     "status is not self-editable; an administrator changes it via PATCH /api/v1/users/{userId}",
+	}, &req) {
+		return
+	}
+	if req.DisplayName == nil {
+		// Nothing to do, but answering 200 with the unchanged user would hide a
+		// client that sent the wrong shape entirely.
+		shared.WriteValidationError(w, "VALIDATION_ERROR", "displayName is required", "displayName")
+		return
+	}
+
+	displayName := strings.TrimSpace(*req.DisplayName)
+	if displayName == "" {
+		shared.WriteValidationError(w, "VALIDATION_ERROR", "displayName is required", "displayName")
+		return
+	}
+	// Count runes, not bytes: a name in a non-Latin script would otherwise get
+	// a limit a fraction of the one a Latin name gets.
+	if len([]rune(displayName)) > MaxDisplayNameLen {
+		shared.WriteValidationError(w, "VALIDATION_ERROR", "displayName is too long", "displayName")
+		return
+	}
+
+	if err := h.users.SetDisplayName(userID, displayName); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			shared.WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "user not found")
+			return
+		}
+		shared.WriteServerError(w, r, err)
+		return
+	}
+
+	// Audited like the admin-side edit: a rename changes how this account is
+	// identified everywhere it appears, so it must be attributable. Metadata
+	// carries no name — audit rows outlive a later GDPR erasure of the account.
+	h.audit.Write(userID, auditlog.ActionUserUpdated, "user", userID,
+		`{"self":true,"field":"displayName"}`, shared.ClientIP(r), r.UserAgent())
+
+	u, err := h.users.FindByID(userID)
+	if err != nil {
+		shared.WriteServerError(w, r, err)
 		return
 	}
 	shared.WriteJSON(w, http.StatusOK, u)

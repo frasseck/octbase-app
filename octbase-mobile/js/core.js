@@ -438,6 +438,9 @@ const api = {
     // 24h Cache-Control, so without a per-version URL the browser would keep
     // serving a replaced avatar's old bytes. The token makes each version a
     // distinct, hard-cacheable URL.
+    // Self-service profile edit — open to every user, unlike update() above.
+    // displayName only; email stays on the Super-Admin update().
+    updateMe: (d)        => http.patch(`${V}/users/me`, d),
     avatarBlob:   (id,v) => http.getBlob(`${V}/users/${id}/avatar${v ? `?v=${encodeURIComponent(v)}` : ''}`),
     uploadAvatar: (file) => http.upload(`${V}/users/me/avatar`, file),
     deleteAvatar: ()     => http.del(`${V}/users/me/avatar`),

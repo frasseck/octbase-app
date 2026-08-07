@@ -6,6 +6,22 @@ All notable changes to Octbase are documented here.
 
 ### Added
 
+- **Every user can now change their own display name**, from the desktop
+  Settings page or the mobile profile sheet. `PATCH /api/v1/users/me` is the
+  new self-service route, sitting beside the `GET` and the avatar endpoints
+  that already lived at that path. Before it, the only write onto a user record
+  was the Super-Admin-only `PATCH /users/{userId}`, so correcting a typo in
+  your own name meant asking an administrator to do it for you.
+  **The email is deliberately not self-editable**: it is the login identity,
+  which is why the admin path mails the *old* address whenever it changes one,
+  and handing every account a self-service way to move it would turn a session
+  takeover into a locked door. `email`, `globalRole` and `status` are refused
+  with `400 UNSUPPORTED_FIELD` and a message naming the admin route, rather
+  than the generic unknown-field wording, so the refusal reads as a boundary
+  instead of a typo. Names are trimmed and capped at 100 characters, counted in
+  runes so a name in a non-Latin script is not given a fraction of the limit a
+  Latin one gets. The rename is audit-logged like the admin-side edit.
+
 - **A task may now hang under any level above it, not only the one directly
   above.** A `TASK` can sit straight under an `EPIC` without a `STORY` invented
   to hold it; a `STORY` may hang off a `THEME` where those levels are on. The

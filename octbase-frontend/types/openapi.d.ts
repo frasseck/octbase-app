@@ -477,7 +477,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Edit my own profile
+         * @description Self-service profile edit, available to every authenticated user regardless of global role. `displayName` is the only editable field: `email`, `globalRole` and `status` are rejected with `400 UNSUPPORTED_FIELD` and stay on `PATCH /api/v1/users/{userId}`, which requires Super Admin. The name is trimmed and capped at 100 characters (counted in runes, not bytes).
+         */
+        patch: operations["usersMeUpdate"];
         trace?: never;
     };
     "/api/v1/users/me/avatar": {
@@ -3946,6 +3950,36 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    usersMeUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    displayName: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     usersMeAvatarUpload: {

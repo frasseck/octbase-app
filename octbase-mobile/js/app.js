@@ -1517,6 +1517,25 @@ async function avatarPickMobile(node) {
     toast(apiErrorMessage(e), 'error');
   }
 }
+// saveDisplayNameMobile writes the caller's own name via PATCH /users/me. The
+// email beside it in the sheet stays read-only: only an administrator moves a
+// sign-in address. Reopening the sheet redraws the header row and the avatar
+// initials from the updated user.
+async function saveDisplayNameMobile(form, ev) {
+  ev.preventDefault();
+  const input = el('#profile-name-mobile');
+  const name = (input?.value || '').trim();
+  if (!name) { toast(t('errors.validation.displayNameRequired'), 'error'); input?.focus(); return; }
+  try {
+    const updated = await api.users.updateMe({ displayName: name });
+    S.user = { ...(S.user || {}), name: updated.displayName, displayName: updated.displayName };
+    toast(t('settings.nameUpdated'), 'success');
+    openProfile();
+  } catch (e) {
+    toast(apiErrorMessage(e), 'error');
+    input?.focus();
+  }
+}
 async function avatarRemoveMobile() {
   try {
     await api.users.deleteAvatar();
@@ -1545,6 +1564,11 @@ function openProfile() {
         <div class="row-sub">${esc(u.email||'')}</div>
       </div>
     </div>
+    <form class="sheet-name-form" data-submit="saveDisplayNameMobile">
+      <label class="field-label" for="profile-name-mobile">${esc(t('settings.nameLabel'))}</label>
+      <input class="input" id="profile-name-mobile" maxlength="100" value="${esc(u.name||'')}" autocomplete="name">
+      <button type="submit" class="btn btn-primary btn-block">${esc(t('settings.nameSave'))}</button>
+    </form>
     <label class="sheet-opt" for="avatar-input-mobile">${icon('edit')}<span>${t('settings.profileUpload')}</span></label>
     <input type="file" id="avatar-input-mobile" accept="image/png,image/jpeg,image/gif,image/webp" data-change="avatarPickMobile" style="display:none" aria-label="${t('settings.profileUpload')}">
     ${u.avatarUpdatedAt ? `<button type="button" class="sheet-opt" data-act="avatarRemoveMobile">${icon('delete')}<span>${t('settings.profileRemove')}</span></button>` : ''}
@@ -2048,6 +2072,7 @@ function initDelegation() {
   SUBMITS.doResetPasswordMobile = (el, ev) => doResetPasswordMobile(el, ev, el.dataset.a0);
   SUBMITS.confirmMfaEnrollmentMobile = (el, ev) => confirmMfaEnrollmentMobile(el, ev);
   SUBMITS.changePasswordMobile = (el, ev) => changePasswordMobile(el, ev);
+  SUBMITS.saveDisplayNameMobile = (el, ev) => saveDisplayNameMobile(el, ev);
   SUBMITS.submitMfaEnrollReauthMobile = (el, ev) => submitMfaEnrollReauthMobile(el, ev);
   SUBMITS.submitMfaReauthMobile = (el, ev) => submitMfaReauthMobile(el, ev, el.dataset.a0);
 

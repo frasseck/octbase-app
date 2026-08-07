@@ -53,6 +53,23 @@ func (r *UserRepo) SetAvatar(userID string, data []byte, contentType string) (st
 	return updatedAt, nil
 }
 
+// SetDisplayName writes the caller's own display name. It touches that one
+// column deliberately: email and global_role are not self-editable, so keeping
+// them out of the statement means the self-service route cannot reach them
+// even if a future handler change were to pass them in.
+func (r *UserRepo) SetDisplayName(userID, displayName string) error {
+	res, err := r.db.Exec(
+		`UPDATE users SET display_name = $1, updated_at = $2 WHERE id = $3 AND status <> 'deleted'`,
+		displayName, shared.Now(), userID)
+	if err != nil {
+		return fmt.Errorf("set display name: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // GetAvatar returns the stored avatar bytes, its content type and cache token.
 // found is false when the user exists but has no avatar (or does not exist).
 func (r *UserRepo) GetAvatar(userID string) (data []byte, contentType, updatedAt string, found bool, err error) {
