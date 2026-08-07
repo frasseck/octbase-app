@@ -31,10 +31,12 @@ All notable changes to Octbase are documented here.
   case that fails SPF and lands in spam rather than erroring visibly. The same
   stale address was documented as the default in `.env.example`,
   `podman-compose.yml`, both `README`s and `docs/operations.md`; all now agree.
-  `docs/technical_documentation.md` §6.4's example sending domain follows.
-  Unrelated `oncall@beyags.com` addresses in `octbase-operations/` are alert
-  recipients at the operating company, not the product's sender, and are
-  unchanged.
+  `docs/technical_documentation.md` §6.4's example sending domain follows, as
+  does the example alert address in `octbase-operations/README.md`, now
+  `support@octbase.io`. That last one is illustrative only — it shows how to
+  pipe `check-health.sh --json` into a `mail` command and is read by nothing;
+  the fleet's real alert recipient is `alert_email` in `octbase-service`, which
+  this repo does not carry.
 
 ### Security
 

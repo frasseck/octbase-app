@@ -87,7 +87,7 @@ Pipe to your alert tool, or branch on the exit code:
 
 ```bash
 if ! ./octbase-operations/check-health.sh --json >/var/log/octbase-health.json; then
-  mail -s "Octbase health: $(jq -r .overall /var/log/octbase-health.json)" oncall@beyags.com \
+  mail -s "Octbase health: $(jq -r .overall /var/log/octbase-health.json)" support@octbase.io \
     < /var/log/octbase-health.json
 fi
 ```
@@ -98,7 +98,7 @@ fi
 # Every 5 minutes; only mail on a non-zero exit (degraded or down).
 */5 * * * * /home/.../octbase/octbase-operations/check-health.sh --quiet --json \
               > /var/log/octbase-health.json 2>&1 \
-            || mail -s "Octbase UNHEALTHY" oncall@beyags.com < /var/log/octbase-health.json
+            || mail -s "Octbase UNHEALTHY" support@octbase.io < /var/log/octbase-health.json
 ```
 
 ### In CI / post-deploy gate
