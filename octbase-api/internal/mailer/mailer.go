@@ -50,14 +50,32 @@ type SMTPMailer struct {
 
 // New creates a Mailer from environment variables. If OCTBASE_SMTP_HOST is
 // not set, the mailer logs to stdout instead of sending.
+//
+// The resolved configuration is logged once, at construction. Without it a
+// misconfigured relay is indistinguishable from a working one until somebody
+// triggers a send and reads the logs: a deployment that shipped an empty
+// OCTBASE_SMTP_PASS, or authenticated as the wrong mailbox, looked exactly like
+// a healthy one from the outside. The password is never logged — only whether
+// one is present, which is the half that actually goes wrong.
 func New() Mailer {
-	return &SMTPMailer{
+	m := &SMTPMailer{
 		host: os.Getenv("OCTBASE_SMTP_HOST"),
 		port: envOrDefault("OCTBASE_SMTP_PORT", "587"),
 		from: envOrDefault("OCTBASE_SMTP_FROM", "noreply@beyags.com"),
 		user: os.Getenv("OCTBASE_SMTP_USER"),
 		pass: os.Getenv("OCTBASE_SMTP_PASS"),
 	}
+	if m.host == "" {
+		slog.Warn("SMTP not configured (OCTBASE_SMTP_HOST is empty): mail is logged and discarded, never delivered")
+		return m
+	}
+	slog.Info("SMTP configured",
+		"host", m.host, "port", m.port, "from", m.from,
+		// The username is not a credential on its own, and naming it is the
+		// point: with more than one mailbox on a relay, authenticating as the
+		// wrong one fails identically to a wrong password.
+		"user", m.user, "auth", m.user != "", "passwordSet", m.pass != "")
+	return m
 }
 
 // Send delivers an email or logs it in dev mode. It honours ctx (cancellation
@@ -98,6 +116,7 @@ func (m *SMTPMailer) Send(ctx context.Context, to, subject, body string) error {
 		}
 	}()
 
+	start := time.Now()
 	if err := m.deliver(&deadlineConn{Conn: conn, timeout: opTimeout}, to, msg); err != nil {
 		// A cancelled/expired ctx surfaces as a use-of-closed-connection error
 		// from whichever operation was in flight; report the real cause.
@@ -106,6 +125,14 @@ func (m *SMTPMailer) Send(ctx context.Context, to, subject, body string) error {
 		}
 		return err
 	}
+	// Confirm the success. Every other line in this package reports a failure,
+	// so silence meant either "delivered" or "nothing ever tried to send" —
+	// which made "did that email go out?" unanswerable from the logs. Fields
+	// mirror the queue's failure line (subject, not recipient): recipients
+	// would accumulate a list of who was mailed in container logs, which are
+	// outside the retention purge that covers the audit and activity tables.
+	slog.Info("email sent", "subject", subject, "relay", addr,
+		"elapsedMs", time.Since(start).Milliseconds())
 	return nil
 }
 
