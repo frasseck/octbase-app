@@ -1,6 +1,7 @@
 package scmintegration_test
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -100,26 +101,26 @@ func TestOAuthAuthorize_ReturnsURL(t *testing.T) {
 	}
 }
 
-func TestOAuthCallback_StoresTokens(t *testing.T) {
-	setEncKey(t)
-	db := testutil.NewTestDB(t)
-	srv := testutil.NewTestServer(t, db)
-	pid := testutil.MustCreateProject(t, srv, "P")
+// seedOAuthCallback stubs the GitHub token endpoint and seeds an unexpired
+// state row, exactly as the authorize endpoint would, leaving the callback
+// ready to be called. Returns the state and the connection id.
+func seedOAuthCallback(t *testing.T, db *sql.DB, srv *httptest.Server, pid string) (state, rcID string) {
+	t.Helper()
 	rc := connectGitHubNoToken(t, srv, pid)
-	rcID := rc["id"].(string)
+	rcID = rc["id"].(string)
 
 	// Stub the GitHub token endpoint.
 	tokenStub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"access_token":"gho_new","refresh_token":"ghr_new","expires_in":3600}`))
 	}))
-	defer tokenStub.Close()
+	t.Cleanup(tokenStub.Close)
 	t.Setenv("OCTBASE_OAUTH_GITHUB_CLIENT_ID", "cid")
 	t.Setenv("OCTBASE_OAUTH_GITHUB_CLIENT_SECRET", "sec")
 	t.Setenv("OCTBASE_OAUTH_GITHUB_TOKEN_URL", tokenStub.URL)
 
 	// Seed a state row directly, as the authorize endpoint would.
 	states := scmintegration.NewOAuthStateRepo(db)
-	state := shared.NewUUID()
+	state = shared.NewUUID()
 	if err := states.Create(&scmintegration.OAuthState{
 		State: state, Provider: "GITHUB", RepositoryID: rcID, UserID: testutil.DemoUserID,
 		ExpiresAt: shared.Now()[:19] + "Z", // not relied upon; replaced below
@@ -130,6 +131,27 @@ func TestOAuthCallback_StoresTokens(t *testing.T) {
 	if _, err := db.Exec(`UPDATE oauth_states SET expires_at=$1 WHERE state=$2`, "2999-01-01T00:00:00Z", state); err != nil {
 		t.Fatalf("set expiry: %v", err)
 	}
+	return state, rcID
+}
+
+func TestOAuthCallback_StoresTokens(t *testing.T) {
+	setEncKey(t)
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+	pid := testutil.MustCreateProject(t, srv, "P")
+
+	// The callback has two success branches: it answers 200 JSON, or — when
+	// OCTBASE_APP_URL is set — a 302 to that URL. This test asserts the JSON
+	// one, so pin the variable instead of inheriting whatever the environment
+	// happens to hold. Without this the branch was chosen by ambient state, and
+	// testutil.Do follows redirects with http.DefaultClient: exporting a
+	// stack's .env to pick up TEST_DATABASE_URL was enough to send this test
+	// out to the real host named by OCTBASE_APP_URL, where it failed on that
+	// host's TLS certificate and pointed nowhere near the actual cause.
+	// TestOAuthCallback_RedirectsToAppURL covers the other branch.
+	t.Setenv("OCTBASE_APP_URL", "")
+
+	state, rcID := seedOAuthCallback(t, db, srv, pid)
 
 	resp := testutil.Do(t, srv, http.MethodGet,
 		"/api/v1/oauth/github/callback?code=abc&state="+state, nil, "")
@@ -148,6 +170,50 @@ func TestOAuthCallback_StoresTokens(t *testing.T) {
 	dec, _ := shared.DecryptSecret(got.AccessToken)
 	if dec != "gho_new" {
 		t.Errorf("stored access token = %q, want gho_new", dec)
+	}
+}
+
+// TestOAuthCallback_RedirectsToAppURL covers the callback's other success
+// branch: with OCTBASE_APP_URL set it sends the browser back to the app
+// instead of answering JSON. That branch had no coverage at all, which is why
+// nothing noticed that reaching it from a test meant leaving the machine.
+//
+// The request deliberately does NOT go through testutil.Do. What matters is
+// the Location header, and testutil.Do follows redirects with
+// http.DefaultClient — following this one would issue a real request to
+// whatever OCTBASE_APP_URL names. The value below is an unroutable
+// .invalid host (RFC 2606), so a regression that starts following it fails
+// loudly here rather than reaching a real server.
+func TestOAuthCallback_RedirectsToAppURL(t *testing.T) {
+	setEncKey(t)
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+	pid := testutil.MustCreateProject(t, srv, "P")
+
+	const appURL = "https://app.example.invalid"
+	t.Setenv("OCTBASE_APP_URL", appURL)
+
+	state, _ := seedOAuthCallback(t, db, srv, pid)
+
+	req, err := http.NewRequest(http.MethodGet,
+		srv.URL+"/api/v1/oauth/github/callback?code=abc&state="+state, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	client := &http.Client{
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("do request: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusFound {
+		t.Errorf("status = %d, want %d", resp.StatusCode, http.StatusFound)
+	}
+	if loc := resp.Header.Get("Location"); loc != appURL {
+		t.Errorf("Location = %q, want %q", loc, appURL)
 	}
 }
 
