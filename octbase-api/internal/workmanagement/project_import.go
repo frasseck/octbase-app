@@ -469,13 +469,12 @@ func (imp *projectImporter) linkTaskParentsTx(tx *sql.Tx) error {
 		return fmt.Errorf("import target project %s not resolved", imp.projectID)
 	}
 	for _, pt := range imp.tasks {
-		wantType, _ := ParentTaskTypeFor(project, pt.task.TaskType)
 		var parent *plannedTask
 		if pt.parentRef != "" {
 			parent = byExportedID[pt.parentRef]
 		}
 		switch {
-		case parent != nil && wantType != "" && parent.task.TaskType == wantType:
+		case parent != nil && TaskParentTypeAllowed(project, pt.task.TaskType, parent.task.TaskType):
 			if _, err := tx.Exec(`UPDATE tasks SET parent_id=$1 WHERE id=$2`, parent.task.ID, pt.task.ID); err != nil {
 				return fmt.Errorf("link parent for task %q: %w", pt.task.Title, err)
 			}

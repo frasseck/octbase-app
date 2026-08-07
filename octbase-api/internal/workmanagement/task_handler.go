@@ -634,17 +634,18 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		// A type change must also keep the existing children valid: they may
-		// only hang under the type exactly one level up from theirs.
+		// A type change must also keep the existing children valid: each of
+		// them has to still be allowed under the new type. That is the same
+		// predicate the children themselves were validated with, so a retype
+		// can never leave behind a pair the create path would have refused.
 		if hasType && old.TaskType != t.TaskType {
 			children, cerr := h.tasks.Children(t.ID)
 			if cerr != nil {
 				shared.WriteServerError(w, r, cerr)
 				return
 			}
-			want := ChildTaskTypeFor(project, t.TaskType)
 			for _, c := range children {
-				if want == "" || c.TaskType != want {
+				if !TaskParentTypeAllowed(project, c.TaskType, t.TaskType) {
 					shared.WriteError(w, http.StatusUnprocessableEntity, "TASK_HAS_CHILDREN", "cannot change type: existing child tasks would no longer fit the hierarchy")
 					return
 				}

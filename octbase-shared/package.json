@@ -12,6 +12,6 @@
     "./richtext.js": "./richtext.js"
   },
   "dependencies": {
-    "dompurify": "3.4.12"
+    "dompurify": "3.4.13"
   }
 }

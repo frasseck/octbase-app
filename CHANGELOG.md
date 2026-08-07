@@ -6,6 +6,24 @@ All notable changes to Octbase are documented here.
 
 ### Added
 
+- **A task may now hang under any level above it, not only the one directly
+  above.** A `TASK` can sit straight under an `EPIC` without a `STORY` invented
+  to hold it; a `STORY` may hang off a `THEME` where those levels are on. The
+  rule was previously "the parent is the type exactly one level up", which is
+  why `POST /projects/{id}/tasks` with a task's `parentId` pointing at an epic
+  came back `422 TASK_PARENT_TYPE_INVALID`. `SUBTASK` is the deliberate
+  exception and keeps its mandatory, exactly-a-`TASK` parent — a subtask is the
+  breakdown of one specific task, and letting it float under an epic would
+  leave nothing for it to be a subtask *of*. Downward links are still refused
+  (a story may not hang off a task), as is a type parenting its own type.
+  This is a strict relaxation: every parent link that was valid before is still
+  valid, so no migration and no data repair is involved. The retype guard
+  follows the same predicate — retyping a story up to an epic over its task
+  children now succeeds instead of answering `TASK_HAS_CHILDREN`, and project
+  import preserves parent links it used to drop with a warning. Both SPAs'
+  parent pickers list every allowed level, grouped by type; the picker label no
+  longer names a single type, because there is no longer a single answer.
+
 - **Outgoing mail is now observable.** The mailer logs its resolved SMTP
   configuration once at startup (`host`, `port`, `from`, `user`, and whether a
   password is set — never the password itself), and one `email sent` line per
@@ -20,6 +38,35 @@ All notable changes to Octbase are documented here.
   than the recipient: container logs are not covered by the retention purge that
   covers the audit and activity tables, so they must not accumulate a record of
   who was mailed.
+
+### Fixed
+
+- **The Settings password form no longer shows a warning sign before anything
+  is wrong.** Its inline error box is hidden with the HTML `hidden` attribute,
+  which the UA stylesheet implements as a plain `display:none` — so
+  `.form-error { display: flex }` outranked it and the empty box was painted
+  from the moment the page opened. With no message in it, all that showed was
+  the `::before` ⚠ floating above the *Change password* button, which read as a
+  warning about the button rather than as an error that had not happened yet
+  (reported as "what is this warning sign for? I don't get it"). `[hidden]` now
+  restates `display: none !important` alongside the `.hidden` class, so both
+  spellings hide for real and the next use of the attribute is not bitten the
+  same way. The existing e2e tests missed it because `:not([hidden])` asks
+  about the attribute, not about what is on screen; the new one asks the
+  browser whether the box is visible.
+
+- **A Super Admin can edit their own profile again.**
+  `PATCH /api/v1/users/{userId}` refused every `SUPER_ADMIN` target with
+  `403 "cannot modify another Super Admin"` — including the signed-in actor,
+  who is not "another". Because there is no self-service profile route
+  (`GET /auth/me` is read-only) and this is the only write path onto a user
+  record, a Super Admin's display name and email were unchangeable for the life
+  of the account: the seeded `Super Admin` could never be given a person's name.
+  The guard now exempts the actor from itself. Editing a *different* Super
+  Admin is still refused, and the self path does not become a way around the
+  demote/disable rules: a self role change was already refused by
+  `CanUpdateUserRole`, and a self status change is now refused explicitly
+  rather than letting the account disable the session it is signed in with.
 
 ### Changed
 
@@ -39,6 +86,17 @@ All notable changes to Octbase are documented here.
   this repo does not carry.
 
 ### Security
+
+- **DOMPurify is pinned to 3.4.13** (was `3.4.12`), picking up the fix for
+  GHSA-55q2-fjhq-7xh7: removing an `IN_PLACE` hook left a detached subtree
+  executable, which is an XSS. DOMPurify is shipped code — it is the rich-text
+  sanitizer both SPAs import — so this is runtime surface, not dev tooling.
+  Caught by the `npm audit --omit=dev` step that arrived with 37b stage 4, and
+  fixed the way that step is meant to be answered: by bumping the pin, never by
+  relaxing `--audit-level`. This is the second advisory that guard has caught
+  since it replaced the SHA-256 integrity check on the vendored copies, which
+  is the whole argument for the swap — a hash could prove the file had not been
+  tampered with, but never that an advisory had been published against it.
 
 - **URL-borne credentials are redacted from the API request log.** chi's request
   logger prints the full request line, and three credentials travel in a URL

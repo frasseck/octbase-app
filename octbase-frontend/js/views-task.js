@@ -1,5 +1,5 @@
 import { t } from '@octbase/shared/i18n.js';
-import { ESTIMATION_UNITS, FIBONACCI_POINTS, STATUSES, STATUS_META, TYPE_META, estimateLabel, estimateLimits, estimationField, estimationUnit, openDescendantsOf, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, taskEstimatable, taskEstimate, typeChildOf, typeParentRule } from '@octbase/shared/meta.js';
+import { ESTIMATION_UNITS, FIBONACCI_POINTS, STATUSES, STATUS_META, TYPE_META, estimateLabel, estimateLimits, estimationField, estimationUnit, openDescendantsOf, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, taskEstimatable, taskEstimate, typeChain, typeChildOf, typeParentAllowed, typeParentRule } from '@octbase/shared/meta.js';
 import { rtSafeHref, sanitizeRichText } from '@octbase/shared/richtext.js';
 import { api, dropProjectTasksPrefetch } from './api.js';
 import { _A0, _A1, _A2, _A3, _VAL, registerActions, registerChanges, registerInputs, registerKeydowns } from './delegation.js';
@@ -494,10 +494,21 @@ function renderDetailFields(task, immutable) {
 // behind a "Select parent…" placeholder; choosing one saves both together.
 function renderParentRow(task) {
   const pending = S.taskPanelData?.pendingType;
-  const rule = typeParentRule(S.project, pending || task.taskType);
+  const type = pending || task.taskType;
+  const rule = typeParentRule(S.project, type);
   if (!rule.parentType) return '';
-  const candidates = (S.taskPanelData?.projectTasks || [])
-    .filter(tk => tk.taskType === rule.parentType && tk.id !== task.id);
+  // Every level above the task's own is a candidate, not just rule.parentType
+  // (typeParentAllowed) — grouped by type, matching the create modal.
+  const groups = typeChain(S.project)
+    .filter(ty => typeParentAllowed(S.project, type, ty))
+    .map(ty => {
+      const candidates = (S.taskPanelData?.projectTasks || [])
+        .filter(tk => tk.taskType === ty && tk.id !== task.id);
+      if (!candidates.length) return '';
+      return `<optgroup label="${esc(TYPE_META[ty].label)}">${
+        candidates.map(tk=>`<option value="${esc(tk.id)}" ${!pending && task.parentId===tk.id?'selected':''}>${esc((taskSeqLabel(tk)?taskSeqLabel(tk)+' — ':'')+tk.title)}</option>`).join('')
+      }</optgroup>`;
+    }).join('');
   return `
       <div class="detail-row">
         <span class="detail-label">${esc(t('task.parentLabel'))}</span>
@@ -505,15 +516,18 @@ function renderParentRow(task) {
           <select class="detail-select" aria-label="${t('task.parentLabel')}" data-change="changeParent" data-a0="${esc(task.id)}">
             ${pending ? `<option value="" disabled selected>${t('task.selectParent')}</option>`
                       : rule.required ? '' : `<option value="">${t('task.noParent')}</option>`}
-            ${candidates.map(tk=>`<option value="${esc(tk.id)}" ${!pending && task.parentId===tk.id?'selected':''}>${esc((taskSeqLabel(tk)?taskSeqLabel(tk)+' — ':'')+tk.title)}</option>`).join('')}
+            ${groups}
           </select>
         </span>
       </div>`;
 }
 
-// renderTaskChildren lists the task's direct children (the type one level
-// down) on the relations tab; each entry opens its own panel. Renders nothing
-// when the task has no children — no empty placeholder claims space.
+// renderTaskChildren lists the task's direct children on the relations tab;
+// each entry opens its own panel. Children are read off parentId and may be of
+// any lower type, not only typeChildOf's — that call is only the "can this
+// type have children at all" question, which a SUBTASK answers with no.
+// Renders nothing when the task has no children — no empty placeholder claims
+// space.
 function renderTaskChildren(task) {
   const childType = typeChildOf(S.project, task.taskType);
   if (!childType) return '';
@@ -1482,7 +1496,9 @@ async function changeType(taskId, taskType) {
   if (d) delete d.pendingType;
   const rule = typeParentRule(S.project, taskType);
   const parent = d?.task?.parentId ? (d.projectTasks || []).find(tk => tk.id === d.task.parentId) : null;
-  const parentOk = !!parent && parent.taskType === rule.parentType;
+  // Any level above the new type keeps the existing parent valid, so a retype
+  // strands the parent far less often than when only rule.parentType counted.
+  const parentOk = !!parent && typeParentAllowed(S.project, taskType, parent.taskType);
   if (rule.required && !parentOk && d) {
     // The new type needs a parent the task doesn't have: the server only
     // accepts taskType+parentId in one PATCH, so defer the save and let the

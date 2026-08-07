@@ -1,5 +1,5 @@
 import { i18n, t } from '@octbase/shared/i18n.js';
-import { ESTIMATION_UNITS, PRIORITIES, TYPE_META, boardLaneLimit, estimableType, estimateLabel, estimateLimits, estimationEnabled, estimationField, estimationUnit, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, typeParentRule } from '@octbase/shared/meta.js';
+import { ESTIMATION_UNITS, PRIORITIES, TYPE_META, boardLaneLimit, estimableType, estimateLabel, estimateLimits, estimationEnabled, estimationField, estimationUnit, parseEstimateInput, priorityMeta, priorityNames, projectTaskTypes, typeChain, typeParentAllowed, typeParentRule } from '@octbase/shared/meta.js';
 import { api } from './api.js';
 import { Auth } from './auth.js';
 import { loadFeatureConfig } from './config.js';
@@ -29,20 +29,29 @@ import { invalidateProjectTasks, personOptions } from './views-task.js';
 let _createTaskParents = [];
 
 // taskParentSelectHtml renders the parent <select> for a task of the given
-// type: the options are the candidate tasks of the type one level up in the
-// project's hierarchy chain (typeParentRule). Empty string for the chain's
-// top type, which cannot have a parent. A required parent (SUBTASK) gets no
-// "no parent" option.
+// type: the options are the candidate tasks of every type ABOVE it in the
+// project's hierarchy chain (typeParentAllowed), grouped by type so a long
+// list stays scannable. Empty string for the chain's top type, which cannot
+// have a parent. A required parent (SUBTASK) gets no "no parent" option — and
+// only one allowed type, so it renders a single group.
 function taskParentSelectHtml(taskType, candidates, selectedId, excludeId) {
   const rule = typeParentRule(S.project, taskType);
   if (!rule || !rule.parentType) return '';
-  const opts = candidates.filter(tk => tk.taskType === rule.parentType && tk.id !== excludeId);
   const label = (tk) => (taskSeqLabel(tk) ? taskSeqLabel(tk) + ' — ' : '') + tk.title;
+  const groups = typeChain(S.project)
+    .filter(ty => typeParentAllowed(S.project, taskType, ty))
+    .map(ty => {
+      const opts = candidates.filter(tk => tk.taskType === ty && tk.id !== excludeId);
+      if (!opts.length) return '';
+      return `<optgroup label="${esc(TYPE_META[ty].label)}">${
+        opts.map(tk=>`<option value="${esc(tk.id)}" ${selectedId===tk.id?'selected':''}>${esc(label(tk))}</option>`).join('')
+      }</optgroup>`;
+    }).join('');
   return `
-      <label class="form-label" for="task-parent">${t('task.parentLabel')} (${TYPE_META[rule.parentType].label})</label>
+      <label class="form-label" for="task-parent">${t('task.parentLabel')}</label>
       <select class="form-select" id="task-parent">
         ${rule.required ? '' : `<option value="">${t('task.noParent')}</option>`}
-        ${opts.map(tk=>`<option value="${esc(tk.id)}" ${selectedId===tk.id?'selected':''}>${esc(label(tk))}</option>`).join('')}
+        ${groups}
       </select>`;
 }
 

@@ -89,7 +89,8 @@ func TestCreateTask_HierarchyViolations(t *testing.T) {
 		{"epic with parent", "EPIC", epic["id"].(string), "TASK_PARENT_NOT_ALLOWED"},
 		{"subtask without parent", "SUBTASK", "", "TASK_PARENT_REQUIRED"},
 		{"subtask under story", "SUBTASK", story["id"].(string), "TASK_PARENT_TYPE_INVALID"},
-		{"task under epic", "TASK", epic["id"].(string), "TASK_PARENT_TYPE_INVALID"},
+		// A parent one or more levels UP is allowed (see
+		// TestCreateTask_SkipLevelParents); one level DOWN never is.
 		{"story under task", "STORY", task["id"].(string), "TASK_PARENT_TYPE_INVALID"},
 		{"parent in other project", "TASK", foreignStory["id"].(string), "TASK_PARENT_INVALID"},
 		{"unknown parent", "TASK", "00000000-0000-0000-0000-00000000dead", "TASK_PARENT_INVALID"},
@@ -99,6 +100,74 @@ func TestCreateTask_HierarchyViolations(t *testing.T) {
 		if status != http.StatusUnprocessableEntity || code != c.wantCode {
 			t.Errorf("%s: status %d code %s, want 422 %s", c.name, status, code, c.wantCode)
 		}
+	}
+}
+
+// TestCreateTask_SkipLevelParents pins the relaxation behind OCT-12: a parent
+// may be any level above the child, not only the one directly above, so a task
+// can sit straight under an epic without a story invented to hold it. SUBTASK
+// is the exception and keeps its exactly-a-TASK parent.
+func TestCreateTask_SkipLevelParents(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+	pid := testutil.MustCreateProject(t, srv, "Skip")
+
+	epic := mustPostTask(t, srv, pid, "Epic", "EPIC", "")
+	story := mustPostTask(t, srv, pid, "Story", "STORY", epic["id"].(string))
+	task := mustPostTask(t, srv, pid, "Task under story", "TASK", story["id"].(string))
+
+	// The point of the change: a TASK directly under an EPIC.
+	underEpic := mustPostTask(t, srv, pid, "Task under epic", "TASK", epic["id"].(string))
+	if underEpic["parentId"] != epic["id"] {
+		t.Errorf("task under epic: parentId = %v, want %v", underEpic["parentId"], epic["id"])
+	}
+	// Re-parenting an existing task onto an epic works the same way.
+	status, code, updated := patchTask(t, srv, task["id"].(string), map[string]interface{}{"parentId": epic["id"]})
+	if status != http.StatusOK || updated["parentId"] != epic["id"] {
+		t.Errorf("re-parent task onto epic: status %d code %s parentId %v, want 200 and the epic", status, code, updated["parentId"])
+	}
+
+	// A SUBTASK still may not skip: its parent must be a TASK, not the epic
+	// or story above it.
+	for _, c := range []struct{ name, parentID string }{
+		{"subtask under epic", epic["id"].(string)},
+		{"subtask under story", story["id"].(string)},
+	} {
+		status, code, _ := postTask(t, srv, pid, c.name, "SUBTASK", c.parentID)
+		if status != http.StatusUnprocessableEntity || code != "TASK_PARENT_TYPE_INVALID" {
+			t.Errorf("%s: status %d code %s, want 422 TASK_PARENT_TYPE_INVALID", c.name, status, code)
+		}
+	}
+}
+
+// TestUpdateTask_RetypeKeepsSkipLevelChildren covers the retype guard against
+// the relaxed rule: children only have to stay *allowed* under the new type,
+// which is a weaker condition than being exactly one level below it.
+func TestUpdateTask_RetypeKeepsSkipLevelChildren(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	srv := testutil.NewTestServer(t, db)
+	pid := testutil.MustCreateProject(t, srv, "Retype")
+
+	// A story holding a task; retyping the story up to an epic leaves the task
+	// two levels below it, which the skip-level rule allows.
+	story := mustPostTask(t, srv, pid, "Story", "STORY", "")
+	child := mustPostTask(t, srv, pid, "Task", "TASK", story["id"].(string))
+	status, code, updated := patchTask(t, srv, story["id"].(string), map[string]interface{}{"taskType": "EPIC"})
+	if status != http.StatusOK || updated["taskType"] != "EPIC" {
+		t.Fatalf("retype story to epic over a task child: status %d code %s type %v, want 200 EPIC", status, code, updated["taskType"])
+	}
+	// The child kept its parent rather than being stranded.
+	if got := getTask(t, srv, child["id"].(string)); got["parentId"] != story["id"] {
+		t.Errorf("child parentId = %v, want %v", got["parentId"], story["id"])
+	}
+
+	// Retyping *down* past a child is still refused: a subtask under the task
+	// would have nothing to be a subtask of.
+	task := mustPostTask(t, srv, pid, "Task2", "TASK", "")
+	mustPostTask(t, srv, pid, "Sub", "SUBTASK", task["id"].(string))
+	status, code, _ = patchTask(t, srv, task["id"].(string), map[string]interface{}{"taskType": "STORY"})
+	if status != http.StatusUnprocessableEntity || code != "TASK_HAS_CHILDREN" {
+		t.Errorf("retype task with subtask child: status %d code %s, want 422 TASK_HAS_CHILDREN", status, code)
 	}
 }
 

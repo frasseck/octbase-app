@@ -130,6 +130,16 @@ class TestSettingsPassword:
                     "#settings-password-confirm"):
             assert settings_page.is_visible(sel), f"{sel} not visible"
 
+    def test_no_error_marker_before_anything_goes_wrong(self, settings_page):
+        """The error box carries the `hidden` ATTRIBUTE, whose `display:none`
+        comes from the UA stylesheet only — so `.form-error { display: flex }`
+        outranked it and the box rendered as a bare ⚠ above the button, with no
+        message, from the moment the page opened (OCT-16: "what is this warning
+        sign for? I don't get it"). The three tests below missed it because
+        `:not([hidden])` asks about the attribute, not about what is on screen;
+        this one asks the browser."""
+        assert not settings_page.is_visible("#settings-password-error")
+
     def test_mismatched_confirmation_never_reaches_the_api(self, settings_page):
         settings_page.fill("#settings-password-current", DEMO_USER_PASSWORD)
         settings_page.fill("#settings-password-new", NEW_PASSWORD)
