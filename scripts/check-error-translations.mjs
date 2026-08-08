@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Guard: every error code the API can emit has a translation in every locale
-// file of both SPAs.
+// Guard: every error the API can emit has a translation in every locale file
+// of both SPAs — in two halves, because the API keys errors two different ways.
 //
 // The API answers errors as { code, message, messageKey }, where messageKey is
 // derived from the code by shared.MessageKeyFor: "errors." + camelCase(code).
@@ -12,9 +12,26 @@
 // So the check has to come from the source of truth on both sides: the codes
 // grepped out of the Go handlers, and the keys read out of the locale JSON.
 //
-// VALIDATION_ERROR is exempt: it is one code covering many messages and is
-// keyed by message text through shared.validationMessageKeys, not by code (its
-// keys live under errors.validation.*). TEST_CODE is a fixture.
+// VALIDATION_ERROR is exempt from the by-code half: it is one code covering
+// many messages, keyed by message TEXT through shared.validationMessageKeys
+// rather than by code. TEST_CODE is a fixture.
+//
+// The second half covers exactly that map, and exists because leaving it
+// uncovered cost every validation message its translation. The Go side spelt
+// the keys "errors.validation.<name>" while all four locale files carry them
+// at top level as "validation.<name>" — so `t()` resolved nothing and every
+// VALIDATION_ERROR rendered its raw English message, in German too. All 17
+// keys, all four files (measured 2026-08-08, OCT-27).
+//
+// Neither existing guard could see it: this one exempted VALIDATION_ERROR by
+// design, and check-i18n-keys.mjs only reads literal t('…') call sites, while
+// this key is assembled at runtime from the API response. That gap between two
+// guards is the thing being closed here.
+//
+// The check deliberately reads the key strings VERBATIM out of the Go map and
+// looks up that exact dotted path. It asserts the two sides AGREE; it does not
+// hardcode which namespace is correct, so moving the keys wholesale stays a
+// one-sided edit that this guard will catch if only one side moves.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -79,9 +96,32 @@ for (const root of GO_ROOTS) {
   }
 }
 
+// validationKeys reads the i18n keys out of shared.validationMessageKeys —
+// the map that turns a VALIDATION_ERROR's English message into a messageKey.
+// Values only: the map's Go-side keys are the English sentences, which are not
+// what a client looks up.
+function validationKeys() {
+  const src = readFileSync(join(ROOT, 'octbase-api/internal/shared/i18nerrors.go'), 'utf8');
+  const block = src.match(/validationMessageKeys\s*=\s*map\[string\]string\{([\s\S]*?)\n\}/);
+  if (!block) {
+    console.error('could not find validationMessageKeys in internal/shared/i18nerrors.go');
+    console.error('If it was renamed or restructured, update this guard — do not delete the check.');
+    process.exit(1);
+  }
+  return [...new Set([...block[1].matchAll(/:\s*"([^"]+)"/g)].map(m => m[1]))];
+}
+
+// lookup walks a dotted key path, the way the SPAs' i18n resolve() does.
+function lookup(dict, key) {
+  return key.split('.').reduce((node, part) => (node == null ? undefined : node[part]), dict);
+}
+
+const vKeys = validationKeys();
+
 let failed = false;
 for (const rel of LOCALE_FILES) {
   const dict = JSON.parse(readFileSync(join(ROOT, rel), 'utf8'));
+
   const missing = [...codes]
     .map(camelCase)
     .filter(key => typeof dict?.errors?.[key] !== 'string')
@@ -91,11 +131,19 @@ for (const rel of LOCALE_FILES) {
     console.error(`${rel}: ${missing.length} untranslated error code(s)`);
     for (const key of missing) console.error(`  errors.${key}`);
   }
+
+  const missingV = vKeys.filter(key => typeof lookup(dict, key) !== 'string').sort();
+  if (missingV.length) {
+    failed = true;
+    console.error(`${rel}: ${missingV.length} untranslated validation message(s)`);
+    for (const key of missingV) console.error(`  ${key}`);
+  }
 }
 
 if (failed) {
-  console.error('\nAdd the key to errors.* in EVERY locale file of BOTH SPAs (en and de).');
-  console.error('A key present in one language only renders as the raw key path.');
+  console.error('\nAdd the key in EVERY locale file of BOTH SPAs (en and de).');
+  console.error('A key present in one language only renders as the raw key path;');
+  console.error('a validation key the locales spell differently renders raw English in both.');
   process.exit(1);
 }
-console.log(`error-translation guard: clean ✓ (${codes.size} codes × ${LOCALE_FILES.length} locale files)`);
+console.log(`error-translation guard: clean ✓ (${codes.size} codes + ${vKeys.length} validation messages × ${LOCALE_FILES.length} locale files)`);

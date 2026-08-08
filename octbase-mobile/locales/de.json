@@ -120,6 +120,7 @@
     "nameRequired": "Name ist erforderlich",
     "emailRequired": "E-Mail ist erforderlich",
     "displayNameRequired": "Anzeigename ist erforderlich",
+    "displayNameTooLong": "Anzeigename ist zu lang (maximal 100 Zeichen)",
     "passwordRequired": "Passwort ist erforderlich",
     "passwordTooShort": "Das Passwort muss mindestens 12 Zeichen lang sein",
     "projectNameRequired": "Der Projektname darf nicht leer sein",
@@ -262,11 +263,7 @@
     "userNotFound": "Benutzer nicht gefunden.",
     "versionConflict": "Dieses Element wurde inzwischen von jemand anderem geändert. Bitte neu laden und erneut versuchen.",
     "viewLoadFailed": "Fehler beim Laden der Ansicht",
-    "boardLaneLimitInvalid": "Die Anzahl Karten pro Spalte muss zwischen 0 (alle anzeigen) und 500 liegen.",
-    "validation": {
-      "displayNameRequired": "Anzeigename ist erforderlich",
-      "displayNameTooLong": "Anzeigename ist zu lang (maximal 100 Zeichen)"
-    }
+    "boardLaneLimitInvalid": "Die Anzahl Karten pro Spalte muss zwischen 0 (alle anzeigen) und 500 liegen."
   },
   "notifications": {
     "title": "Benachrichtigungen",

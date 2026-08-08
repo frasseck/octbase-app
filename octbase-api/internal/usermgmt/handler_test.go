@@ -71,7 +71,9 @@ func TestSuperAdmin_CreateUser_MissingDisplayName_ReturnsMessageKey(t *testing.T
 
 	var body map[string]interface{}
 	testutil.DecodeJSON(t, resp, &body)
-	if want := "errors.validation.displayNameRequired"; body["messageKey"] != want {
+	// validation.*, not errors.validation.* — the locale files carry these keys
+	// at top level, and the errors.-prefixed spelling resolved to nothing (OCT-27).
+	if want := "validation.displayNameRequired"; body["messageKey"] != want {
 		t.Errorf("messageKey = %v, want %q", body["messageKey"], want)
 	}
 }

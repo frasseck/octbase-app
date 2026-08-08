@@ -1525,7 +1525,7 @@ async function saveDisplayNameMobile(form, ev) {
   ev.preventDefault();
   const input = el('#profile-name-mobile');
   const name = (input?.value || '').trim();
-  if (!name) { toast(t('errors.validation.displayNameRequired'), 'error'); input?.focus(); return; }
+  if (!name) { toast(t('validation.displayNameRequired'), 'error'); input?.focus(); return; }
   try {
     const updated = await api.users.updateMe({ displayName: name });
     S.user = { ...(S.user || {}), name: updated.displayName, displayName: updated.displayName };

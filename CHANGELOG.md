@@ -57,6 +57,32 @@ All notable changes to Octbase are documented here.
 
 ### Fixed
 
+- **Validation errors are translated again — all of them, in both languages.**
+  The API keys a `VALIDATION_ERROR` by its message text rather than by its
+  code, and `shared.validationMessageKeys` spelt those keys
+  `errors.validation.<name>` while all four locale files carry them at top
+  level as `validation.<name>`. The lookup resolved to nothing, so
+  `apiErrorMessage()` fell back to the raw English sentence and **every**
+  validation message — "email is required", "password must be at least 12
+  characters", all 15 — rendered in English even with the interface set to
+  German. The Go side is the one that was wrong: the locale namespace is also
+  what the classic-terminology overlay was written against
+  (`classic.validation.sprintNameRequired`), so re-prefixing the locales would
+  have had to move that overlay too. Dropping the `errors.` prefix makes 15
+  keys resolve using translations that already existed, reviewed, in every
+  file; only `displayNameTooLong` was genuinely new. Codes other than
+  `VALIDATION_ERROR` keep their `errors.<camelCase>` keys — that half was
+  always correct.
+  **The gap that hid it is closed too**, which matters more than the strings:
+  `check-error-translations.mjs` exempted `VALIDATION_ERROR` by design, and
+  `check-i18n-keys.mjs` only reads literal `t('…')` call sites while this key
+  is assembled at runtime from the API response — so the bug lived exactly
+  between two guards. The first guard now also reads
+  `validationMessageKeys` out of the Go source and checks each key against
+  every locale file, asserting the two sides *agree* rather than hardcoding a
+  namespace. A Go test pins the prefix as the cheap half that fails without a
+  Node run.
+
 - **The Settings password form no longer shows a warning sign before anything
   is wrong.** Its inline error box is hidden with the HTML `hidden` attribute,
   which the UA stylesheet implements as a plain `display:none` — so

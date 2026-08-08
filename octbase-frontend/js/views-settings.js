@@ -564,7 +564,7 @@ async function saveDisplayName(e) {
   const input = el('#settings-display-name');
   const name = (input?.value || '').trim();
   if (!name) {
-    toast(t('errors.validation.displayNameRequired'), 'error');
+    toast(t('validation.displayNameRequired'), 'error');
     input?.focus();
     return;
   }

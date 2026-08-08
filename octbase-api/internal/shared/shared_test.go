@@ -307,7 +307,11 @@ func TestWriteValidationError_IncludesMessageKey(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if want := "errors.validation.displayNameRequired"; body.MessageKey != want {
+	// validation.*, not errors.validation.* — see MessageKeyFor. This test
+	// asserted the errors.-prefixed spelling and passed for as long as the bug
+	// existed: it pinned the key's FORMAT while nothing checked it against the
+	// locale files, which is the gap check-error-translations.mjs now covers.
+	if want := "validation.displayNameRequired"; body.MessageKey != want {
 		t.Errorf("MessageKey = %q, want %q", body.MessageKey, want)
 	}
 	details, ok := body.Details.(map[string]interface{})
@@ -327,7 +331,7 @@ func TestWriteValidationError_UnknownMessageFallsBackToGeneric(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if want := "errors.validation.generic"; body.MessageKey != want {
+	if want := "validation.generic"; body.MessageKey != want {
 		t.Errorf("MessageKey = %q, want %q", body.MessageKey, want)
 	}
 }

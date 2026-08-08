@@ -120,6 +120,7 @@
     "nameRequired": "Name is required",
     "emailRequired": "Email is required",
     "displayNameRequired": "Display name is required",
+    "displayNameTooLong": "Display name is too long (100 characters maximum)",
     "passwordRequired": "Password is required",
     "passwordTooShort": "Password must be at least 12 characters",
     "projectNameRequired": "Project name must not be blank",
@@ -262,11 +263,7 @@
     "userNotFound": "User not found.",
     "versionConflict": "This item was changed by someone else. Reload and try again.",
     "viewLoadFailed": "Error loading view",
-    "boardLaneLimitInvalid": "The number of cards per lane must be between 0 (show all) and 500.",
-    "validation": {
-      "displayNameRequired": "Display name is required",
-      "displayNameTooLong": "Display name is too long (100 characters maximum)"
-    }
+    "boardLaneLimitInvalid": "The number of cards per lane must be between 0 (show all) and 500."
   },
   "notifications": {
     "title": "Notifications",
