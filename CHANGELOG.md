@@ -4,6 +4,8 @@ All notable changes to Octbase are documented here.
 
 ## Unreleased
 
+## v1.0.2 — 2026-08-08
+
 ### Added
 
 - **Every user can now change their own display name**, from the desktop
