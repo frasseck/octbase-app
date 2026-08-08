@@ -239,3 +239,46 @@ func TestMessageKeyFor_DoubleUnderscore(t *testing.T) {
 		t.Errorf("MessageKeyFor(FOO__BAR) = %q, want errors.fooBar", got)
 	}
 }
+
+// TestMessageKeyFor_ValidationNamespace pins the namespace VALIDATION_ERROR
+// messages resolve in (OCT-27). These keys had been spelt
+// "errors.validation.<name>" while all four locale files carry them at top
+// level as "validation.<name>", so t() resolved nothing and every validation
+// message rendered its raw English text — in German too. The locale side is
+// the one to match: it is what the classic-terminology overlay was written
+// against (classic.validation.sprintNameRequired), and re-prefixing here would
+// need that overlay moved as well.
+//
+// scripts/check-error-translations.mjs checks the same agreement against the
+// locale files; this test is the cheap Go-side half that fails without a
+// Node run.
+func TestMessageKeyFor_ValidationNamespace(t *testing.T) {
+	// A mapped message, and the fallback for an unmapped one.
+	cases := map[string]string{
+		"email is required":               "validation.emailRequired",
+		"something nobody put in the map": "validation.generic",
+	}
+	for msg, want := range cases {
+		if got := MessageKeyFor("VALIDATION_ERROR", msg); got != want {
+			t.Errorf("MessageKeyFor(VALIDATION_ERROR, %q) = %q, want %q", msg, got, want)
+		}
+	}
+
+	// Every mapped key sits under validation., never errors.validation. —
+	// the prefix is the whole bug, so assert it on the map itself rather than
+	// on a sample.
+	for msg, key := range validationMessageKeys {
+		if strings.HasPrefix(key, "errors.") {
+			t.Errorf("validationMessageKeys[%q] = %q: validation keys live under validation., not errors.", msg, key)
+		}
+		if !strings.HasPrefix(key, "validation.") {
+			t.Errorf("validationMessageKeys[%q] = %q: want a validation.* key", msg, key)
+		}
+	}
+
+	// Codes other than VALIDATION_ERROR keep the errors. prefix — this change
+	// must not have leaked into the by-code path.
+	if got := MessageKeyFor("PROJECT_NOT_FOUND", ""); got != "errors.projectNotFound" {
+		t.Errorf("MessageKeyFor(PROJECT_NOT_FOUND) = %q, want errors.projectNotFound", got)
+	}
+}
