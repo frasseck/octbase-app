@@ -140,7 +140,18 @@ class TestBoardLaneLimit:
         app.click(".modal button[type=submit], .modal .btn-primary")
         settle(app)
 
-        card = app.locator(f"#col-{column['id']} .board-card:has-text('{title}')")
+        # Wait for the card, then assert how many there are — the two do
+        # different jobs. Creating is API-backed and the lane redraws when the
+        # response lands, which is an API-length wait; settle() only budgets
+        # SHORT and is documented never to raise, and locator.count() takes an
+        # immediate snapshot with no retry. So a redraw arriving a moment later
+        # used to read as "the card was never drawn" — this test failed exactly
+        # that way on CI 2026-08-08 and passed on the identical tree minutes
+        # later. wait_for_selector fixes the race; the count assertion still
+        # earns its place by catching a card drawn twice, which waiting cannot.
+        card_sel = f"#col-{column['id']} .board-card:has-text('{title}')"
+        app.wait_for_selector(card_sel, timeout=TIMEOUT)
+        card = app.locator(card_sel)
         assert card.count() == 1, "the newly created card must be visible in its lane"
 
     def test_an_out_of_range_limit_is_refused_and_the_field_snaps_back(
