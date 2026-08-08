@@ -131,6 +131,19 @@ All notable changes to Octbase are documented here.
   starts following the redirect fails loudly instead of reaching a real server.
   No production code changed.
 
+- **The board lane-cap e2e test no longer fails on a slow redraw.**
+  `test_a_card_created_into_a_capped_lane_is_still_drawn` submitted the create
+  dialog, called `settle()`, and asserted on `locator.count()`. Creating a card
+  is API-backed and the lane redraws when the response lands, but `settle()`
+  budgets only `SHORT` and is documented never to raise, while `count()` takes
+  an immediate snapshot with no retry — so a redraw arriving a moment later read
+  as "the newly created card must be visible in its lane". It failed exactly
+  that way on CI during the 1.0.2 cut and passed on the identical tree minutes
+  afterwards, which is how a false red nearly cost a legitimate release tag. The
+  test now waits for the card with an API-length `wait_for_selector` and keeps
+  the count assertion, which still catches a card drawn twice — something
+  waiting alone cannot. No production code changed.
+
 - **The default `OCTBASE_SMTP_FROM` is now `noreply@octbase.io`** (was
   `noreply@beyags.com`), catching the fallback up with the domain rename. Every
   deployment sets the variable explicitly, so this changes nothing on a
